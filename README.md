@@ -98,7 +98,7 @@ This repository uses **Git submodules** to organize 40 independent components (a
 
 ```bash
 # Clone with all submodules
-git clone --recurse-submodules https://github.com/quikapp/quikapp.git
+git clone --recurse-submodules https://github.com/quikapp-dev/quikapp.git
 
 # Or if already cloned, initialize submodules
 git submodule update --init --recursive
@@ -138,13 +138,13 @@ Submodules currently use local paths. To add remote repositories:
 # Edit .gitmodules to update URLs
 [submodule "admin"]
     path = admin
-    url = https://github.com/your-org/quikapp-admin.git
+    url = https://github.com/quikapp-dev/admin.git
 
 # Sync the changes
 git submodule sync
 
 # Or use command line
-git submodule set-url admin https://github.com/your-org/quikapp-admin.git
+git submodule set-url admin https://github.com/quikapp-dev/admin.git
 ```
 
 ## Quick Start
@@ -161,7 +161,7 @@ git submodule set-url admin https://github.com/your-org/quikapp-admin.git
 
 ```bash
 # Clone the repository
-git clone https://github.com/quikapp/quikapp.git
+git clone https://github.com/quikapp-dev/quikapp.git
 cd quikapp
 
 # Copy environment file
