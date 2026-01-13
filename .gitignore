@@ -1,0 +1,106 @@
+# Environment files - NEVER commit real credentials
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+*.env
+
+# Keep example files
+!.env.example
+!.env.*.example
+
+# Dependencies
+node_modules/
+vendor/
+.pnp/
+.pnp.js
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+target/
+_build/
+deps/
+*.beam
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*.sublime-*
+
+# OS files
+.DS_Store
+Thumbs.db
+nul
+desktop.ini
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+firebase-debug*.log
+
+# Testing
+coverage/
+.nyc_output/
+htmlcov/
+.pytest_cache/
+__pycache__/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+tmpclaude-*
+
+# Secrets and keys - NEVER commit
+*.pem
+*.key
+*.p12
+*.pfx
+*-key.json
+*-credentials.json
+service-account*.json
+firebase-*.json
+
+# Database files
+*.sqlite
+*.sqlite3
+*.db
+
+# Mobile specific
+*.apk
+*.aab
+*.ipa
+.expo/
+android/.gradle/
+android/app/build/
+ios/Pods/
+ios/build/
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+!*.tfvars.example
+
+# Docker
+.docker/
+
+# Generated files
+generated/
+uploads/
+
+# Claude settings (keep local)
+.claude/settings.local.json

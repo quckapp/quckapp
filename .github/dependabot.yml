@@ -1,0 +1,153 @@
+# QuikApp Dependabot Configuration
+# Automatically creates PRs to update dependencies
+
+version: 2
+updates:
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "ci"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    reviewers:
+      - "quikapp/devops"
+    open-pull-requests-limit: 5
+
+  # Docker
+  - package-ecosystem: "docker"
+    directory: "/services/nestjs/backend-gateway"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "docker"
+    labels:
+      - "dependencies"
+      - "docker"
+    groups:
+      docker-images:
+        patterns:
+          - "*"
+
+  # Node.js (NestJS services)
+  - package-ecosystem: "npm"
+    directory: "/services/nestjs"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "deps(nestjs)"
+    labels:
+      - "dependencies"
+      - "javascript"
+      - "nestjs"
+    groups:
+      nestjs-core:
+        patterns:
+          - "@nestjs/*"
+      typescript:
+        patterns:
+          - "typescript"
+          - "@types/*"
+      testing:
+        patterns:
+          - "jest"
+          - "@jest/*"
+          - "supertest"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-patch"]
+    open-pull-requests-limit: 10
+
+  # Maven (Spring Boot services)
+  - package-ecosystem: "maven"
+    directory: "/services/spring"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "deps(spring)"
+    labels:
+      - "dependencies"
+      - "java"
+      - "spring-boot"
+    groups:
+      spring-boot:
+        patterns:
+          - "org.springframework.boot:*"
+          - "org.springframework:*"
+          - "org.springframework.security:*"
+    open-pull-requests-limit: 10
+
+  # Go modules
+  - package-ecosystem: "gomod"
+    directory: "/services/go"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "deps(go)"
+    labels:
+      - "dependencies"
+      - "go"
+    groups:
+      go-modules:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 10
+
+  # Python (pip)
+  - package-ecosystem: "pip"
+    directory: "/services/python"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "deps(python)"
+    labels:
+      - "dependencies"
+      - "python"
+    groups:
+      ml-frameworks:
+        patterns:
+          - "tensorflow*"
+          - "torch*"
+          - "scikit-learn"
+          - "pandas"
+          - "numpy"
+      flask:
+        patterns:
+          - "flask*"
+          - "gunicorn"
+          - "werkzeug"
+    open-pull-requests-limit: 10
+
+  # Elixir (Mix)
+  - package-ecosystem: "mix"
+    directory: "/services/elixir"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "deps(elixir)"
+    labels:
+      - "dependencies"
+      - "elixir"
+    groups:
+      phoenix:
+        patterns:
+          - "phoenix*"
+      ecto:
+        patterns:
+          - "ecto*"
+    open-pull-requests-limit: 10
+
+  # Helm charts
+  - package-ecosystem: "docker"
+    directory: "/infrastructure/helm/quikapp"
+    schedule:
+      interval: "monthly"
+    commit-message:
+      prefix: "deps(helm)"
+    labels:
+      - "dependencies"
+      - "helm"

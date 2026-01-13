@@ -1,0 +1,7 @@
+# Chart Releaser Configuration
+# Used by helm/chart-releaser-action
+
+owner: quikapp
+git-repo: quikapp
+charts-dir: helm
+pages-branch: gh-pages

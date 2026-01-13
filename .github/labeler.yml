@@ -1,0 +1,159 @@
+# QuikApp PR Labeler Configuration
+# Defines labels based on file paths
+
+# Stack labels
+nestjs:
+  - changed-files:
+      - any-glob-to-any-file: 'services/nestjs/**'
+
+spring-boot:
+  - changed-files:
+      - any-glob-to-any-file: 'services/spring/**'
+
+elixir:
+  - changed-files:
+      - any-glob-to-any-file: 'services/elixir/**'
+
+go:
+  - changed-files:
+      - any-glob-to-any-file: 'services/go/**'
+
+python:
+  - changed-files:
+      - any-glob-to-any-file: 'services/python/**'
+
+# Service area labels
+backend-gateway:
+  - changed-files:
+      - any-glob-to-any-file: 'services/nestjs/backend-gateway/**'
+
+auth:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'services/spring/auth-service/**'
+          - 'services/spring/permission-service/**'
+
+messaging:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'services/elixir/message-service/**'
+          - 'services/go/thread-service/**'
+          - 'services/go/channel-service/**'
+
+realtime:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'services/nestjs/realtime-service/**'
+          - 'services/elixir/presence-service/**'
+          - 'services/elixir/event-broadcast-service/**'
+
+media:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'services/go/media-service/**'
+          - 'services/go/file-service/**'
+          - 'services/go/cdn-service/**'
+          - 'services/go/attachment-service/**'
+
+analytics:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'services/python/analytics-service/**'
+          - 'services/python/insights-service/**'
+
+ml:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'services/python/ml-service/**'
+          - 'services/python/sentiment-service/**'
+          - 'services/python/smart-reply-service/**'
+          - 'services/python/moderation-service/**'
+
+# Infrastructure labels
+infrastructure:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'docker-compose*.yml'
+          - 'Dockerfile*'
+          - '.dockerignore'
+          - 'infrastructure/**'
+
+helm:
+  - changed-files:
+      - any-glob-to-any-file: 'infrastructure/helm/**'
+
+kubernetes:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'infrastructure/helm/**'
+          - 'infrastructure/k8s/**'
+
+monitoring:
+  - changed-files:
+      - any-glob-to-any-file: 'infrastructure/monitoring/**'
+
+# CI/CD labels
+ci:
+  - changed-files:
+      - any-glob-to-any-file: '.github/workflows/**'
+
+github-actions:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/workflows/**'
+          - '.github/actions/**'
+
+# Documentation labels
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'docs/**'
+          - '**/*.md'
+          - 'README*'
+
+# Database labels
+database:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/migrations/**'
+          - 'database/**'
+          - '**/*schema*'
+          - '**/*migration*'
+
+# Configuration labels
+config:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/.env*'
+          - '**/config/**'
+          - '**/*.yml'
+          - '**/*.yaml'
+          - '**/*.json'
+
+# Test labels
+tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/__tests__/**'
+          - '**/test/**'
+          - '**/tests/**'
+          - '**/*.test.*'
+          - '**/*.spec.*'
+          - '**/*_test.go'
+          - '**/*_test.exs'
+
+# Dependencies
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/package.json'
+          - '**/package-lock.json'
+          - '**/pnpm-lock.yaml'
+          - '**/yarn.lock'
+          - '**/pom.xml'
+          - '**/go.mod'
+          - '**/go.sum'
+          - '**/requirements*.txt'
+          - '**/pyproject.toml'
+          - '**/mix.exs'
+          - '**/mix.lock'

@@ -1,0 +1,41 @@
+# QuikApp Code Owners
+# These owners will be requested for review when someone opens a PR
+
+# Default owners for everything
+* @quikapp/core-team
+
+# NestJS services
+/services/nestjs/ @quikapp/backend-team @quikapp/nodejs-team
+
+# Spring Boot services
+/services/spring/ @quikapp/backend-team @quikapp/java-team
+
+# Elixir services
+/services/elixir/ @quikapp/backend-team @quikapp/elixir-team
+
+# Go services
+/services/go/ @quikapp/backend-team @quikapp/go-team
+
+# Python services
+/services/python/ @quikapp/backend-team @quikapp/python-team @quikapp/ml-team
+
+# Infrastructure
+/docker-compose*.yml @quikapp/devops-team
+/infrastructure/ @quikapp/devops-team @quikapp/sre-team
+
+# CI/CD
+/.github/ @quikapp/devops-team
+
+# Database schemas and migrations
+**/migrations/ @quikapp/backend-team @quikapp/dba-team
+**/schema* @quikapp/backend-team @quikapp/dba-team
+
+# Security-sensitive files
+**/auth*/ @quikapp/security-team
+**/permission*/ @quikapp/security-team
+**/*secret* @quikapp/security-team
+**/.env* @quikapp/security-team
+
+# Documentation
+/docs/ @quikapp/docs-team
+*.md @quikapp/docs-team

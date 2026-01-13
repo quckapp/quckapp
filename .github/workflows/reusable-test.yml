@@ -1,0 +1,177 @@
+# QuikApp Reusable Test Workflow
+# Can be called from other workflows to run tests for specific stacks
+
+name: Reusable Tests
+
+on:
+  workflow_call:
+    inputs:
+      stack:
+        description: 'Technology stack to test'
+        required: true
+        type: string
+      working-directory:
+        description: 'Working directory for the tests'
+        required: true
+        type: string
+      coverage-flag:
+        description: 'Coverage flag for Codecov'
+        required: false
+        type: string
+        default: ''
+    outputs:
+      test-result:
+        description: 'Test result (success/failure)'
+        value: ${{ jobs.test.outputs.result }}
+
+env:
+  NODE_VERSION: '20'
+  JAVA_VERSION: '17'
+  GO_VERSION: '1.21'
+  PYTHON_VERSION: '3.11'
+  ELIXIR_VERSION: '1.15'
+  OTP_VERSION: '26'
+
+jobs:
+  test:
+    name: Test ${{ inputs.stack }}
+    runs-on: ubuntu-latest
+    outputs:
+      result: ${{ steps.result.outputs.result }}
+
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ==========================================================================
+      # NestJS Setup
+      # ==========================================================================
+      - name: Setup pnpm
+        if: inputs.stack == 'nestjs'
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Setup Node.js
+        if: inputs.stack == 'nestjs'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          cache-dependency-path: ${{ inputs.working-directory }}/pnpm-lock.yaml
+
+      - name: Install dependencies (NestJS)
+        if: inputs.stack == 'nestjs'
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests (NestJS)
+        if: inputs.stack == 'nestjs'
+        run: pnpm test:cov
+        env:
+          CI: true
+
+      # ==========================================================================
+      # Spring Boot Setup
+      # ==========================================================================
+      - name: Setup Java
+        if: inputs.stack == 'spring'
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Run tests (Spring)
+        if: inputs.stack == 'spring'
+        run: mvn test -B
+
+      # ==========================================================================
+      # Elixir Setup
+      # ==========================================================================
+      - name: Setup Elixir
+        if: inputs.stack == 'elixir'
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: ${{ env.ELIXIR_VERSION }}
+          otp-version: ${{ env.OTP_VERSION }}
+
+      - name: Cache deps (Elixir)
+        if: inputs.stack == 'elixir'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ inputs.working-directory }}/deps
+            ${{ inputs.working-directory }}/_build
+          key: ${{ runner.os }}-elixir-${{ env.ELIXIR_VERSION }}-${{ hashFiles('**/mix.lock') }}
+
+      - name: Install dependencies (Elixir)
+        if: inputs.stack == 'elixir'
+        run: mix deps.get
+
+      - name: Run tests (Elixir)
+        if: inputs.stack == 'elixir'
+        run: mix test --cover
+        env:
+          MIX_ENV: test
+
+      # ==========================================================================
+      # Go Setup
+      # ==========================================================================
+      - name: Setup Go
+        if: inputs.stack == 'go'
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: ${{ inputs.working-directory }}/go.sum
+
+      - name: Run tests (Go)
+        if: inputs.stack == 'go'
+        run: go test -v -race -coverprofile=coverage.out ./...
+
+      # ==========================================================================
+      # Python Setup
+      # ==========================================================================
+      - name: Setup Python
+        if: inputs.stack == 'python'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: ${{ inputs.working-directory }}/requirements*.txt
+
+      - name: Install dependencies (Python)
+        if: inputs.stack == 'python'
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run tests (Python)
+        if: inputs.stack == 'python'
+        run: pytest --cov=. --cov-report=xml -v
+        env:
+          PYTHONPATH: .
+
+      # ==========================================================================
+      # Coverage Upload
+      # ==========================================================================
+      - name: Upload coverage
+        if: inputs.coverage-flag != ''
+        uses: codecov/codecov-action@v3
+        with:
+          flags: ${{ inputs.coverage-flag }}
+          fail_ci_if_error: false
+
+      - name: Set result
+        id: result
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "result=success" >> $GITHUB_OUTPUT
+          else
+            echo "result=failure" >> $GITHUB_OUTPUT
+          fi
