@@ -90,6 +90,63 @@ QuikApp/
 - Cloud Firestore
 - Firebase Hosting
 
+## Repository Setup
+
+This repository uses **Git submodules** to organize 40 independent components (apps, services, infrastructure).
+
+### Cloning the Repository
+
+```bash
+# Clone with all submodules
+git clone --recurse-submodules https://github.com/quikapp/quikapp.git
+
+# Or if already cloned, initialize submodules
+git submodule update --init --recursive
+```
+
+### Working with Submodules
+
+```bash
+# Update all submodules to latest commits
+git submodule update --remote --merge
+
+# Pull changes in main repo and all submodules
+git pull --recurse-submodules
+
+# Check submodule status
+git submodule status
+
+# Run command in all submodules
+git submodule foreach 'git status'
+```
+
+### Submodule Structure
+
+| Category | Submodules |
+|----------|------------|
+| **Apps** | `admin`, `web`, `mobile` |
+| **Documentation** | `docs` |
+| **Infrastructure** | `infrastructure` |
+| **Packages** | `packages/api-client` |
+| **Services** | 33 microservices in `services/*` |
+
+### Adding Remote URLs
+
+Submodules currently use local paths. To add remote repositories:
+
+```bash
+# Edit .gitmodules to update URLs
+[submodule "admin"]
+    path = admin
+    url = https://github.com/your-org/quikapp-admin.git
+
+# Sync the changes
+git submodule sync
+
+# Or use command line
+git submodule set-url admin https://github.com/your-org/quikapp-admin.git
+```
+
 ## Quick Start
 
 ### Prerequisites
