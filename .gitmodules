@@ -1,0 +1,117 @@
+[submodule "admin"]
+	path = admin
+	url = ./admin
+[submodule "docs"]
+	path = docs
+	url = ./docs
+[submodule "infrastructure"]
+	path = infrastructure
+	url = ./infrastructure
+[submodule "mobile"]
+	path = mobile
+	url = ./mobile
+[submodule "web"]
+	path = web
+	url = ./web
+[submodule "packages/api-client"]
+	path = packages/api-client
+	url = ./packages/api-client
+[submodule "services/admin-service"]
+	path = services/admin-service
+	url = ./services/admin-service
+[submodule "services/analytics-service"]
+	path = services/analytics-service
+	url = ./services/analytics-service
+[submodule "services/attachment-service"]
+	path = services/attachment-service
+	url = ./services/attachment-service
+[submodule "services/audit-service"]
+	path = services/audit-service
+	url = ./services/audit-service
+[submodule "services/auth-service"]
+	path = services/auth-service
+	url = ./services/auth-service
+[submodule "services/backend-gateway"]
+	path = services/backend-gateway
+	url = ./services/backend-gateway
+[submodule "services/bookmark-service"]
+	path = services/bookmark-service
+	url = ./services/bookmark-service
+[submodule "services/call-service"]
+	path = services/call-service
+	url = ./services/call-service
+[submodule "services/cdn-service"]
+	path = services/cdn-service
+	url = ./services/cdn-service
+[submodule "services/channel-service"]
+	path = services/channel-service
+	url = ./services/channel-service
+[submodule "services/event-broadcast-service"]
+	path = services/event-broadcast-service
+	url = ./services/event-broadcast-service
+[submodule "services/export-service"]
+	path = services/export-service
+	url = ./services/export-service
+[submodule "services/file-service"]
+	path = services/file-service
+	url = ./services/file-service
+[submodule "services/huddle-service"]
+	path = services/huddle-service
+	url = ./services/huddle-service
+[submodule "services/insights-service"]
+	path = services/insights-service
+	url = ./services/insights-service
+[submodule "services/integration-service"]
+	path = services/integration-service
+	url = ./services/integration-service
+[submodule "services/media-service"]
+	path = services/media-service
+	url = ./services/media-service
+[submodule "services/message-service"]
+	path = services/message-service
+	url = ./services/message-service
+[submodule "services/ml-service"]
+	path = services/ml-service
+	url = ./services/ml-service
+[submodule "services/moderation-service"]
+	path = services/moderation-service
+	url = ./services/moderation-service
+[submodule "services/notification-orchestrator"]
+	path = services/notification-orchestrator
+	url = ./services/notification-orchestrator
+[submodule "services/notification-service"]
+	path = services/notification-service
+	url = ./services/notification-service
+[submodule "services/permission-service"]
+	path = services/permission-service
+	url = ./services/permission-service
+[submodule "services/presence-service"]
+	path = services/presence-service
+	url = ./services/presence-service
+[submodule "services/realtime-service"]
+	path = services/realtime-service
+	url = ./services/realtime-service
+[submodule "services/reminder-service"]
+	path = services/reminder-service
+	url = ./services/reminder-service
+[submodule "services/search-service"]
+	path = services/search-service
+	url = ./services/search-service
+[submodule "services/sentiment-service"]
+	path = services/sentiment-service
+	url = ./services/sentiment-service
+[submodule "services/smart-reply-service"]
+	path = services/smart-reply-service
+	url = ./services/smart-reply-service
+[submodule "services/spark-etl"]
+	path = services/spark-etl
+	url = ./services/spark-etl
+[submodule "services/thread-service"]
+	path = services/thread-service
+	url = ./services/thread-service
+[submodule "services/user-service"]
+	path = services/user-service
+	url = ./services/user-service
+[submodule "services/workspace-service"]
+	path = services/workspace-service
+	url = ./services/workspace-service
