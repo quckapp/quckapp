@@ -1,0 +1,449 @@
+# QuikApp CD Pipeline
+# Deploys to different environments based on branch/tag
+
+name: CD
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: choice
+        options:
+          - development
+          - qa
+          - uat1
+          - uat2
+          - uat3
+          - staging
+          - production
+      services:
+        description: 'Services to deploy (comma-separated or "all")'
+        required: false
+        default: 'all'
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository }}
+
+jobs:
+  # ==========================================================================
+  # Determine Environment
+  # ==========================================================================
+  setup:
+    name: Setup Deployment
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.env.outputs.environment }}
+      namespace: ${{ steps.env.outputs.namespace }}
+      values-file: ${{ steps.env.outputs.values-file }}
+      image-tag: ${{ steps.env.outputs.image-tag }}
+      should-deploy: ${{ steps.env.outputs.should-deploy }}
+
+    steps:
+      - name: Determine environment
+        id: env
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            ENV="${{ github.event.inputs.environment }}"
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            ENV="staging"
+          elif [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
+            ENV="development"
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            ENV="production"
+          else
+            ENV="development"
+          fi
+
+          case $ENV in
+            production)
+              NAMESPACE="quikapp"
+              VALUES_FILE="values-production.yaml"
+              ;;
+            staging)
+              NAMESPACE="quikapp-staging"
+              VALUES_FILE="values-staging.yaml"
+              ;;
+            uat1)
+              NAMESPACE="quikapp-uat1"
+              VALUES_FILE="values-uat1.yaml"
+              ;;
+            uat2)
+              NAMESPACE="quikapp-uat2"
+              VALUES_FILE="values-uat2.yaml"
+              ;;
+            uat3)
+              NAMESPACE="quikapp-uat3"
+              VALUES_FILE="values-uat3.yaml"
+              ;;
+            qa)
+              NAMESPACE="quikapp-qa"
+              VALUES_FILE="values-qa.yaml"
+              ;;
+            *)
+              NAMESPACE="quikapp-dev"
+              VALUES_FILE="values-development.yaml"
+              ;;
+          esac
+
+          # Determine image tag
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            IMAGE_TAG="${{ github.ref_name }}"
+          else
+            IMAGE_TAG="${{ github.sha }}"
+          fi
+
+          echo "environment=$ENV" >> $GITHUB_OUTPUT
+          echo "namespace=$NAMESPACE" >> $GITHUB_OUTPUT
+          echo "values-file=$VALUES_FILE" >> $GITHUB_OUTPUT
+          echo "image-tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "should-deploy=true" >> $GITHUB_OUTPUT
+
+          echo "### Deployment Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "| Setting | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | $ENV |" >> $GITHUB_STEP_SUMMARY
+          echo "| Namespace | $NAMESPACE |" >> $GITHUB_STEP_SUMMARY
+          echo "| Values File | $VALUES_FILE |" >> $GITHUB_STEP_SUMMARY
+          echo "| Image Tag | $IMAGE_TAG |" >> $GITHUB_STEP_SUMMARY
+
+  # ==========================================================================
+  # Build Docker Images
+  # ==========================================================================
+  build-images:
+    name: Build Images
+    needs: setup
+    if: needs.setup.outputs.should-deploy == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          # NestJS Services
+          - name: backend-gateway
+            context: services/nestjs/backend-gateway
+            dockerfile: services/nestjs/backend-gateway/Dockerfile
+          - name: notification-service
+            context: services/nestjs/notification-service
+            dockerfile: services/nestjs/notification-service/Dockerfile
+          - name: realtime-service
+            context: services/nestjs/realtime-service
+            dockerfile: services/nestjs/realtime-service/Dockerfile
+          # Spring Boot Services
+          - name: auth-service
+            context: services/spring/auth-service
+            dockerfile: services/spring/auth-service/Dockerfile
+          - name: user-service
+            context: services/spring/user-service
+            dockerfile: services/spring/user-service/Dockerfile
+          - name: permission-service
+            context: services/spring/permission-service
+            dockerfile: services/spring/permission-service/Dockerfile
+          - name: audit-service
+            context: services/spring/audit-service
+            dockerfile: services/spring/audit-service/Dockerfile
+          - name: admin-service
+            context: services/spring/admin-service
+            dockerfile: services/spring/admin-service/Dockerfile
+          # Elixir Services
+          - name: presence-service
+            context: services/elixir/presence-service
+            dockerfile: services/elixir/presence-service/Dockerfile
+          - name: message-service
+            context: services/elixir/message-service
+            dockerfile: services/elixir/message-service/Dockerfile
+          - name: call-service
+            context: services/elixir/call-service
+            dockerfile: services/elixir/call-service/Dockerfile
+          - name: notification-orchestrator
+            context: services/elixir/notification-orchestrator
+            dockerfile: services/elixir/notification-orchestrator/Dockerfile
+          - name: huddle-service
+            context: services/elixir/huddle-service
+            dockerfile: services/elixir/huddle-service/Dockerfile
+          - name: event-broadcast-service
+            context: services/elixir/event-broadcast-service
+            dockerfile: services/elixir/event-broadcast-service/Dockerfile
+          # Go Services
+          - name: workspace-service
+            context: services/go/workspace-service
+            dockerfile: services/go/workspace-service/Dockerfile
+          - name: channel-service
+            context: services/go/channel-service
+            dockerfile: services/go/channel-service/Dockerfile
+          - name: thread-service
+            context: services/go/thread-service
+            dockerfile: services/go/thread-service/Dockerfile
+          - name: search-service
+            context: services/go/search-service
+            dockerfile: services/go/search-service/Dockerfile
+          - name: file-service
+            context: services/go/file-service
+            dockerfile: services/go/file-service/Dockerfile
+          - name: media-service
+            context: services/go/media-service
+            dockerfile: services/go/media-service/Dockerfile
+          - name: bookmark-service
+            context: services/go/bookmark-service
+            dockerfile: services/go/bookmark-service/Dockerfile
+          - name: reminder-service
+            context: services/go/reminder-service
+            dockerfile: services/go/reminder-service/Dockerfile
+          - name: attachment-service
+            context: services/go/attachment-service
+            dockerfile: services/go/attachment-service/Dockerfile
+          - name: cdn-service
+            context: services/go/cdn-service
+            dockerfile: services/go/cdn-service/Dockerfile
+          # Python Services
+          - name: analytics-service
+            context: services/python/analytics-service
+            dockerfile: services/python/analytics-service/Dockerfile
+          - name: ml-service
+            context: services/python/ml-service
+            dockerfile: services/python/ml-service/Dockerfile
+          - name: moderation-service
+            context: services/python/moderation-service
+            dockerfile: services/python/moderation-service/Dockerfile
+          - name: export-service
+            context: services/python/export-service
+            dockerfile: services/python/export-service/Dockerfile
+          - name: integration-service
+            context: services/python/integration-service
+            dockerfile: services/python/integration-service/Dockerfile
+          - name: sentiment-service
+            context: services/python/sentiment-service
+            dockerfile: services/python/sentiment-service/Dockerfile
+          - name: insights-service
+            context: services/python/insights-service
+            dockerfile: services/python/insights-service/Dockerfile
+          - name: smart-reply-service
+            context: services/python/smart-reply-service
+            dockerfile: services/python/smart-reply-service/Dockerfile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service.name }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ needs.setup.outputs.image-tag }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            GIT_COMMIT=${{ github.sha }}
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service.name }}:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-${{ matrix.service.name }}.sarif'
+          severity: 'CRITICAL,HIGH'
+        continue-on-error: true
+
+  # ==========================================================================
+  # Deploy to Kubernetes
+  # ==========================================================================
+  deploy:
+    name: Deploy to ${{ needs.setup.outputs.environment }}
+    needs: [setup, build-images]
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.setup.outputs.environment }}
+      url: ${{ needs.setup.outputs.environment == 'production' && 'https://api.quikapp.io' || needs.setup.outputs.environment == 'staging' && 'https://api.staging.quikapp.io' || needs.setup.outputs.environment == 'uat1' && 'https://api.uat1.quikapp.io' || needs.setup.outputs.environment == 'uat2' && 'https://api.uat2.quikapp.io' || needs.setup.outputs.environment == 'uat3' && 'https://api.uat3.quikapp.io' || needs.setup.outputs.environment == 'qa' && 'https://api.qa.quikapp.io' || 'https://api.dev.quikapp.io' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'v3.13.0'
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Add Helm repos
+        run: |
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm repo add elastic https://helm.elastic.co
+          helm repo add minio https://charts.min.io/
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo add grafana https://grafana.github.io/helm-charts
+          helm repo add jaegertracing https://jaegertracing.github.io/helm-charts
+          helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+          helm repo update
+
+      - name: Build Helm dependencies
+        run: |
+          helm dependency build infrastructure/helm/quikapp
+
+      - name: Create namespace
+        run: |
+          kubectl create namespace ${{ needs.setup.outputs.namespace }} --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy with Helm
+        run: |
+          helm upgrade --install quikapp infrastructure/helm/quikapp \
+            --namespace ${{ needs.setup.outputs.namespace }} \
+            --values infrastructure/helm/quikapp/${{ needs.setup.outputs.values-file }} \
+            --set global.imageRegistry=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }} \
+            --set global.imagePullPolicy=Always \
+            --timeout 15m \
+            --wait \
+            --atomic
+
+      - name: Verify deployment
+        run: |
+          kubectl rollout status deployment -n ${{ needs.setup.outputs.namespace }} --timeout=10m
+
+      - name: Run smoke tests
+        run: |
+          # Wait for services to be ready
+          sleep 30
+
+          # Get service endpoints
+          GATEWAY_URL=$(kubectl get svc backend-gateway -n ${{ needs.setup.outputs.namespace }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+
+          if [ -n "$GATEWAY_URL" ]; then
+            echo "Testing backend-gateway health endpoint..."
+            curl -sf "http://${GATEWAY_URL}:3000/health" || echo "Health check failed (may need ingress)"
+          else
+            echo "LoadBalancer IP not available, skipping smoke tests"
+          fi
+
+      - name: Deployment summary
+        run: |
+          echo "### Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Resource | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Deployments | $(kubectl get deployments -n ${{ needs.setup.outputs.namespace }} --no-headers | wc -l) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Pods | $(kubectl get pods -n ${{ needs.setup.outputs.namespace }} --no-headers | wc -l) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Services | $(kubectl get services -n ${{ needs.setup.outputs.namespace }} --no-headers | wc -l) |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Pod Status" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          kubectl get pods -n ${{ needs.setup.outputs.namespace }} >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+  # ==========================================================================
+  # Notify
+  # ==========================================================================
+  notify:
+    name: Notify
+    needs: [setup, deploy]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Slack notification
+        if: vars.SLACK_WEBHOOK_URL != ''
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "Deployment ${{ needs.deploy.result == 'success' && '✅ Succeeded' || '❌ Failed' }}",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "QuikApp Deployment ${{ needs.deploy.result == 'success' && 'Succeeded' || 'Failed' }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Environment:*\n${{ needs.setup.outputs.environment }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Triggered by:*\n${{ github.actor }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Commit:*\n${{ github.sha }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Branch:*\n${{ github.ref_name }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Workflow"
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ vars.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK

@@ -1,0 +1,109 @@
+name: Kubernetes Deploy All Environments
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        type: choice
+        options:
+          - dev
+          - qa
+          - uat1
+          - uat2
+          - uat3
+          - staging
+          - live
+      image_tag:
+        description: 'Image tag to deploy'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
+
+jobs:
+  deploy:
+    name: Deploy to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-eks-${{ inputs.environment }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Setup Kustomize
+        uses: imranismail/setup-kustomize@v2
+
+      - name: Update kubeconfig
+        run: |
+          CLUSTER_NAME="quikapp-${{ inputs.environment }}"
+          if [[ "${{ inputs.environment }}" == "live" ]]; then
+            CLUSTER_NAME="quikapp-prod"
+          fi
+          aws eks update-kubeconfig --name $CLUSTER_NAME --region ${{ env.AWS_REGION }}
+
+      - name: Update image tags
+        run: |
+          cd infrastructure/k8s/overlays/${{ inputs.environment }}
+          kustomize edit set image \
+            quikapp/api=${{ env.ECR_REGISTRY }}/quikapp/api:${{ inputs.image_tag }} \
+            quikapp/worker=${{ env.ECR_REGISTRY }}/quikapp/worker:${{ inputs.image_tag }}
+
+      - name: Deploy
+        run: |
+          kustomize build infrastructure/k8s/overlays/${{ inputs.environment }} | kubectl apply -f -
+
+      - name: Wait for rollout
+        run: |
+          PREFIX="${{ inputs.environment }}"
+          NAMESPACE="quikapp-${{ inputs.environment }}"
+
+          kubectl rollout status deployment/${PREFIX}-quikapp-api -n ${NAMESPACE} --timeout=600s
+          kubectl rollout status deployment/${PREFIX}-quikapp-worker -n ${NAMESPACE} --timeout=600s
+
+      - name: Verify deployment
+        run: |
+          NAMESPACE="quikapp-${{ inputs.environment }}"
+          echo "=== Pods ==="
+          kubectl get pods -n ${NAMESPACE} -l app.kubernetes.io/name=quikapp
+          echo ""
+          echo "=== Services ==="
+          kubectl get svc -n ${NAMESPACE}
+          echo ""
+          echo "=== Ingress ==="
+          kubectl get ingress -n ${NAMESPACE}
+
+      - name: Run smoke tests
+        if: inputs.environment == 'staging' || inputs.environment == 'live'
+        run: |
+          NAMESPACE="quikapp-${{ inputs.environment }}"
+          PREFIX="${{ inputs.environment }}"
+
+          # Get API service endpoint
+          API_SVC=$(kubectl get svc ${PREFIX}-quikapp-api -n ${NAMESPACE} -o jsonpath='{.spec.clusterIP}')
+
+          # Run health check via kubectl exec
+          kubectl run smoke-test --rm -it --restart=Never \
+            --image=curlimages/curl:latest \
+            -n ${NAMESPACE} \
+            -- curl -sf "http://${API_SVC}/health/live" || exit 1
+
+          echo "Smoke tests passed!"
