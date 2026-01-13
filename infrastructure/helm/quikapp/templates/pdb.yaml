@@ -1,0 +1,72 @@
+{{/*
+Generate PodDisruptionBudgets for all enabled services
+*/}}
+{{- if .Values.podDisruptionBudget.enabled }}
+
+{{- $services := dict
+  "backendGateway" .Values.backendGateway
+  "notificationService" .Values.notificationService
+  "realtimeService" .Values.realtimeService
+  "authService" .Values.authService
+  "userService" .Values.userService
+  "permissionService" .Values.permissionService
+  "auditService" .Values.auditService
+  "adminService" .Values.adminService
+  "presenceService" .Values.presenceService
+  "messageService" .Values.messageService
+  "callService" .Values.callService
+  "notificationOrchestrator" .Values.notificationOrchestrator
+  "huddleService" .Values.huddleService
+  "eventBroadcastService" .Values.eventBroadcastService
+  "workspaceService" .Values.workspaceService
+  "channelService" .Values.channelService
+  "threadService" .Values.threadService
+  "searchService" .Values.searchService
+  "fileService" .Values.fileService
+  "mediaService" .Values.mediaService
+  "bookmarkService" .Values.bookmarkService
+  "reminderService" .Values.reminderService
+  "attachmentService" .Values.attachmentService
+  "cdnService" .Values.cdnService
+  "analyticsService" .Values.analyticsService
+  "mlService" .Values.mlService
+  "moderationService" .Values.moderationService
+  "exportService" .Values.exportService
+  "integrationService" .Values.integrationService
+  "sentimentService" .Values.sentimentService
+  "insightsService" .Values.insightsService
+  "smartReplyService" .Values.smartReplyService
+-}}
+
+{{- range $key, $service := $services }}
+{{- if $service.enabled }}
+{{- $replicaCount := $service.replicaCount | default 1 }}
+{{- if gt (int $replicaCount) 1 }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $service.name }}
+  namespace: {{ $.Values.global.namespace | default $.Release.Namespace }}
+  labels:
+    {{- include "quikapp.serviceLabels" (dict "root" $ "serviceName" $service.name "component" "backend") | nindent 4 }}
+spec:
+  {{- if $service.pdb }}
+  {{- if $service.pdb.minAvailable }}
+  minAvailable: {{ $service.pdb.minAvailable }}
+  {{- else if $service.pdb.maxUnavailable }}
+  maxUnavailable: {{ $service.pdb.maxUnavailable }}
+  {{- else }}
+  minAvailable: {{ $.Values.podDisruptionBudget.minAvailable | default 1 }}
+  {{- end }}
+  {{- else }}
+  minAvailable: {{ $.Values.podDisruptionBudget.minAvailable | default 1 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "quikapp.serviceSelectorLabels" (dict "root" $ "serviceName" $service.name) | nindent 6 }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{- end }}

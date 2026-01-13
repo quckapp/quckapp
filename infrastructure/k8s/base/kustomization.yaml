@@ -1,0 +1,100 @@
+# =============================================================================
+# KUSTOMIZE BASE CONFIGURATION
+# =============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: quikapp-base
+
+# Common labels applied to all resources
+commonLabels:
+  app.kubernetes.io/part-of: quikapp
+  app.kubernetes.io/managed-by: kustomize
+
+# Namespace for all resources
+namespace: quikapp
+
+# Base resources
+resources:
+  # Base configuration
+  - namespace.yaml
+  - configmap.yaml
+  - secrets.yaml
+  - rbac.yaml
+  - network-policies.yaml
+
+  # Spring Boot services
+  - ../services/spring-boot/auth-service.yaml
+  - ../services/spring-boot/user-service.yaml
+  - ../services/spring-boot/admin-services.yaml
+
+  # NestJS services
+  - ../services/nestjs/backend-gateway.yaml
+  - ../services/nestjs/notification-realtime.yaml
+
+  # Go services
+  - ../services/go/core-services.yaml
+
+  # Elixir services
+  - ../services/elixir/realtime-services.yaml
+
+  # Python services
+  - ../services/python/analytics-ml-services.yaml
+
+  # Ingress
+  - ../ingress/ingress.yaml
+
+# ConfigMap generator for common configuration
+configMapGenerator:
+  - name: quikapp-version
+    literals:
+      - VERSION=latest
+      - BUILD_DATE=unknown
+
+# Image configuration (overridden per environment)
+images:
+  - name: quikapp.azurecr.io/backend-gateway
+    newTag: latest
+  - name: quikapp.azurecr.io/auth-service
+    newTag: latest
+  - name: quikapp.azurecr.io/user-service
+    newTag: latest
+  - name: quikapp.azurecr.io/workspace-service
+    newTag: latest
+  - name: quikapp.azurecr.io/channel-service
+    newTag: latest
+  - name: quikapp.azurecr.io/thread-service
+    newTag: latest
+  - name: quikapp.azurecr.io/search-service
+    newTag: latest
+  - name: quikapp.azurecr.io/file-service
+    newTag: latest
+  - name: quikapp.azurecr.io/media-service
+    newTag: latest
+  - name: quikapp.azurecr.io/notification-service
+    newTag: latest
+  - name: quikapp.azurecr.io/realtime-service
+    newTag: latest
+  - name: quikapp.azurecr.io/presence-service
+    newTag: latest
+  - name: quikapp.azurecr.io/message-service
+    newTag: latest
+  - name: quikapp.azurecr.io/call-service
+    newTag: latest
+  - name: quikapp.azurecr.io/huddle-service
+    newTag: latest
+  - name: quikapp.azurecr.io/analytics-service
+    newTag: latest
+  - name: quikapp.azurecr.io/ml-service
+    newTag: latest
+  - name: quikapp.azurecr.io/moderation-service
+    newTag: latest
+  - name: quikapp.azurecr.io/sentiment-service
+    newTag: latest
+  - name: quikapp.azurecr.io/permission-service
+    newTag: latest
+  - name: quikapp.azurecr.io/audit-service
+    newTag: latest
+  - name: quikapp.azurecr.io/admin-service
+    newTag: latest

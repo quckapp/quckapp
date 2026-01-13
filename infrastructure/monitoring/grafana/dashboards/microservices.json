@@ -1,0 +1,206 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "gridPos": { "h": 2, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "content": "# Microservices Metrics\nDetailed metrics for all 32 QuikApp microservices", "mode": "markdown" },
+      "type": "text"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [{ "options": { "0": { "color": "red", "text": "DOWN" }, "1": { "color": "green", "text": "UP" } }, "type": "value" }],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 2 },
+      "id": 2,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        { "expr": "up{service=\"auth-service\"}", "legendFormat": "auth-service", "refId": "A" },
+        { "expr": "up{service=\"user-service\"}", "legendFormat": "user-service", "refId": "B" },
+        { "expr": "up{service=\"permission-service\"}", "legendFormat": "permission-service", "refId": "C" },
+        { "expr": "up{service=\"audit-service\"}", "legendFormat": "audit-service", "refId": "D" },
+        { "expr": "up{service=\"admin-service\"}", "legendFormat": "admin-service", "refId": "E" },
+        { "expr": "up{service=\"backend-gateway\"}", "legendFormat": "backend-gateway", "refId": "F" },
+        { "expr": "up{service=\"notification-service\"}", "legendFormat": "notification-service", "refId": "G" },
+        { "expr": "up{service=\"realtime-service\"}", "legendFormat": "realtime-service", "refId": "H" },
+        { "expr": "up{service=\"presence-service\"}", "legendFormat": "presence-service", "refId": "I" },
+        { "expr": "up{service=\"call-service\"}", "legendFormat": "call-service", "refId": "J" },
+        { "expr": "up{service=\"message-service\"}", "legendFormat": "message-service", "refId": "K" },
+        { "expr": "up{service=\"notification-orchestrator\"}", "legendFormat": "notification-orchestrator", "refId": "L" },
+        { "expr": "up{service=\"huddle-service\"}", "legendFormat": "huddle-service", "refId": "M" },
+        { "expr": "up{service=\"event-broadcast-service\"}", "legendFormat": "event-broadcast-service", "refId": "N" },
+        { "expr": "up{service=\"media-service\"}", "legendFormat": "media-service", "refId": "O" },
+        { "expr": "up{service=\"file-service\"}", "legendFormat": "file-service", "refId": "P" },
+        { "expr": "up{service=\"workspace-service\"}", "legendFormat": "workspace-service", "refId": "Q" },
+        { "expr": "up{service=\"channel-service\"}", "legendFormat": "channel-service", "refId": "R" },
+        { "expr": "up{service=\"search-service\"}", "legendFormat": "search-service", "refId": "S" },
+        { "expr": "up{service=\"thread-service\"}", "legendFormat": "thread-service", "refId": "T" },
+        { "expr": "up{service=\"bookmark-service\"}", "legendFormat": "bookmark-service", "refId": "U" },
+        { "expr": "up{service=\"reminder-service\"}", "legendFormat": "reminder-service", "refId": "V" },
+        { "expr": "up{service=\"attachment-service\"}", "legendFormat": "attachment-service", "refId": "W" },
+        { "expr": "up{service=\"cdn-service\"}", "legendFormat": "cdn-service", "refId": "X" },
+        { "expr": "up{service=\"analytics-service\"}", "legendFormat": "analytics-service", "refId": "Y" },
+        { "expr": "up{service=\"ml-service\"}", "legendFormat": "ml-service", "refId": "Z" },
+        { "expr": "up{service=\"moderation-service\"}", "legendFormat": "moderation-service", "refId": "AA" },
+        { "expr": "up{service=\"export-service\"}", "legendFormat": "export-service", "refId": "AB" },
+        { "expr": "up{service=\"integration-service\"}", "legendFormat": "integration-service", "refId": "AC" },
+        { "expr": "up{service=\"sentiment-service\"}", "legendFormat": "sentiment-service", "refId": "AD" },
+        { "expr": "up{service=\"insights-service\"}", "legendFormat": "insights-service", "refId": "AE" },
+        { "expr": "up{service=\"smart-reply-service\"}", "legendFormat": "smart-reply-service", "refId": "AF" }
+      ],
+      "title": "Service Health Status",
+      "transformations": [{ "id": "merge", "options": {} }],
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "barAlignment": 0, "drawStyle": "line", "fillOpacity": 10, "gradientMode": "none", "hideFrom": { "legend": false, "tooltip": false, "viz": false }, "lineInterpolation": "linear", "lineWidth": 1, "pointSize": 5, "scaleDistribution": { "type": "linear" }, "showPoints": "auto", "spanNulls": false, "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "off" } },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "reqps"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 10 },
+      "id": 3,
+      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "sum(rate(http_requests_total{stack=\"spring-boot\"}[5m])) by (service)", "legendFormat": "{{service}}", "refId": "A" }
+      ],
+      "title": "Spring Boot Request Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "barAlignment": 0, "drawStyle": "line", "fillOpacity": 10, "gradientMode": "none", "hideFrom": { "legend": false, "tooltip": false, "viz": false }, "lineInterpolation": "linear", "lineWidth": 1, "pointSize": 5, "scaleDistribution": { "type": "linear" }, "showPoints": "auto", "spanNulls": false, "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "off" } },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "reqps"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 10 },
+      "id": 4,
+      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "sum(rate(http_requests_total{stack=\"nestjs\"}[5m])) by (service)", "legendFormat": "{{service}}", "refId": "A" }
+      ],
+      "title": "NestJS Request Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "barAlignment": 0, "drawStyle": "line", "fillOpacity": 10, "gradientMode": "none", "hideFrom": { "legend": false, "tooltip": false, "viz": false }, "lineInterpolation": "linear", "lineWidth": 1, "pointSize": 5, "scaleDistribution": { "type": "linear" }, "showPoints": "auto", "spanNulls": false, "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "off" } },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "reqps"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
+      "id": 5,
+      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "sum(rate(http_requests_total{stack=\"elixir\"}[5m])) by (service)", "legendFormat": "{{service}}", "refId": "A" }
+      ],
+      "title": "Elixir Request Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "barAlignment": 0, "drawStyle": "line", "fillOpacity": 10, "gradientMode": "none", "hideFrom": { "legend": false, "tooltip": false, "viz": false }, "lineInterpolation": "linear", "lineWidth": 1, "pointSize": 5, "scaleDistribution": { "type": "linear" }, "showPoints": "auto", "spanNulls": false, "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "off" } },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "reqps"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 18 },
+      "id": 6,
+      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "sum(rate(http_requests_total{stack=\"go\"}[5m])) by (service)", "legendFormat": "{{service}}", "refId": "A" }
+      ],
+      "title": "Go Request Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "barAlignment": 0, "drawStyle": "line", "fillOpacity": 10, "gradientMode": "none", "hideFrom": { "legend": false, "tooltip": false, "viz": false }, "lineInterpolation": "linear", "lineWidth": 1, "pointSize": 5, "scaleDistribution": { "type": "linear" }, "showPoints": "auto", "spanNulls": false, "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "off" } },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "reqps"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 26 },
+      "id": 7,
+      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "sum(rate(http_requests_total{stack=\"python\"}[5m])) by (service)", "legendFormat": "{{service}}", "refId": "A" }
+      ],
+      "title": "Python Request Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "barAlignment": 0, "drawStyle": "line", "fillOpacity": 10, "gradientMode": "none", "hideFrom": { "legend": false, "tooltip": false, "viz": false }, "lineInterpolation": "linear", "lineWidth": 1, "pointSize": 5, "scaleDistribution": { "type": "linear" }, "showPoints": "auto", "spanNulls": false, "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "off" } },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 0.01 }, { "color": "red", "value": 0.05 }] },
+          "unit": "percentunit"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 26 },
+      "id": 8,
+      "options": { "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) by (service) / sum(rate(http_requests_total[5m])) by (service)", "legendFormat": "{{service}}", "refId": "A" }
+      ],
+      "title": "Error Rate by Service",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["quikapp", "microservices"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "QuikApp Microservices",
+  "uid": "quikapp-microservices",
+  "version": 1
+}

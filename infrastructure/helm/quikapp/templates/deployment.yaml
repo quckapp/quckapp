@@ -1,0 +1,205 @@
+{{/*
+Generate deployments for all microservices
+*/}}
+
+{{- $services := dict
+  "backendGateway" .Values.backendGateway
+  "notificationService" .Values.notificationService
+  "realtimeService" .Values.realtimeService
+  "authService" .Values.authService
+  "userService" .Values.userService
+  "permissionService" .Values.permissionService
+  "auditService" .Values.auditService
+  "adminService" .Values.adminService
+  "presenceService" .Values.presenceService
+  "messageService" .Values.messageService
+  "callService" .Values.callService
+  "notificationOrchestrator" .Values.notificationOrchestrator
+  "huddleService" .Values.huddleService
+  "eventBroadcastService" .Values.eventBroadcastService
+  "workspaceService" .Values.workspaceService
+  "channelService" .Values.channelService
+  "threadService" .Values.threadService
+  "searchService" .Values.searchService
+  "fileService" .Values.fileService
+  "mediaService" .Values.mediaService
+  "bookmarkService" .Values.bookmarkService
+  "reminderService" .Values.reminderService
+  "attachmentService" .Values.attachmentService
+  "cdnService" .Values.cdnService
+  "analyticsService" .Values.analyticsService
+  "mlService" .Values.mlService
+  "moderationService" .Values.moderationService
+  "exportService" .Values.exportService
+  "integrationService" .Values.integrationService
+  "sentimentService" .Values.sentimentService
+  "insightsService" .Values.insightsService
+  "smartReplyService" .Values.smartReplyService
+-}}
+
+{{- range $key, $service := $services }}
+{{- if $service.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $service.name }}
+  namespace: {{ $.Values.global.namespace | default $.Release.Namespace }}
+  labels:
+    {{- include "quikapp.serviceLabels" (dict "root" $ "serviceName" $service.name "component" "backend") | nindent 4 }}
+  annotations:
+    description: "QuikApp {{ $service.name }} deployment"
+spec:
+  {{- if not $service.autoscaling.enabled }}
+  replicas: {{ $service.replicaCount | default 1 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "quikapp.serviceSelectorLabels" (dict "root" $ "serviceName" $service.name) | nindent 6 }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+  template:
+    metadata:
+      labels:
+        {{- include "quikapp.serviceSelectorLabels" (dict "root" $ "serviceName" $service.name) | nindent 8 }}
+        app.kubernetes.io/part-of: quikapp
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ $service.service.port | quote }}
+        prometheus.io/path: "/metrics"
+    spec:
+      {{- if $.Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- range $.Values.global.imagePullSecrets }}
+        - name: {{ . }}
+        {{- end }}
+      {{- end }}
+      serviceAccountName: {{ include "quikapp.serviceAccountName" $ }}
+      securityContext:
+        {{- toYaml $.Values.global.podSecurityContext | nindent 8 }}
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: {{ $service.name }}
+          image: {{ include "quikapp.image" (dict "root" $ "image" $service.image) }}
+          imagePullPolicy: {{ $.Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ $service.service.port }}
+              protocol: TCP
+          {{- if $service.healthCheck }}
+          livenessProbe:
+            httpGet:
+              path: {{ $service.healthCheck.path }}
+              port: {{ $service.healthCheck.port }}
+            initialDelaySeconds: {{ $service.healthCheck.initialDelaySeconds | default 30 }}
+            periodSeconds: {{ $service.healthCheck.periodSeconds | default 10 }}
+            timeoutSeconds: {{ $service.healthCheck.timeoutSeconds | default 5 }}
+            failureThreshold: {{ $service.healthCheck.failureThreshold | default 3 }}
+          readinessProbe:
+            httpGet:
+              path: {{ $service.healthCheck.path }}
+              port: {{ $service.healthCheck.port }}
+            initialDelaySeconds: {{ $service.healthCheck.initialDelaySeconds | default 10 }}
+            periodSeconds: {{ $service.healthCheck.periodSeconds | default 5 }}
+            timeoutSeconds: {{ $service.healthCheck.timeoutSeconds | default 3 }}
+            failureThreshold: {{ $service.healthCheck.failureThreshold | default 3 }}
+          startupProbe:
+            httpGet:
+              path: {{ $service.healthCheck.path }}
+              port: {{ $service.healthCheck.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+          {{- end }}
+          env:
+            # Service-specific environment variables
+            {{- range $envKey, $envValue := $service.env }}
+            - name: {{ $envKey }}
+              value: {{ $envValue | quote }}
+            {{- end }}
+            # Tracing configuration
+            {{- if $.Values.global.tracing.enabled }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ $.Values.global.tracing.endpoint | quote }}
+            - name: OTEL_TRACES_SAMPLER
+              value: "parentbased_traceidratio"
+            - name: OTEL_TRACES_SAMPLER_ARG
+              value: {{ $.Values.global.tracing.samplingRatio | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: {{ $service.name | quote }}
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "service.name={{ $service.name }},service.namespace=quikapp,deployment.environment={{ $.Values.global.environment }}"
+            {{- end }}
+            # Logging configuration
+            - name: LOG_LEVEL
+              value: {{ $.Values.global.logging.level | quote }}
+            - name: LOG_FORMAT
+              value: {{ $.Values.global.logging.format | quote }}
+            # Pod metadata
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          {{- if $service.envFrom }}
+          envFrom:
+            {{- toYaml $service.envFrom | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- if $service.resources }}
+            {{- toYaml $service.resources | nindent 12 }}
+            {{- else }}
+            {{- toYaml $.Values.global.resources | nindent 12 }}
+            {{- end }}
+          securityContext:
+            {{- toYaml $.Values.global.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            {{- if $service.volumeMounts }}
+            {{- toYaml $service.volumeMounts | nindent 12 }}
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        {{- if $service.volumes }}
+        {{- toYaml $service.volumes | nindent 8 }}
+        {{- end }}
+      {{- with $service.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $service.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $service.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "quikapp.serviceSelectorLabels" (dict "root" $ "serviceName" $service.name) | nindent 14 }}
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "quikapp.serviceSelectorLabels" (dict "root" $ "serviceName" $service.name) | nindent 14 }}
+{{- end }}
+{{- end }}

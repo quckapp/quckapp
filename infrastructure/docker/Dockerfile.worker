@@ -1,0 +1,71 @@
+# =============================================================================
+# QuikApp Worker Dockerfile (Standalone)
+# =============================================================================
+# Alternative standalone Dockerfile for the Worker service.
+# Use if you prefer separate Dockerfiles per service.
+#
+# Build:
+#   docker build -f docker/Dockerfile.worker -t quikapp/worker .
+# =============================================================================
+
+FROM node:20-alpine AS base
+RUN apk add --no-cache libc6-compat curl tini ffmpeg imagemagick vips-tools
+WORKDIR /app
+
+# -----------------------------------------------------------------------------
+# Dependencies
+# -----------------------------------------------------------------------------
+FROM base AS deps
+COPY package.json package-lock.json* yarn.lock* pnpm-lock.yaml* ./
+RUN \
+    if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
+    elif [ -f package-lock.json ]; then npm ci; \
+    elif [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm i --frozen-lockfile; \
+    else echo "No lockfile found." && exit 1; fi
+
+# -----------------------------------------------------------------------------
+# Builder
+# -----------------------------------------------------------------------------
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npm run build && npm prune --production
+
+# -----------------------------------------------------------------------------
+# Production - Media Processing Worker
+# -----------------------------------------------------------------------------
+FROM base AS production
+
+LABEL org.opencontainers.image.title="QuikApp Worker"
+LABEL org.opencontainers.image.version="1.0.0"
+
+# Create non-root user
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 quikapp
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV WORKER_PORT=9090
+ENV WORKER_TYPE=media-processing
+ENV WORKER_CONCURRENCY=5
+
+# Copy application
+COPY --from=builder --chown=quikapp:nodejs /app/dist ./dist
+COPY --from=builder --chown=quikapp:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=quikapp:nodejs /app/package.json ./
+
+# Setup runtime directories
+RUN mkdir -p processing .cache /tmp && \
+    chown -R quikapp:nodejs processing .cache /tmp
+
+USER quikapp
+
+EXPOSE 9090
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:9090/health || exit 1
+
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["node", "dist/worker.js"]

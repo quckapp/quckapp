@@ -1,0 +1,361 @@
+{{/*
+Generate ingress for services that have ingress enabled
+*/}}
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "quikapp.fullname" . }}-api
+  namespace: {{ .Values.global.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "quikapp.labels" . | nindent 4 }}
+  annotations:
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    nginx.ingress.kubernetes.io/ssl-redirect: {{ .Values.global.tlsEnabled | quote }}
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- end }}
+  {{- if .Values.global.tlsEnabled }}
+  tls:
+    - hosts:
+        - api.{{ .Values.global.domain }}
+        - ws.{{ .Values.global.domain }}
+        - cdn.{{ .Values.global.domain }}
+      secretName: {{ .Values.global.tlsSecretName }}
+  {{- end }}
+  rules:
+    # API Gateway
+    - host: api.{{ .Values.global.domain }}
+      http:
+        paths:
+          {{- if .Values.backendGateway.enabled }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.backendGateway.name }}
+                port:
+                  number: {{ .Values.backendGateway.service.port }}
+          {{- end }}
+
+          # Auth Service
+          {{- if .Values.authService.enabled }}
+          {{- if .Values.authService.ingress.enabled }}
+          - path: {{ .Values.authService.ingress.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.authService.name }}
+                port:
+                  number: {{ .Values.authService.service.port }}
+          {{- end }}
+          {{- end }}
+
+          # User Service
+          {{- if .Values.userService.enabled }}
+          {{- if .Values.userService.ingress.enabled }}
+          - path: {{ .Values.userService.ingress.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.userService.name }}
+                port:
+                  number: {{ .Values.userService.service.port }}
+          {{- end }}
+          {{- end }}
+
+          # Message Service
+          {{- if .Values.messageService.enabled }}
+          {{- if .Values.messageService.ingress.enabled }}
+          - path: {{ .Values.messageService.ingress.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.messageService.name }}
+                port:
+                  number: {{ .Values.messageService.service.port }}
+          {{- end }}
+          {{- end }}
+
+          # Workspace Service
+          {{- if .Values.workspaceService.enabled }}
+          {{- if .Values.workspaceService.ingress.enabled }}
+          - path: {{ .Values.workspaceService.ingress.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.workspaceService.name }}
+                port:
+                  number: {{ .Values.workspaceService.service.port }}
+          {{- end }}
+          {{- end }}
+
+          # Channel Service
+          {{- if .Values.channelService.enabled }}
+          {{- if .Values.channelService.ingress.enabled }}
+          - path: {{ .Values.channelService.ingress.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.channelService.name }}
+                port:
+                  number: {{ .Values.channelService.service.port }}
+          {{- end }}
+          {{- end }}
+
+          # Thread Service
+          {{- if .Values.threadService.enabled }}
+          {{- if .Values.threadService.ingress.enabled }}
+          - path: {{ .Values.threadService.ingress.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.threadService.name }}
+                port:
+                  number: {{ .Values.threadService.service.port }}
+          {{- end }}
+          {{- end }}
+
+          # Search Service
+          {{- if .Values.searchService.enabled }}
+          {{- if .Values.searchService.ingress.enabled }}
+          - path: {{ .Values.searchService.ingress.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.searchService.name }}
+                port:
+                  number: {{ .Values.searchService.service.port }}
+          {{- end }}
+          {{- end }}
+
+          # File Service
+          {{- if .Values.fileService.enabled }}
+          {{- if .Values.fileService.ingress.enabled }}
+          - path: {{ .Values.fileService.ingress.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.fileService.name }}
+                port:
+                  number: {{ .Values.fileService.service.port }}
+          {{- end }}
+          {{- end }}
+
+          # Media Service
+          {{- if .Values.mediaService.enabled }}
+          {{- if .Values.mediaService.ingress.enabled }}
+          - path: {{ .Values.mediaService.ingress.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.mediaService.name }}
+                port:
+                  number: {{ .Values.mediaService.service.port }}
+          {{- end }}
+          {{- end }}
+
+          # Call Service
+          {{- if .Values.callService.enabled }}
+          {{- if .Values.callService.ingress.enabled }}
+          - path: {{ .Values.callService.ingress.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.callService.name }}
+                port:
+                  number: {{ .Values.callService.service.port }}
+          {{- end }}
+          {{- end }}
+
+          # Huddle Service
+          {{- if .Values.huddleService.enabled }}
+          {{- if .Values.huddleService.ingress.enabled }}
+          - path: {{ .Values.huddleService.ingress.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.huddleService.name }}
+                port:
+                  number: {{ .Values.huddleService.service.port }}
+          {{- end }}
+          {{- end }}
+
+          # Analytics Service
+          {{- if .Values.analyticsService.enabled }}
+          {{- if .Values.analyticsService.ingress.enabled }}
+          - path: {{ .Values.analyticsService.ingress.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.analyticsService.name }}
+                port:
+                  number: {{ .Values.analyticsService.service.port }}
+          {{- end }}
+          {{- end }}
+
+          # Export Service
+          {{- if .Values.exportService.enabled }}
+          {{- if .Values.exportService.ingress.enabled }}
+          - path: {{ .Values.exportService.ingress.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.exportService.name }}
+                port:
+                  number: {{ .Values.exportService.service.port }}
+          {{- end }}
+          {{- end }}
+
+          # Integration Service
+          {{- if .Values.integrationService.enabled }}
+          {{- if .Values.integrationService.ingress.enabled }}
+          - path: {{ .Values.integrationService.ingress.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.integrationService.name }}
+                port:
+                  number: {{ .Values.integrationService.service.port }}
+          {{- end }}
+          {{- end }}
+
+          # Insights Service
+          {{- if .Values.insightsService.enabled }}
+          {{- if .Values.insightsService.ingress.enabled }}
+          - path: {{ .Values.insightsService.ingress.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.insightsService.name }}
+                port:
+                  number: {{ .Values.insightsService.service.port }}
+          {{- end }}
+          {{- end }}
+
+          # Bookmarks Service
+          {{- if .Values.bookmarkService.enabled }}
+          {{- if .Values.bookmarkService.ingress.enabled }}
+          - path: {{ .Values.bookmarkService.ingress.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.bookmarkService.name }}
+                port:
+                  number: {{ .Values.bookmarkService.service.port }}
+          {{- end }}
+          {{- end }}
+
+          # Reminders Service
+          {{- if .Values.reminderService.enabled }}
+          {{- if .Values.reminderService.ingress.enabled }}
+          - path: {{ .Values.reminderService.ingress.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.reminderService.name }}
+                port:
+                  number: {{ .Values.reminderService.service.port }}
+          {{- end }}
+          {{- end }}
+
+          # Attachments Service
+          {{- if .Values.attachmentService.enabled }}
+          {{- if .Values.attachmentService.ingress.enabled }}
+          - path: {{ .Values.attachmentService.ingress.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.attachmentService.name }}
+                port:
+                  number: {{ .Values.attachmentService.service.port }}
+          {{- end }}
+          {{- end }}
+
+          # Admin Service
+          {{- if .Values.adminService.enabled }}
+          {{- if .Values.adminService.ingress.enabled }}
+          - path: {{ .Values.adminService.ingress.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.adminService.name }}
+                port:
+                  number: {{ .Values.adminService.service.port }}
+          {{- end }}
+          {{- end }}
+
+    # WebSocket endpoint
+    - host: ws.{{ .Values.global.domain }}
+      http:
+        paths:
+          {{- if .Values.realtimeService.enabled }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.realtimeService.name }}
+                port:
+                  number: {{ .Values.realtimeService.service.port }}
+          {{- end }}
+
+    # CDN endpoint
+    - host: cdn.{{ .Values.global.domain }}
+      http:
+        paths:
+          {{- if .Values.cdnService.enabled }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.cdnService.name }}
+                port:
+                  number: {{ .Values.cdnService.service.port }}
+          {{- end }}
+
+---
+# WebSocket-specific ingress with appropriate annotations
+{{- if .Values.realtimeService.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "quikapp.fullname" . }}-websocket
+  namespace: {{ .Values.global.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "quikapp.labels" . | nindent 4 }}
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$remote_addr"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/websocket-services: {{ .Values.realtimeService.name }}
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- end }}
+  {{- if .Values.global.tlsEnabled }}
+  tls:
+    - hosts:
+        - ws.{{ .Values.global.domain }}
+      secretName: {{ .Values.global.tlsSecretName }}
+  {{- end }}
+  rules:
+    - host: ws.{{ .Values.global.domain }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.realtimeService.name }}
+                port:
+                  number: {{ .Values.realtimeService.service.port }}
+{{- end }}
+{{- end }}

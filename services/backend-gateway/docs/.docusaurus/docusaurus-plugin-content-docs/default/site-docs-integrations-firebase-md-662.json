@@ -1,0 +1,29 @@
+{
+  "id": "integrations/firebase",
+  "title": "Firebase Integration",
+  "description": "Firebase setup for push notifications",
+  "source": "@site/docs/integrations/firebase.md",
+  "sourceDirName": "integrations",
+  "slug": "/integrations/firebase",
+  "permalink": "/docs/integrations/firebase",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/quckchat/backend/tree/main/docs/docs/integrations/firebase.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 1,
+  "frontMatter": {
+    "sidebar_position": 1,
+    "title": "Firebase Integration",
+    "description": "Firebase setup for push notifications"
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Railway Deployment",
+    "permalink": "/docs/deployment/railway"
+  },
+  "next": {
+    "title": "Firebase Setup",
+    "permalink": "/docs/integrations/firebase-setup"
+  }
+}

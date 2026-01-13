@@ -1,0 +1,20 @@
+{
+  "$schema": "https://compodoc.app/schema.json",
+  "name": "QuickChat Backend API",
+  "output": "./documentation",
+  "tsconfig": "./tsconfig.json",
+  "theme": "material",
+  "hideGenerator": false,
+  "coverageTest": 0,
+  "coverageMinimumPerFile": 0,
+  "coverageTestThresholdFail": false,
+  "disableSourceCode": false,
+  "disablePrivate": true,
+  "disableProtected": false,
+  "disableInternal": true,
+  "disableLifeCycleHooks": true,
+  "disableRoutesGraph": false,
+  "disableDependencies": false,
+  "disableCoverage": false,
+  "language": "en-US"
+}

@@ -1,0 +1,29 @@
+{
+  "id": "deployment/environments",
+  "title": "Environments",
+  "description": "Development, staging, and production environment setup",
+  "source": "@site/docs/deployment/environments.md",
+  "sourceDirName": "deployment",
+  "slug": "/deployment/environments",
+  "permalink": "/docs/deployment/environments",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/quckchat/backend/tree/main/docs/docs/deployment/environments.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 1,
+  "frontMatter": {
+    "sidebar_position": 1,
+    "title": "Environments",
+    "description": "Development, staging, and production environment setup"
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Postman Collection",
+    "permalink": "/docs/api-reference/postman"
+  },
+  "next": {
+    "title": "Docker Deployment",
+    "permalink": "/docs/deployment/docker"
+  }
+}

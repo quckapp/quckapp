@@ -1,0 +1,226 @@
+# =============================================================================
+# QuikApp Build & Run Compose
+# =============================================================================
+# Docker Compose for building and running the application containers.
+#
+# Usage:
+#   docker-compose -f docker/docker-compose.build.yml build
+#   docker-compose -f docker/docker-compose.build.yml up -d
+#
+# Or combine with infrastructure:
+#   docker-compose -f docker/docker-compose.yml -f docker/docker-compose.build.yml up -d
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # ===========================================================================
+  # API Service
+  # ===========================================================================
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: api
+      args:
+        - NODE_ENV=production
+    image: quikapp/api:local
+    container_name: quikapp-api
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      LOG_LEVEL: debug
+
+      # Database
+      DATABASE_URL: postgresql://quikapp:quikapp_dev@postgres:5432/quikapp
+
+      # Redis
+      REDIS_URL: redis://redis:6379
+
+      # AWS LocalStack
+      AWS_ENDPOINT_URL: http://localstack:4566
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+
+      # S3
+      S3_MEDIA_BUCKET: quikapp-media-dev
+      S3_THUMBNAILS_BUCKET: quikapp-thumbnails-dev
+
+      # SQS
+      SQS_MEDIA_QUEUE_URL: http://localstack:4566/000000000000/quikapp-dev-media-processing
+      SQS_THUMBNAILS_QUEUE_URL: http://localstack:4566/000000000000/quikapp-dev-thumbnails
+      SQS_NOTIFICATIONS_QUEUE_URL: http://localstack:4566/000000000000/quikapp-dev-notifications
+
+      # DynamoDB
+      DYNAMODB_MEDIA_TABLE: quikapp-dev-media-metadata
+
+      # JWT
+      JWT_SECRET: dev-jwt-secret-change-in-production
+      JWT_EXPIRES_IN: 1d
+
+      # CORS
+      CORS_ORIGINS: http://localhost:3000,http://localhost:5173
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - quikapp-network
+
+  # ===========================================================================
+  # Media Processing Worker
+  # ===========================================================================
+  worker:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: worker
+    image: quikapp/worker:local
+    container_name: quikapp-worker
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      WORKER_TYPE: media-processing
+      WORKER_CONCURRENCY: 3
+      WORKER_PORT: 9090
+
+      DATABASE_URL: postgresql://quikapp:quikapp_dev@postgres:5432/quikapp
+      REDIS_URL: redis://redis:6379
+
+      AWS_ENDPOINT_URL: http://localstack:4566
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+
+      S3_MEDIA_BUCKET: quikapp-media-dev
+      S3_THUMBNAILS_BUCKET: quikapp-thumbnails-dev
+      SQS_QUEUE_URL: http://localstack:4566/000000000000/quikapp-dev-media-processing
+      DYNAMODB_MEDIA_TABLE: quikapp-dev-media-metadata
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    networks:
+      - quikapp-network
+
+  # ===========================================================================
+  # Thumbnail Worker
+  # ===========================================================================
+  thumbnail-worker:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: thumbnail-worker
+    image: quikapp/thumbnail-worker:local
+    container_name: quikapp-thumbnail-worker
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      WORKER_TYPE: thumbnail
+      WORKER_CONCURRENCY: 5
+
+      REDIS_URL: redis://redis:6379
+
+      AWS_ENDPOINT_URL: http://localstack:4566
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+
+      S3_MEDIA_BUCKET: quikapp-media-dev
+      S3_THUMBNAILS_BUCKET: quikapp-thumbnails-dev
+      SQS_QUEUE_URL: http://localstack:4566/000000000000/quikapp-dev-thumbnails
+    depends_on:
+      redis:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    networks:
+      - quikapp-network
+
+  # ===========================================================================
+  # Notification Worker
+  # ===========================================================================
+  notification-worker:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: notification-worker
+    image: quikapp/notification-worker:local
+    container_name: quikapp-notification-worker
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      WORKER_TYPE: notification
+      WORKER_CONCURRENCY: 10
+
+      DATABASE_URL: postgresql://quikapp:quikapp_dev@postgres:5432/quikapp
+      REDIS_URL: redis://redis:6379
+
+      AWS_ENDPOINT_URL: http://localstack:4566
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+
+      SQS_QUEUE_URL: http://localstack:4566/000000000000/quikapp-dev-notifications
+      SNS_TOPIC_ARN: arn:aws:sns:us-east-1:000000000000:quikapp-user-notifications-dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    networks:
+      - quikapp-network
+
+  # ===========================================================================
+  # Development Container (for debugging)
+  # ===========================================================================
+  dev:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: development
+    image: quikapp/dev:local
+    container_name: quikapp-dev
+    profiles:
+      - dev
+    ports:
+      - "3000:3000"
+      - "9090:9090"
+      - "9229:9229"  # Node.js debug port
+    volumes:
+      - ../src:/app/src:ro
+      - ../package.json:/app/package.json:ro
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://quikapp:quikapp_dev@postgres:5432/quikapp
+      REDIS_URL: redis://redis:6379
+      AWS_ENDPOINT_URL: http://localstack:4566
+    depends_on:
+      - postgres
+      - redis
+      - localstack
+    networks:
+      - quikapp-network
+
+networks:
+  quikapp-network:
+    external: true
+    name: quikapp-network

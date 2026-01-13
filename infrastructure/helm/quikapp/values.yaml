@@ -1,0 +1,1185 @@
+# QuikApp Helm Chart Values
+# Default configuration for all microservices
+
+# =============================================================================
+# Global Configuration
+# =============================================================================
+global:
+  # Environment name (development, staging, production)
+  environment: development
+
+  # Image pull policy
+  imagePullPolicy: IfNotPresent
+
+  # Image registry
+  imageRegistry: ""
+
+  # Image pull secrets
+  imagePullSecrets: []
+
+  # Namespace
+  namespace: quikapp
+
+  # Domain for ingress
+  domain: quikapp.local
+
+  # TLS enabled
+  tlsEnabled: false
+
+  # TLS secret name
+  tlsSecretName: quikapp-tls
+
+  # Service account
+  serviceAccount:
+    create: true
+    name: quikapp-sa
+    annotations: {}
+
+  # Pod security context
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+
+  # Container security context
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+
+  # Resource defaults
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # Tracing configuration
+  tracing:
+    enabled: true
+    endpoint: "http://otel-collector:4317"
+    samplingRatio: 0.1
+
+  # Logging configuration
+  logging:
+    level: info
+    format: json
+
+# =============================================================================
+# Infrastructure Configuration
+# =============================================================================
+infrastructure:
+  enabled: true
+
+# =============================================================================
+# Monitoring Configuration
+# =============================================================================
+monitoring:
+  enabled: true
+
+# =============================================================================
+# Ingress Configuration
+# =============================================================================
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+  hosts:
+    - host: api.quikapp.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# =============================================================================
+# Network Policies
+# =============================================================================
+networkPolicies:
+  enabled: true
+
+# =============================================================================
+# Pod Disruption Budgets
+# =============================================================================
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# =============================================================================
+# Microservices Configuration
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# NestJS Services
+# -----------------------------------------------------------------------------
+backendGateway:
+  enabled: true
+  name: backend-gateway
+  replicaCount: 2
+  image:
+    repository: quikapp/backend-gateway
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 3000
+  ingress:
+    enabled: true
+    path: /api
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  env:
+    NODE_ENV: production
+    PORT: "3000"
+  envFrom:
+    - secretRef:
+        name: quikapp-secrets
+    - configMapRef:
+        name: quikapp-config
+  healthCheck:
+    path: /health
+    port: 3000
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+notificationService:
+  enabled: true
+  name: notification-service
+  replicaCount: 2
+  image:
+    repository: quikapp/notification-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 3001
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    NODE_ENV: production
+    PORT: "3001"
+  healthCheck:
+    path: /health
+    port: 3001
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 70
+
+realtimeService:
+  enabled: true
+  name: realtime-service
+  replicaCount: 3
+  image:
+    repository: quikapp/realtime-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 3002
+  ingress:
+    enabled: true
+    path: /ws
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+      nginx.ingress.kubernetes.io/upstream-hash-by: "$remote_addr"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  env:
+    NODE_ENV: production
+    PORT: "3002"
+  healthCheck:
+    path: /health
+    port: 3002
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 60
+
+# -----------------------------------------------------------------------------
+# Spring Boot Services
+# -----------------------------------------------------------------------------
+authService:
+  enabled: true
+  name: auth-service
+  replicaCount: 2
+  image:
+    repository: quikapp/auth-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 8080
+  ingress:
+    enabled: true
+    path: /api/auth
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  env:
+    SPRING_PROFILES_ACTIVE: kubernetes
+    SERVER_PORT: "8080"
+  healthCheck:
+    path: /actuator/health
+    port: 8080
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 70
+
+userService:
+  enabled: true
+  name: user-service
+  replicaCount: 2
+  image:
+    repository: quikapp/user-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 8081
+  ingress:
+    enabled: true
+    path: /api/users
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  env:
+    SPRING_PROFILES_ACTIVE: kubernetes
+    SERVER_PORT: "8081"
+  healthCheck:
+    path: /actuator/health
+    port: 8081
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 70
+
+permissionService:
+  enabled: true
+  name: permission-service
+  replicaCount: 2
+  image:
+    repository: quikapp/permission-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 8082
+  resources:
+    requests:
+      cpu: 100m
+      memory: 384Mi
+    limits:
+      cpu: 500m
+      memory: 768Mi
+  env:
+    SPRING_PROFILES_ACTIVE: kubernetes
+    SERVER_PORT: "8082"
+  healthCheck:
+    path: /actuator/health
+    port: 8082
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+
+auditService:
+  enabled: true
+  name: audit-service
+  replicaCount: 2
+  image:
+    repository: quikapp/audit-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 8083
+  resources:
+    requests:
+      cpu: 100m
+      memory: 384Mi
+    limits:
+      cpu: 500m
+      memory: 768Mi
+  env:
+    SPRING_PROFILES_ACTIVE: kubernetes
+    SERVER_PORT: "8083"
+  healthCheck:
+    path: /actuator/health
+    port: 8083
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+
+adminService:
+  enabled: true
+  name: admin-service
+  replicaCount: 1
+  image:
+    repository: quikapp/admin-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 8084
+  ingress:
+    enabled: true
+    path: /api/admin
+  resources:
+    requests:
+      cpu: 100m
+      memory: 384Mi
+    limits:
+      cpu: 500m
+      memory: 768Mi
+  env:
+    SPRING_PROFILES_ACTIVE: kubernetes
+    SERVER_PORT: "8084"
+  healthCheck:
+    path: /actuator/health
+    port: 8084
+  autoscaling:
+    enabled: false
+
+# -----------------------------------------------------------------------------
+# Elixir Services
+# -----------------------------------------------------------------------------
+presenceService:
+  enabled: true
+  name: presence-service
+  replicaCount: 3
+  image:
+    repository: quikapp/presence-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 4000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    MIX_ENV: prod
+    PORT: "4000"
+    RELEASE_COOKIE: quikapp-cookie
+  healthCheck:
+    path: /health
+    port: 4000
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 15
+    targetCPUUtilizationPercentage: 60
+
+messageService:
+  enabled: true
+  name: message-service
+  replicaCount: 3
+  image:
+    repository: quikapp/message-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 4001
+  ingress:
+    enabled: true
+    path: /api/messages
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  env:
+    MIX_ENV: prod
+    PORT: "4001"
+    RELEASE_COOKIE: quikapp-cookie
+  healthCheck:
+    path: /health
+    port: 4001
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 60
+
+callService:
+  enabled: true
+  name: call-service
+  replicaCount: 2
+  image:
+    repository: quikapp/call-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 4002
+  ingress:
+    enabled: true
+    path: /api/calls
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  env:
+    MIX_ENV: prod
+    PORT: "4002"
+    RELEASE_COOKIE: quikapp-cookie
+  healthCheck:
+    path: /health
+    port: 4002
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 60
+
+notificationOrchestrator:
+  enabled: true
+  name: notification-orchestrator
+  replicaCount: 2
+  image:
+    repository: quikapp/notification-orchestrator
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 4003
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    MIX_ENV: prod
+    PORT: "4003"
+    RELEASE_COOKIE: quikapp-cookie
+  healthCheck:
+    path: /health
+    port: 4003
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 70
+
+huddleService:
+  enabled: true
+  name: huddle-service
+  replicaCount: 2
+  image:
+    repository: quikapp/huddle-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 4004
+  ingress:
+    enabled: true
+    path: /api/huddles
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  env:
+    MIX_ENV: prod
+    PORT: "4004"
+    RELEASE_COOKIE: quikapp-cookie
+  healthCheck:
+    path: /health
+    port: 4004
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 60
+
+eventBroadcastService:
+  enabled: true
+  name: event-broadcast-service
+  replicaCount: 2
+  image:
+    repository: quikapp/event-broadcast-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 4005
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    MIX_ENV: prod
+    PORT: "4005"
+    RELEASE_COOKIE: quikapp-cookie
+  healthCheck:
+    path: /health
+    port: 4005
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+
+# -----------------------------------------------------------------------------
+# Go Services
+# -----------------------------------------------------------------------------
+workspaceService:
+  enabled: true
+  name: workspace-service
+  replicaCount: 2
+  image:
+    repository: quikapp/workspace-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 8090
+  ingress:
+    enabled: true
+    path: /api/workspaces
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  env:
+    GIN_MODE: release
+    PORT: "8090"
+  healthCheck:
+    path: /health
+    port: 8090
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 70
+
+channelService:
+  enabled: true
+  name: channel-service
+  replicaCount: 2
+  image:
+    repository: quikapp/channel-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 8091
+  ingress:
+    enabled: true
+    path: /api/channels
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  env:
+    GIN_MODE: release
+    PORT: "8091"
+  healthCheck:
+    path: /health
+    port: 8091
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+
+threadService:
+  enabled: true
+  name: thread-service
+  replicaCount: 2
+  image:
+    repository: quikapp/thread-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 8092
+  ingress:
+    enabled: true
+    path: /api/threads
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  env:
+    GIN_MODE: release
+    PORT: "8092"
+  healthCheck:
+    path: /health
+    port: 8092
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 70
+
+searchService:
+  enabled: true
+  name: search-service
+  replicaCount: 2
+  image:
+    repository: quikapp/search-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 8093
+  ingress:
+    enabled: true
+    path: /api/search
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+  env:
+    GIN_MODE: release
+    PORT: "8093"
+  healthCheck:
+    path: /health
+    port: 8093
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+
+fileService:
+  enabled: true
+  name: file-service
+  replicaCount: 2
+  image:
+    repository: quikapp/file-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 8094
+  ingress:
+    enabled: true
+    path: /api/files
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: "500m"
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+  env:
+    GIN_MODE: release
+    PORT: "8094"
+  healthCheck:
+    path: /health
+    port: 8094
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+
+mediaService:
+  enabled: true
+  name: media-service
+  replicaCount: 2
+  image:
+    repository: quikapp/media-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 8095
+  ingress:
+    enabled: true
+    path: /api/media
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: "1g"
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+  env:
+    GIN_MODE: release
+    PORT: "8095"
+  healthCheck:
+    path: /health
+    port: 8095
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 70
+
+bookmarkService:
+  enabled: true
+  name: bookmark-service
+  replicaCount: 2
+  image:
+    repository: quikapp/bookmark-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 8096
+  ingress:
+    enabled: true
+    path: /api/bookmarks
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  env:
+    GIN_MODE: release
+    PORT: "8096"
+  healthCheck:
+    path: /health
+    port: 8096
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+
+reminderService:
+  enabled: true
+  name: reminder-service
+  replicaCount: 2
+  image:
+    repository: quikapp/reminder-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 8097
+  ingress:
+    enabled: true
+    path: /api/reminders
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  env:
+    GIN_MODE: release
+    PORT: "8097"
+  healthCheck:
+    path: /health
+    port: 8097
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+
+attachmentService:
+  enabled: true
+  name: attachment-service
+  replicaCount: 2
+  image:
+    repository: quikapp/attachment-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 8098
+  ingress:
+    enabled: true
+    path: /api/attachments
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  env:
+    GIN_MODE: release
+    PORT: "8098"
+  healthCheck:
+    path: /health
+    port: 8098
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 70
+
+cdnService:
+  enabled: true
+  name: cdn-service
+  replicaCount: 3
+  image:
+    repository: quikapp/cdn-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 8099
+  ingress:
+    enabled: true
+    path: /cdn
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-buffering: "on"
+      nginx.ingress.kubernetes.io/proxy-buffer-size: "128k"
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+  env:
+    GIN_MODE: release
+    PORT: "8099"
+  healthCheck:
+    path: /health
+    port: 8099
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 15
+    targetCPUUtilizationPercentage: 60
+
+# -----------------------------------------------------------------------------
+# Python Services
+# -----------------------------------------------------------------------------
+analyticsService:
+  enabled: true
+  name: analytics-service
+  replicaCount: 2
+  image:
+    repository: quikapp/analytics-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 5000
+  ingress:
+    enabled: true
+    path: /api/analytics
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  env:
+    FLASK_ENV: production
+    PORT: "5000"
+  healthCheck:
+    path: /health
+    port: 5000
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 70
+
+mlService:
+  enabled: true
+  name: ml-service
+  replicaCount: 2
+  image:
+    repository: quikapp/ml-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 5001
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+  env:
+    FLASK_ENV: production
+    PORT: "5001"
+  healthCheck:
+    path: /health
+    port: 5001
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+
+moderationService:
+  enabled: true
+  name: moderation-service
+  replicaCount: 2
+  image:
+    repository: quikapp/moderation-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 5002
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  env:
+    FLASK_ENV: production
+    PORT: "5002"
+  healthCheck:
+    path: /health
+    port: 5002
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 70
+
+exportService:
+  enabled: true
+  name: export-service
+  replicaCount: 2
+  image:
+    repository: quikapp/export-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 5003
+  ingress:
+    enabled: true
+    path: /api/export
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  env:
+    FLASK_ENV: production
+    PORT: "5003"
+  healthCheck:
+    path: /health
+    port: 5003
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+
+integrationService:
+  enabled: true
+  name: integration-service
+  replicaCount: 2
+  image:
+    repository: quikapp/integration-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 5004
+  ingress:
+    enabled: true
+    path: /api/integrations
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    FLASK_ENV: production
+    PORT: "5004"
+  healthCheck:
+    path: /health
+    port: 5004
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+
+sentimentService:
+  enabled: true
+  name: sentiment-service
+  replicaCount: 2
+  image:
+    repository: quikapp/sentiment-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 5005
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  env:
+    FLASK_ENV: production
+    PORT: "5005"
+  healthCheck:
+    path: /health
+    port: 5005
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+
+insightsService:
+  enabled: true
+  name: insights-service
+  replicaCount: 2
+  image:
+    repository: quikapp/insights-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 5006
+  ingress:
+    enabled: true
+    path: /api/insights
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  env:
+    FLASK_ENV: production
+    PORT: "5006"
+  healthCheck:
+    path: /health
+    port: 5006
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+
+smartReplyService:
+  enabled: true
+  name: smart-reply-service
+  replicaCount: 2
+  image:
+    repository: quikapp/smart-reply-service
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 5007
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  env:
+    FLASK_ENV: production
+    PORT: "5007"
+  healthCheck:
+    path: /health
+    port: 5007
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+
+# =============================================================================
+# API Documentation (Swagger UI)
+# =============================================================================
+swaggerUi:
+  enabled: true
+  replicas: 1
+  image:
+    repository: swaggerapi/swagger-ui
+    tag: v5.10.3
+    pullPolicy: IfNotPresent
+  basePath: /docs
+  docExpansion: list
+  tryItOutEnabled: true
+  defaultModelsExpandDepth: 1
+  service:
+    type: ClusterIP
+    port: 8080
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  nodeSelector: {}
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/rewrite-target: /$2
+    hosts:
+      - host: api.quikapp.local
+        paths:
+          - path: /docs(/|$)(.*)
+            pathType: Prefix
+    tls: []

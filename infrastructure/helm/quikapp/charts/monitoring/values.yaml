@@ -1,0 +1,422 @@
+# QuikApp Monitoring Stack Values
+
+# =============================================================================
+# Prometheus Stack (Prometheus, Alertmanager, Grafana)
+# =============================================================================
+prometheusStack:
+  enabled: true
+
+kube-prometheus-stack:
+  fullnameOverride: prometheus
+
+  # Prometheus configuration
+  prometheus:
+    prometheusSpec:
+      retention: 15d
+      retentionSize: 50GB
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 2000m
+          memory: 4Gi
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 50Gi
+      serviceMonitorSelectorNilUsesHelmValues: false
+      podMonitorSelectorNilUsesHelmValues: false
+      ruleSelectorNilUsesHelmValues: false
+      additionalScrapeConfigs:
+        # QuikApp microservices
+        - job_name: 'quikapp-services'
+          kubernetes_sd_configs:
+            - role: pod
+              namespaces:
+                names:
+                  - quikapp
+          relabel_configs:
+            - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+              action: keep
+              regex: true
+            - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+              action: replace
+              target_label: __metrics_path__
+              regex: (.+)
+            - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+              action: replace
+              regex: ([^:]+)(?::\d+)?;(\d+)
+              replacement: $1:$2
+              target_label: __address__
+            - source_labels: [__meta_kubernetes_namespace]
+              action: replace
+              target_label: namespace
+            - source_labels: [__meta_kubernetes_pod_name]
+              action: replace
+              target_label: pod
+            - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+              action: replace
+              target_label: service
+
+  # Alertmanager configuration
+  alertmanager:
+    alertmanagerSpec:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
+      storage:
+        volumeClaimTemplate:
+          spec:
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 10Gi
+    config:
+      global:
+        resolve_timeout: 5m
+      route:
+        group_by: ['alertname', 'service', 'severity']
+        group_wait: 10s
+        group_interval: 5m
+        repeat_interval: 12h
+        receiver: 'default'
+        routes:
+          - match:
+              severity: critical
+            receiver: 'critical'
+          - match:
+              severity: warning
+            receiver: 'warning'
+      receivers:
+        - name: 'default'
+          webhook_configs: []
+        - name: 'critical'
+          webhook_configs: []
+        - name: 'warning'
+          webhook_configs: []
+      inhibit_rules:
+        - source_matchers:
+            - severity="critical"
+          target_matchers:
+            - severity="warning"
+          equal: ['alertname', 'service']
+
+  # Grafana configuration
+  grafana:
+    enabled: true
+    adminPassword: "admin"
+    persistence:
+      enabled: true
+      size: 10Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    sidecar:
+      dashboards:
+        enabled: true
+        searchNamespace: ALL
+      datasources:
+        enabled: true
+    additionalDataSources:
+      - name: Loki
+        type: loki
+        url: http://loki:3100
+        access: proxy
+        jsonData:
+          maxLines: 1000
+      - name: Jaeger
+        type: jaeger
+        url: http://jaeger-query:16686
+        access: proxy
+        jsonData:
+          tracesToLogsV2:
+            datasourceUid: loki
+            filterByTraceID: true
+            filterBySpanID: true
+      - name: Tempo
+        type: tempo
+        url: http://tempo:3200
+        access: proxy
+    dashboardProviders:
+      dashboardproviders.yaml:
+        apiVersion: 1
+        providers:
+          - name: 'quikapp'
+            orgId: 1
+            folder: 'QuikApp'
+            type: file
+            disableDeletion: false
+            editable: true
+            options:
+              path: /var/lib/grafana/dashboards/quikapp
+
+  # Node exporter
+  nodeExporter:
+    enabled: true
+
+  # Kube state metrics
+  kubeStateMetrics:
+    enabled: true
+
+  # Default rules
+  defaultRules:
+    create: true
+    rules:
+      alertmanager: true
+      etcd: false
+      configReloaders: true
+      general: true
+      k8s: true
+      kubeApiserverAvailability: true
+      kubeApiserverBurnrate: true
+      kubeApiserverHistogram: true
+      kubeApiserverSlos: true
+      kubeControllerManager: false
+      kubelet: true
+      kubeProxy: false
+      kubePrometheusGeneral: true
+      kubePrometheusNodeRecording: true
+      kubernetesApps: true
+      kubernetesResources: true
+      kubernetesStorage: true
+      kubernetesSystem: true
+      kubeScheduler: false
+      kubeStateMetrics: true
+      network: true
+      node: true
+      nodeExporterAlerting: true
+      nodeExporterRecording: true
+      prometheus: true
+      prometheusOperator: true
+
+# =============================================================================
+# Loki Stack (Loki + Promtail)
+# =============================================================================
+lokiStack:
+  enabled: true
+
+loki-stack:
+  loki:
+    enabled: true
+    persistence:
+      enabled: true
+      size: 50Gi
+    config:
+      auth_enabled: false
+      server:
+        http_listen_port: 3100
+      common:
+        replication_factor: 1
+        ring:
+          kvstore:
+            store: inmemory
+      limits_config:
+        retention_period: 720h
+        reject_old_samples: true
+        reject_old_samples_max_age: 168h
+        ingestion_rate_mb: 16
+        ingestion_burst_size_mb: 32
+        per_stream_rate_limit: 5MB
+        max_entries_limit_per_query: 5000
+      schema_config:
+        configs:
+          - from: 2020-10-24
+            store: boltdb-shipper
+            object_store: filesystem
+            schema: v11
+            index:
+              prefix: index_
+              period: 24h
+      storage_config:
+        boltdb_shipper:
+          active_index_directory: /data/loki/boltdb-shipper-active
+          cache_location: /data/loki/boltdb-shipper-cache
+          shared_store: filesystem
+        filesystem:
+          directory: /data/loki/chunks
+      compactor:
+        working_directory: /data/loki/boltdb-shipper-compactor
+        shared_store: filesystem
+        retention_enabled: true
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+
+  promtail:
+    enabled: true
+    config:
+      clients:
+        - url: http://loki:3100/loki/api/v1/push
+      scrape_configs:
+        - job_name: kubernetes-pods
+          kubernetes_sd_configs:
+            - role: pod
+          pipeline_stages:
+            - docker: {}
+            - json:
+                expressions:
+                  level: level
+                  message: message
+                  trace_id: trace_id
+                  span_id: span_id
+            - labels:
+                level:
+                trace_id:
+                span_id:
+          relabel_configs:
+            - source_labels:
+                - __meta_kubernetes_pod_label_app_kubernetes_io_part_of
+              action: keep
+              regex: quikapp
+            - source_labels:
+                - __meta_kubernetes_pod_name
+              target_label: pod
+            - source_labels:
+                - __meta_kubernetes_namespace
+              target_label: namespace
+            - source_labels:
+                - __meta_kubernetes_pod_label_app_kubernetes_io_name
+              target_label: service
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+# =============================================================================
+# Jaeger Configuration
+# =============================================================================
+jaeger:
+  enabled: true
+
+  provisionDataStore:
+    cassandra: false
+    elasticsearch: true
+
+  storage:
+    type: elasticsearch
+    elasticsearch:
+      host: elasticsearch
+      port: 9200
+      scheme: http
+
+  query:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  collector:
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+
+  agent:
+    enabled: false
+
+# =============================================================================
+# OpenTelemetry Collector Configuration
+# =============================================================================
+otelCollector:
+  enabled: true
+
+opentelemetry-collector:
+  mode: deployment
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+  config:
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+      jaeger:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:14250
+          thrift_http:
+            endpoint: 0.0.0.0:14268
+      zipkin:
+        endpoint: 0.0.0.0:9411
+
+    processors:
+      batch:
+        timeout: 10s
+        send_batch_size: 1024
+      memory_limiter:
+        check_interval: 1s
+        limit_mib: 800
+        spike_limit_mib: 200
+      tail_sampling:
+        decision_wait: 10s
+        num_traces: 100000
+        policies:
+          - name: error-policy
+            type: status_code
+            status_code:
+              status_codes:
+                - ERROR
+          - name: latency-policy
+            type: latency
+            latency:
+              threshold_ms: 2000
+          - name: probabilistic-policy
+            type: probabilistic
+            probabilistic:
+              sampling_percentage: 10
+
+    exporters:
+      otlp/jaeger:
+        endpoint: jaeger-collector:14250
+        tls:
+          insecure: true
+      prometheus:
+        endpoint: 0.0.0.0:8889
+        namespace: otel
+      logging:
+        verbosity: normal
+
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp, jaeger, zipkin]
+          processors: [memory_limiter, tail_sampling, batch]
+          exporters: [otlp/jaeger]
+        metrics:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [prometheus]

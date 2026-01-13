@@ -1,0 +1,288 @@
+# QuikApp Development Environment Values
+# Usage: helm install quikapp ./quikapp -f values-development.yaml
+
+global:
+  environment: development
+  imagePullPolicy: Always
+  namespace: quikapp-dev
+  domain: dev.quikapp.local
+  tlsEnabled: false
+
+  # Reduced resources for development
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+  # Development logging
+  logging:
+    level: debug
+    format: json
+
+  # Full tracing in development
+  tracing:
+    enabled: true
+    samplingRatio: 1.0
+
+# Single replica for all services in development
+backendGateway:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+notificationService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+realtimeService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+authService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+userService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+permissionService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+auditService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+adminService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+presenceService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+messageService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+callService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+notificationOrchestrator:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+huddleService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+eventBroadcastService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+workspaceService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+channelService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+threadService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+searchService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+fileService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+mediaService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+bookmarkService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+reminderService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+attachmentService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+cdnService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+analyticsService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+mlService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+moderationService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+exportService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+integrationService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+sentimentService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+insightsService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+smartReplyService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+# Disable PDB in development
+podDisruptionBudget:
+  enabled: false
+
+# Disable network policies in development
+networkPolicies:
+  enabled: false
+
+# Infrastructure with minimal resources
+infrastructure:
+  enabled: true
+
+  redis:
+    master:
+      persistence:
+        size: 1Gi
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 100m
+          memory: 128Mi
+
+  mysql:
+    primary:
+      persistence:
+        size: 5Gi
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+
+  postgresql:
+    primary:
+      persistence:
+        size: 5Gi
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+
+  mongodb:
+    persistence:
+      size: 5Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  kafka:
+    persistence:
+      size: 5Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  elasticsearch:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+    volumeClaimTemplate:
+      resources:
+        requests:
+          storage: 10Gi
+
+  minio:
+    persistence:
+      size: 10Gi
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+# Monitoring with minimal resources
+monitoring:
+  enabled: true

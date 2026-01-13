@@ -1,0 +1,258 @@
+# =============================================================================
+# KUBERNETES PROMOTION PIPELINE
+# =============================================================================
+# Promote deployments through environments: dev -> qa -> staging -> prod
+# =============================================================================
+
+trigger: none
+
+pr: none
+
+parameters:
+  - name: sourceEnvironment
+    displayName: 'Source Environment'
+    type: string
+    default: 'dev'
+    values:
+      - dev
+      - qa
+      - staging
+
+  - name: targetEnvironments
+    displayName: 'Target Environments'
+    type: object
+    default:
+      - qa
+
+  - name: services
+    displayName: 'Services to Promote (comma-separated, or "all")'
+    type: string
+    default: 'all'
+
+  - name: imageTag
+    displayName: 'Image Tag to Promote'
+    type: string
+
+  - name: skipTests
+    displayName: 'Skip Integration Tests'
+    type: boolean
+    default: false
+
+  - name: useCanary
+    displayName: 'Use Canary Deployment (staging/prod only)'
+    type: boolean
+    default: false
+
+variables:
+  - group: quikapp-common
+  - group: quikapp-kubernetes-common
+
+  - name: allServices
+    value: 'backend-gateway,auth-service,user-service,workspace-service,channel-service,thread-service,search-service,file-service,media-service,notification-service,realtime-service,presence-service,message-service,call-service,huddle-service,analytics-service,ml-service,moderation-service,sentiment-service,permission-service,audit-service,admin-service'
+
+stages:
+  # =============================================================================
+  # VALIDATION
+  # =============================================================================
+  - stage: ValidatePromotion
+    displayName: 'Validate Promotion'
+    jobs:
+      - job: ValidateImages
+        displayName: 'Validate Image Tags'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - bash: |
+              echo "=== Promotion Configuration ==="
+              echo "Source: ${{ parameters.sourceEnvironment }}"
+              echo "Targets: ${{ join(',', parameters.targetEnvironments) }}"
+              echo "Image Tag: ${{ parameters.imageTag }}"
+              echo "Services: ${{ parameters.services }}"
+              echo "==============================="
+            displayName: 'Display Configuration'
+
+          - task: AzureCLI@2
+            displayName: 'Verify Images Exist in ACR'
+            inputs:
+              azureSubscription: '$(AZURE_SERVICE_CONNECTION)'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                SERVICES="${{ parameters.services }}"
+                if [ "$SERVICES" = "all" ]; then
+                  SERVICES="${{ variables.allServices }}"
+                fi
+
+                echo "Verifying images for tag: ${{ parameters.imageTag }}"
+
+                for service in ${SERVICES//,/ }; do
+                  echo "Checking $service..."
+                  az acr repository show-tags \
+                    --name $(ACR_NAME) \
+                    --repository $service \
+                    --query "[?contains(@, '${{ parameters.imageTag }}')]" \
+                    -o tsv || echo "WARNING: Tag not found for $service"
+                done
+
+  # =============================================================================
+  # DEPLOY TO EACH TARGET ENVIRONMENT
+  # =============================================================================
+  - ${{ each targetEnv in parameters.targetEnvironments }}:
+    - stage: Deploy_${{ targetEnv }}
+      displayName: 'Deploy to ${{ targetEnv }}'
+      dependsOn:
+        - ValidatePromotion
+        - ${{ if ne(targetEnv, parameters.targetEnvironments[0]) }}:
+          - ${{ if eq(parameters.targetEnvironments[0], 'qa') }}:
+            - Deploy_qa
+          - ${{ if eq(parameters.targetEnvironments[0], 'staging') }}:
+            - Deploy_staging
+      variables:
+        - group: quikapp-${{ targetEnv }}
+        - name: kubernetesServiceConnection
+          ${{ if eq(targetEnv, 'dev') }}:
+            value: 'quikapp-aks-dev'
+          ${{ elseif eq(targetEnv, 'qa') }}:
+            value: 'quikapp-aks-qa'
+          ${{ elseif eq(targetEnv, 'staging') }}:
+            value: 'quikapp-aks-staging'
+          ${{ elseif eq(targetEnv, 'prod') }}:
+            value: 'quikapp-aks-prod'
+        - name: namespace
+          ${{ if eq(targetEnv, 'prod') }}:
+            value: 'quikapp'
+          ${{ else }}:
+            value: 'quikapp-${{ targetEnv }}'
+        - name: kustomizeOverlay
+          ${{ if eq(targetEnv, 'dev') }}:
+            value: 'dev'
+          ${{ elseif eq(targetEnv, 'qa') }}:
+            value: 'qa'
+          ${{ elseif eq(targetEnv, 'staging') }}:
+            value: 'staging'
+          ${{ elseif eq(targetEnv, 'prod') }}:
+            value: 'prod'
+      jobs:
+        # Approval for staging/prod
+        - ${{ if in(targetEnv, 'staging', 'prod') }}:
+          - job: Approval_${{ targetEnv }}
+            displayName: 'Approval for ${{ targetEnv }}'
+            pool: server
+            steps:
+              - task: ManualValidation@0
+                displayName: 'Approve Deployment to ${{ targetEnv }}'
+                inputs:
+                  notifyUsers: |
+                    platform-team@quikapp.io
+                  instructions: |
+                    Approve promotion to ${{ targetEnv }}
+
+                    Source: ${{ parameters.sourceEnvironment }}
+                    Image Tag: ${{ parameters.imageTag }}
+                    Services: ${{ parameters.services }}
+                  onTimeout: 'reject'
+                  timeoutInMinutes: 120
+
+        # Deploy
+        - deployment: Deploy_${{ targetEnv }}_Job
+          displayName: 'Deploy to ${{ targetEnv }}'
+          ${{ if in(targetEnv, 'staging', 'prod') }}:
+            dependsOn: Approval_${{ targetEnv }}
+          pool:
+            vmImage: 'ubuntu-latest'
+          environment: 'quikapp-${{ targetEnv }}'
+          strategy:
+            runOnce:
+              deploy:
+                steps:
+                  - checkout: self
+                    fetchDepth: 1
+
+                  # Standard deployment
+                  - ${{ if or(not(parameters.useCanary), in(targetEnv, 'dev', 'qa')) }}:
+                    - template: templates/kubernetes-deploy.yml
+                      parameters:
+                        environment: '${{ targetEnv }}'
+                        kubernetesServiceConnection: '$(kubernetesServiceConnection)'
+                        namespace: '$(namespace)'
+                        kustomizeOverlay: '$(kustomizeOverlay)'
+                        imageTag: '${{ parameters.imageTag }}'
+                        services: '${{ parameters.services }}'
+
+                  # Canary deployment for staging/prod
+                  - ${{ if and(parameters.useCanary, in(targetEnv, 'staging', 'prod')) }}:
+                    - ${{ if eq(parameters.services, 'all') }}:
+                      - ${{ each service in split(variables.allServices, ',') }}:
+                        - template: templates/kubernetes-canary.yml
+                          parameters:
+                            environment: '${{ targetEnv }}'
+                            kubernetesServiceConnection: '$(kubernetesServiceConnection)'
+                            namespace: '$(namespace)'
+                            service: '${{ service }}'
+                            imageTag: '${{ parameters.imageTag }}'
+                    - ${{ else }}:
+                      - ${{ each service in split(parameters.services, ',') }}:
+                        - template: templates/kubernetes-canary.yml
+                          parameters:
+                            environment: '${{ targetEnv }}'
+                            kubernetesServiceConnection: '$(kubernetesServiceConnection)'
+                            namespace: '$(namespace)'
+                            service: '${{ service }}'
+                            imageTag: '${{ parameters.imageTag }}'
+
+        # Health checks
+        - job: HealthCheck_${{ targetEnv }}
+          displayName: 'Health Check - ${{ targetEnv }}'
+          dependsOn: Deploy_${{ targetEnv }}_Job
+          pool:
+            vmImage: 'ubuntu-latest'
+          steps:
+            - template: templates/kubernetes-healthcheck.yml
+              parameters:
+                kubernetesServiceConnection: '$(kubernetesServiceConnection)'
+                namespace: '$(namespace)'
+
+        # Integration tests (optional)
+        - ${{ if and(not(parameters.skipTests), in(targetEnv, 'qa', 'staging')) }}:
+          - job: IntegrationTests_${{ targetEnv }}
+            displayName: 'Integration Tests - ${{ targetEnv }}'
+            dependsOn: HealthCheck_${{ targetEnv }}
+            pool:
+              vmImage: 'ubuntu-latest'
+            steps:
+              - checkout: self
+                fetchDepth: 1
+
+              - bash: |
+                  echo "Running integration tests against ${{ targetEnv }}"
+                  # Add integration test commands here
+                  # npm run test:integration -- --env=${{ targetEnv }}
+                displayName: 'Run Integration Tests'
+
+  # =============================================================================
+  # SUMMARY
+  # =============================================================================
+  - stage: Summary
+    displayName: 'Promotion Summary'
+    dependsOn:
+      - ${{ each targetEnv in parameters.targetEnvironments }}:
+        - Deploy_${{ targetEnv }}
+    condition: always()
+    jobs:
+      - job: PromotionSummary
+        displayName: 'Generate Summary'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - bash: |
+              echo "========================================"
+              echo "       PROMOTION SUMMARY"
+              echo "========================================"
+              echo "Source Environment: ${{ parameters.sourceEnvironment }}"
+              echo "Target Environments: ${{ join(',', parameters.targetEnvironments) }}"
+              echo "Image Tag: ${{ parameters.imageTag }}"
+              echo "Services: ${{ parameters.services }}"
+              echo "Canary Deployment: ${{ parameters.useCanary }}"
+              echo "Pipeline Run: $(Build.BuildNumber)"
+              echo "========================================"
+            displayName: 'Display Promotion Summary'

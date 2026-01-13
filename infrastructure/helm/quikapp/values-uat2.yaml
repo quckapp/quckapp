@@ -1,0 +1,305 @@
+# QuikApp UAT2 Environment Values
+# Purpose: Internal QA/Testing - Higher verbosity for debugging
+# Usage: helm install quikapp ./quikapp -f values-uat2.yaml
+
+global:
+  environment: uat2
+  imagePullPolicy: IfNotPresent
+  namespace: quikapp-uat2
+  domain: uat2.quikapp.io
+  tlsEnabled: true
+  tlsSecretName: quikapp-uat2-tls
+
+  # UAT resources (moderate)
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 400m
+      memory: 512Mi
+
+  # Debug logging for internal testing
+  logging:
+    level: debug
+    format: json
+
+  # Higher tracing for debugging
+  tracing:
+    enabled: true
+    samplingRatio: 0.8
+
+# 2 replicas for services in UAT2
+backendGateway:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 75
+
+notificationService:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+
+realtimeService:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+
+authService:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+
+userService:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+
+permissionService:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 3
+
+auditService:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 3
+
+adminService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+presenceService:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+
+messageService:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+
+callService:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+
+notificationOrchestrator:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+
+huddleService:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+
+eventBroadcastService:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+
+workspaceService:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+
+channelService:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+
+threadService:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+
+searchService:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+
+fileService:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+
+mediaService:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+
+bookmarkService:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 3
+
+reminderService:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 3
+
+attachmentService:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+
+cdnService:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+
+analyticsService:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+
+mlService:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 3
+
+moderationService:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+
+exportService:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 3
+
+integrationService:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 3
+
+sentimentService:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 3
+
+insightsService:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 3
+
+smartReplyService:
+  replicaCount: 2
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 3
+
+# Enable PDB in UAT2
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Enable network policies in UAT2
+networkPolicies:
+  enabled: true
+
+# UAT2 Infrastructure
+infrastructure:
+  enabled: true
+
+  redis:
+    master:
+      persistence:
+        size: 5Gi
+
+  mysql:
+    primary:
+      persistence:
+        size: 15Gi
+
+  postgresql:
+    primary:
+      persistence:
+        size: 15Gi
+
+  mongodb:
+    persistence:
+      size: 15Gi
+
+  kafka:
+    persistence:
+      size: 15Gi
+
+  elasticsearch:
+    replicas: 2
+    volumeClaimTemplate:
+      resources:
+        requests:
+          storage: 25Gi
+
+  minio:
+    persistence:
+      size: 40Gi
+
+# Enable monitoring in UAT2
+monitoring:
+  enabled: true

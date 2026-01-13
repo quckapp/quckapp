@@ -1,0 +1,296 @@
+# QuikApp Local Development Environment Values
+# Usage: For local Docker Compose development (not Kubernetes)
+# This file provides reference values for local development parity
+
+global:
+  environment: local
+  imagePullPolicy: Never
+  namespace: quikapp-local
+  domain: localhost
+  tlsEnabled: false
+
+  # Minimal resources for local development
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+  # Verbose logging for local debugging
+  logging:
+    level: debug
+    format: pretty
+    prettyPrint: true
+
+  # Full tracing for local debugging
+  tracing:
+    enabled: true
+    samplingRatio: 1.0
+
+# Single replica for all services (local development)
+backendGateway:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+  env:
+    PORT: 3000
+    NODE_ENV: development
+
+notificationService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+realtimeService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+  env:
+    MIX_ENV: dev
+    PORT: 4000
+
+authService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+userService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+permissionService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+auditService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+adminService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+presenceService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+messageService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+callService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+notificationOrchestrator:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+huddleService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+eventBroadcastService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+workspaceService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+channelService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+threadService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+searchService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+fileService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+mediaService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+bookmarkService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+reminderService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+attachmentService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+cdnService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+analyticsService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+mlService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+moderationService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+exportService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+integrationService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+sentimentService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+insightsService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+smartReplyService:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+
+# Disable PDB for local development
+podDisruptionBudget:
+  enabled: false
+
+# Disable network policies for local development
+networkPolicies:
+  enabled: false
+
+# Local infrastructure (minimal)
+infrastructure:
+  enabled: true
+
+  redis:
+    master:
+      persistence:
+        size: 512Mi
+      resources:
+        requests:
+          cpu: 25m
+          memory: 32Mi
+        limits:
+          cpu: 50m
+          memory: 64Mi
+
+  mysql:
+    primary:
+      persistence:
+        size: 1Gi
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
+
+  postgresql:
+    primary:
+      persistence:
+        size: 1Gi
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
+
+  mongodb:
+    persistence:
+      size: 1Gi
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+  kafka:
+    persistence:
+      size: 1Gi
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+  elasticsearch:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 200m
+        memory: 512Mi
+    volumeClaimTemplate:
+      resources:
+        requests:
+          storage: 2Gi
+
+  minio:
+    persistence:
+      size: 2Gi
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+# Disable monitoring for local (use docker-compose profiles instead)
+monitoring:
+  enabled: false

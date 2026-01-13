@@ -1,0 +1,29 @@
+{
+  "id": "features/index",
+  "title": "Features Overview",
+  "description": "Overview of all QuckChat features",
+  "source": "@site/docs/features/index.md",
+  "sourceDirName": "features",
+  "slug": "/features/",
+  "permalink": "/docs/features/",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/quckchat/backend/tree/main/docs/docs/features/index.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 1,
+  "frontMatter": {
+    "sidebar_position": 1,
+    "title": "Features Overview",
+    "description": "Overview of all QuckChat features"
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Realtime Service (Elixir)",
+    "permalink": "/docs/architecture/realtime-service"
+  },
+  "next": {
+    "title": "New Features",
+    "permalink": "/docs/features/new-features"
+  }
+}

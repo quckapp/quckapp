@@ -1,0 +1,770 @@
+# =============================================================================
+# GO CORE SERVICES
+# =============================================================================
+# workspace-service, channel-service, thread-service, search-service,
+# file-service, media-service
+# =============================================================================
+
+# =============================================================================
+# WORKSPACE SERVICE (Go/Gin)
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workspace-service
+  namespace: quikapp
+  labels:
+    app.kubernetes.io/name: workspace-service
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: quikapp
+    app.kubernetes.io/technology: go
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: workspace-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: workspace-service
+        app.kubernetes.io/component: backend
+        app.kubernetes.io/part-of: quikapp
+        app.kubernetes.io/technology: go
+        app.kubernetes.io/uses-broker: "true"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: quikapp-backend-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: workspace-service
+          image: quikapp.azurecr.io/workspace-service:latest
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: grpc
+              containerPort: 9090
+          env:
+            - name: ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-common-config
+                  key: ENVIRONMENT
+            - name: HTTP_PORT
+              value: "8080"
+            - name: GRPC_PORT
+              value: "9090"
+            # PostgreSQL
+            - name: DATABASE_URL
+              value: "postgres://$(POSTGRES_USERNAME):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/quikapp_workspaces?sslmode=disable"
+            # Redis
+            - name: REDIS_ADDR
+              value: "$(REDIS_HOST):$(REDIS_PORT)"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: quikapp-database-secrets
+                  key: REDIS_PASSWORD
+            # Kafka
+            - name: KAFKA_BROKERS
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-broker-config
+                  key: KAFKA_BROKERS
+            # Monitoring
+            - name: OTEL_SERVICE_NAME
+              value: "workspace-service"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-monitoring-config
+                  key: OTEL_EXPORTER_OTLP_ENDPOINT
+          envFrom:
+            - configMapRef:
+                name: quikapp-database-config
+            - secretRef:
+                name: quikapp-database-secrets
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: workspace-service
+  namespace: quikapp
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+    - name: grpc
+      port: 9090
+      targetPort: grpc
+  selector:
+    app.kubernetes.io/name: workspace-service
+---
+# =============================================================================
+# CHANNEL SERVICE (Go/Gin)
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: channel-service
+  namespace: quikapp
+  labels:
+    app.kubernetes.io/name: channel-service
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: quikapp
+    app.kubernetes.io/technology: go
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: channel-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: channel-service
+        app.kubernetes.io/component: backend
+        app.kubernetes.io/part-of: quikapp
+        app.kubernetes.io/technology: go
+        app.kubernetes.io/uses-broker: "true"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      serviceAccountName: quikapp-backend-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: channel-service
+          image: quikapp.azurecr.io/channel-service:latest
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: grpc
+              containerPort: 9090
+          env:
+            - name: ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-common-config
+                  key: ENVIRONMENT
+            - name: DATABASE_URL
+              value: "postgres://$(POSTGRES_USERNAME):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/quikapp_channels?sslmode=disable"
+            - name: REDIS_ADDR
+              value: "$(REDIS_HOST):$(REDIS_PORT)"
+            - name: KAFKA_BROKERS
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-broker-config
+                  key: KAFKA_BROKERS
+            - name: OTEL_SERVICE_NAME
+              value: "channel-service"
+          envFrom:
+            - configMapRef:
+                name: quikapp-database-config
+            - secretRef:
+                name: quikapp-database-secrets
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: channel-service
+  namespace: quikapp
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+    - name: grpc
+      port: 9090
+      targetPort: grpc
+  selector:
+    app.kubernetes.io/name: channel-service
+---
+# =============================================================================
+# THREAD SERVICE (Go/Gin)
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: thread-service
+  namespace: quikapp
+  labels:
+    app.kubernetes.io/name: thread-service
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: quikapp
+    app.kubernetes.io/technology: go
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: thread-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: thread-service
+        app.kubernetes.io/component: backend
+        app.kubernetes.io/part-of: quikapp
+        app.kubernetes.io/technology: go
+        app.kubernetes.io/uses-broker: "true"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      serviceAccountName: quikapp-backend-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: thread-service
+          image: quikapp.azurecr.io/thread-service:latest
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-common-config
+                  key: ENVIRONMENT
+            - name: DATABASE_URL
+              value: "postgres://$(POSTGRES_USERNAME):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/quikapp_threads?sslmode=disable"
+            - name: REDIS_ADDR
+              value: "$(REDIS_HOST):$(REDIS_PORT)"
+            - name: KAFKA_BROKERS
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-broker-config
+                  key: KAFKA_BROKERS
+            - name: OTEL_SERVICE_NAME
+              value: "thread-service"
+          envFrom:
+            - configMapRef:
+                name: quikapp-database-config
+            - secretRef:
+                name: quikapp-database-secrets
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: thread-service
+  namespace: quikapp
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+  selector:
+    app.kubernetes.io/name: thread-service
+---
+# =============================================================================
+# SEARCH SERVICE (Go/Gin)
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: search-service
+  namespace: quikapp
+  labels:
+    app.kubernetes.io/name: search-service
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: quikapp
+    app.kubernetes.io/technology: go
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: search-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: search-service
+        app.kubernetes.io/component: backend
+        app.kubernetes.io/part-of: quikapp
+        app.kubernetes.io/technology: go
+        app.kubernetes.io/uses-broker: "true"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      serviceAccountName: quikapp-backend-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: search-service
+          image: quikapp.azurecr.io/search-service:latest
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-common-config
+                  key: ENVIRONMENT
+            - name: ELASTICSEARCH_URL
+              value: "http://$(ELASTICSEARCH_HOST):$(ELASTICSEARCH_PORT)"
+            - name: ELASTICSEARCH_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: quikapp-database-secrets
+                  key: ELASTICSEARCH_USERNAME
+            - name: ELASTICSEARCH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: quikapp-database-secrets
+                  key: ELASTICSEARCH_PASSWORD
+            - name: REDIS_ADDR
+              value: "$(REDIS_HOST):$(REDIS_PORT)"
+            - name: KAFKA_BROKERS
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-broker-config
+                  key: KAFKA_BROKERS
+            - name: OTEL_SERVICE_NAME
+              value: "search-service"
+          envFrom:
+            - configMapRef:
+                name: quikapp-database-config
+            - secretRef:
+                name: quikapp-database-secrets
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: search-service
+  namespace: quikapp
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+  selector:
+    app.kubernetes.io/name: search-service
+---
+# =============================================================================
+# FILE SERVICE (Go/Gin)
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: file-service
+  namespace: quikapp
+  labels:
+    app.kubernetes.io/name: file-service
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: quikapp
+    app.kubernetes.io/technology: go
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: file-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: file-service
+        app.kubernetes.io/component: backend
+        app.kubernetes.io/part-of: quikapp
+        app.kubernetes.io/technology: go
+        app.kubernetes.io/uses-broker: "true"
+        app.kubernetes.io/uses-external-api: "true"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      serviceAccountName: quikapp-backend-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: file-service
+          image: quikapp.azurecr.io/file-service:latest
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-common-config
+                  key: ENVIRONMENT
+            - name: DATABASE_URL
+              value: "postgres://$(POSTGRES_USERNAME):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/quikapp_files?sslmode=disable"
+            - name: REDIS_ADDR
+              value: "$(REDIS_HOST):$(REDIS_PORT)"
+            - name: KAFKA_BROKERS
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-broker-config
+                  key: KAFKA_BROKERS
+            # Azure Blob Storage
+            - name: AZURE_STORAGE_ACCOUNT
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-storage-config
+                  key: AZURE_STORAGE_CONTAINER
+            - name: MAX_FILE_SIZE
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-storage-config
+                  key: MAX_FILE_SIZE
+            - name: OTEL_SERVICE_NAME
+              value: "file-service"
+          envFrom:
+            - configMapRef:
+                name: quikapp-database-config
+            - configMapRef:
+                name: quikapp-storage-config
+            - secretRef:
+                name: quikapp-database-secrets
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: file-service
+  namespace: quikapp
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+  selector:
+    app.kubernetes.io/name: file-service
+---
+# =============================================================================
+# MEDIA SERVICE (Go/Gin)
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: media-service
+  namespace: quikapp
+  labels:
+    app.kubernetes.io/name: media-service
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: quikapp
+    app.kubernetes.io/technology: go
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: media-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: media-service
+        app.kubernetes.io/component: backend
+        app.kubernetes.io/part-of: quikapp
+        app.kubernetes.io/technology: go
+        app.kubernetes.io/uses-broker: "true"
+        app.kubernetes.io/uses-external-api: "true"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      serviceAccountName: quikapp-backend-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: media-service
+          image: quikapp.azurecr.io/media-service:latest
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-common-config
+                  key: ENVIRONMENT
+            - name: DATABASE_URL
+              value: "postgres://$(POSTGRES_USERNAME):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/quikapp_media?sslmode=disable"
+            - name: REDIS_ADDR
+              value: "$(REDIS_HOST):$(REDIS_PORT)"
+            - name: KAFKA_BROKERS
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-broker-config
+                  key: KAFKA_BROKERS
+            - name: THUMBNAIL_SIZES
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-storage-config
+                  key: THUMBNAIL_SIZES
+            - name: OTEL_SERVICE_NAME
+              value: "media-service"
+          envFrom:
+            - configMapRef:
+                name: quikapp-database-config
+            - configMapRef:
+                name: quikapp-storage-config
+            - secretRef:
+                name: quikapp-database-secrets
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: media-service
+  namespace: quikapp
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+  selector:
+    app.kubernetes.io/name: media-service
+---
+# =============================================================================
+# HPA FOR GO SERVICES
+# =============================================================================
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: workspace-service-hpa
+  namespace: quikapp
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: workspace-service
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: channel-service-hpa
+  namespace: quikapp
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: channel-service
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: search-service-hpa
+  namespace: quikapp
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: search-service
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: file-service-hpa
+  namespace: quikapp
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: file-service
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

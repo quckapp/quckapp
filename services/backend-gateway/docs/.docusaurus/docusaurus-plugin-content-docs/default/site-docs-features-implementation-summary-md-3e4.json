@@ -1,0 +1,29 @@
+{
+  "id": "features/implementation-summary",
+  "title": "Implementation Summary",
+  "description": "Summary of all implemented features and files",
+  "source": "@site/docs/features/implementation-summary.md",
+  "sourceDirName": "features",
+  "slug": "/features/implementation-summary",
+  "permalink": "/docs/features/implementation-summary",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/quckchat/backend/tree/main/docs/docs/features/implementation-summary.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 3,
+  "frontMatter": {
+    "sidebar_position": 3,
+    "title": "Implementation Summary",
+    "description": "Summary of all implemented features and files"
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "New Features",
+    "permalink": "/docs/features/new-features"
+  },
+  "next": {
+    "title": "OpenAPI Specification",
+    "permalink": "/docs/api-reference/openapi"
+  }
+}

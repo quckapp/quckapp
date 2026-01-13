@@ -1,0 +1,159 @@
+# =============================================================================
+# QUIKAPP TERRAFORM CONFIGURATION
+# =============================================================================
+# Copy this file to terraform.tfvars and update values for your environment
+# Or use environment-specific files: terraform.tfvars.dev, terraform.tfvars.prod, etc.
+# =============================================================================
+
+# =============================================================================
+# GENERAL SETTINGS
+# =============================================================================
+
+project_name = "quikapp"
+environment  = "dev"  # local, dev, qa, uat1, uat2, uat3, staging, prod, live
+location     = "eastus"
+
+# Optional: Specify subscription (uses default if not set)
+# subscription_id = "00000000-0000-0000-0000-000000000000"
+
+# =============================================================================
+# NETWORKING
+# =============================================================================
+
+vnet_address_space            = ["10.0.0.0/16"]
+aks_subnet_cidr               = "10.0.0.0/20"
+private_endpoints_subnet_cidr = "10.0.16.0/24"
+app_gateway_subnet_cidr       = "10.0.17.0/24"
+
+# =============================================================================
+# AKS CONFIGURATION
+# =============================================================================
+
+aks_enabled = true
+
+# Kubernetes version (null = latest stable)
+# kubernetes_version = "1.28"
+
+# SKU tier: Free (dev/test) or Standard (production SLA)
+# aks_sku_tier = "Free"
+
+# System node pool
+system_node_pool_vm_size   = "Standard_D2s_v3"
+system_node_pool_count     = 1
+system_node_pool_min_count = 1
+system_node_pool_max_count = 3
+
+# User node pools (optional)
+# user_node_pools = {
+#   "workload" = {
+#     vm_size    = "Standard_D4s_v3"
+#     node_count = 2
+#     min_count  = 1
+#     max_count  = 5
+#     node_labels = {
+#       "workload-type" = "application"
+#     }
+#   }
+#   "gpu" = {
+#     vm_size    = "Standard_NC6s_v3"
+#     node_count = 1
+#     min_count  = 0
+#     max_count  = 2
+#     node_taints = ["nvidia.com/gpu=true:NoSchedule"]
+#     node_labels = {
+#       "workload-type" = "gpu"
+#     }
+#   }
+# }
+
+# Azure AD admin groups (object IDs)
+# aks_admin_group_object_ids = [
+#   "00000000-0000-0000-0000-000000000000"
+# ]
+
+# =============================================================================
+# ACR CONFIGURATION
+# =============================================================================
+
+acr_enabled       = true
+# acr_sku           = "Basic"  # Basic, Standard, Premium
+# acr_admin_enabled = false
+
+# Geo-replication (Premium SKU only)
+# acr_georeplications = [
+#   {
+#     location                  = "westus2"
+#     regional_endpoint_enabled = true
+#     zone_redundancy_enabled   = false
+#   }
+# ]
+
+# =============================================================================
+# KEY VAULT CONFIGURATION
+# =============================================================================
+
+keyvault_enabled = true
+# keyvault_sku     = "standard"  # standard, premium
+
+# Override environment defaults
+# keyvault_purge_protection = true
+# keyvault_soft_delete_days = 90
+
+# Auto-generated secrets (merged with defaults: jwt-secret, jwt-refresh-secret, encryption-key)
+# keyvault_generated_secrets = {
+#   "api-key" = {
+#     length       = 48
+#     special      = false
+#     content_type = "API key"
+#   }
+#   "webhook-secret" = {
+#     length       = 32
+#     special      = true
+#     content_type = "Webhook signing secret"
+#   }
+# }
+
+# User-provided secrets (sensitive - consider using environment variables or Azure DevOps)
+# keyvault_secrets = {
+#   "external-api-key" = {
+#     value        = "your-api-key-here"
+#     content_type = "External API key"
+#   }
+# }
+
+# Additional RBAC role assignments
+# keyvault_role_assignments = {
+#   "app-team" = {
+#     principal_id         = "00000000-0000-0000-0000-000000000000"
+#     role_definition_name = "Key Vault Secrets User"
+#     description          = "Application team read-only access"
+#   }
+# }
+
+# =============================================================================
+# PRIVATE ENDPOINTS
+# =============================================================================
+
+# Enable private endpoints for ACR and Key Vault
+# This is automatically enabled for staging/prod environments
+# enable_private_endpoints = false
+
+# =============================================================================
+# MONITORING
+# =============================================================================
+
+# Enable Log Analytics and monitoring
+enable_monitoring = true
+
+# Log retention (overrides environment default)
+# log_analytics_retention_days = 30
+
+# =============================================================================
+# TAGS
+# =============================================================================
+
+tags = {
+  Owner       = "Platform Team"
+  CostCenter  = "Engineering"
+  Application = "QuikApp"
+}

@@ -1,0 +1,21 @@
+{
+  "new_message": "Nuevo mensaje de {sender}",
+  "new_message_body": "{sender}: {message}",
+  "missed_call": "Llamada perdida de {caller}",
+  "incoming_call": "Llamada entrante de {caller}",
+  "new_group_message": "Nuevo mensaje en {group}",
+  "added_to_group": "{user} te agregó a {group}",
+  "removed_from_group": "Fuiste removido de {group}",
+  "group_name_changed": "El nombre del grupo cambió a {name}",
+  "new_broadcast": "Nueva difusión de {sender}",
+  "status_update": "{user} actualizó su estado",
+  "mention": "{user} te mencionó en {group}",
+  "reaction": "{user} reaccionó a tu mensaje",
+  "poll_created": "{user} creó una nueva encuesta en {group}",
+  "poll_ended": "La encuesta terminó en {group}",
+  "scheduled_message": "Mensaje programado enviado",
+  "export_ready": "Tu exportación de datos está lista para descargar",
+  "password_changed": "Tu contraseña fue cambiada exitosamente",
+  "login_new_device": "Nuevo inicio de sesión detectado desde {device}",
+  "account_verified": "Tu cuenta ha sido verificada"
+}

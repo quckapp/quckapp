@@ -1,0 +1,29 @@
+{
+  "id": "architecture/websockets",
+  "title": "WebSocket Architecture",
+  "description": "Real-time communication with Socket.IO",
+  "source": "@site/docs/architecture/websockets.md",
+  "sourceDirName": "architecture",
+  "slug": "/architecture/websockets",
+  "permalink": "/docs/architecture/websockets",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/quckchat/backend/tree/main/docs/docs/architecture/websockets.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 5,
+  "frontMatter": {
+    "sidebar_position": 5,
+    "title": "WebSocket Architecture",
+    "description": "Real-time communication with Socket.IO"
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Database Architecture",
+    "permalink": "/docs/architecture/database"
+  },
+  "next": {
+    "title": "Security Architecture",
+    "permalink": "/docs/architecture/security"
+  }
+}

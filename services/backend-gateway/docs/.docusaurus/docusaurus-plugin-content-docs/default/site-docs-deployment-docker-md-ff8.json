@@ -1,0 +1,29 @@
+{
+  "id": "deployment/docker",
+  "title": "Docker Deployment",
+  "description": "Docker and Docker Compose deployment guide",
+  "source": "@site/docs/deployment/docker.md",
+  "sourceDirName": "deployment",
+  "slug": "/deployment/docker",
+  "permalink": "/docs/deployment/docker",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/quckchat/backend/tree/main/docs/docs/deployment/docker.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 2,
+  "frontMatter": {
+    "sidebar_position": 2,
+    "title": "Docker Deployment",
+    "description": "Docker and Docker Compose deployment guide"
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Environments",
+    "permalink": "/docs/deployment/environments"
+  },
+  "next": {
+    "title": "Railway Deployment",
+    "permalink": "/docs/deployment/railway"
+  }
+}

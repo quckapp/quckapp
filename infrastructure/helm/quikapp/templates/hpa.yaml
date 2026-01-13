@@ -1,0 +1,101 @@
+{{/*
+Generate HorizontalPodAutoscalers for services with autoscaling enabled
+*/}}
+
+{{- $services := dict
+  "backendGateway" .Values.backendGateway
+  "notificationService" .Values.notificationService
+  "realtimeService" .Values.realtimeService
+  "authService" .Values.authService
+  "userService" .Values.userService
+  "permissionService" .Values.permissionService
+  "auditService" .Values.auditService
+  "adminService" .Values.adminService
+  "presenceService" .Values.presenceService
+  "messageService" .Values.messageService
+  "callService" .Values.callService
+  "notificationOrchestrator" .Values.notificationOrchestrator
+  "huddleService" .Values.huddleService
+  "eventBroadcastService" .Values.eventBroadcastService
+  "workspaceService" .Values.workspaceService
+  "channelService" .Values.channelService
+  "threadService" .Values.threadService
+  "searchService" .Values.searchService
+  "fileService" .Values.fileService
+  "mediaService" .Values.mediaService
+  "bookmarkService" .Values.bookmarkService
+  "reminderService" .Values.reminderService
+  "attachmentService" .Values.attachmentService
+  "cdnService" .Values.cdnService
+  "analyticsService" .Values.analyticsService
+  "mlService" .Values.mlService
+  "moderationService" .Values.moderationService
+  "exportService" .Values.exportService
+  "integrationService" .Values.integrationService
+  "sentimentService" .Values.sentimentService
+  "insightsService" .Values.insightsService
+  "smartReplyService" .Values.smartReplyService
+-}}
+
+{{- range $key, $service := $services }}
+{{- if and $service.enabled $service.autoscaling }}
+{{- if $service.autoscaling.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $service.name }}
+  namespace: {{ $.Values.global.namespace | default $.Release.Namespace }}
+  labels:
+    {{- include "quikapp.serviceLabels" (dict "root" $ "serviceName" $service.name "component" "backend") | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ $service.name }}
+  minReplicas: {{ $service.autoscaling.minReplicas | default 1 }}
+  maxReplicas: {{ $service.autoscaling.maxReplicas | default 10 }}
+  metrics:
+    {{- if $service.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ $service.autoscaling.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if $service.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ $service.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- end }}
+    {{- if $service.autoscaling.customMetrics }}
+    {{- toYaml $service.autoscaling.customMetrics | nindent 4 }}
+    {{- end }}
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 10
+          periodSeconds: 60
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+        - type: Pods
+          value: 4
+          periodSeconds: 15
+      selectPolicy: Max
+{{- end }}
+{{- end }}
+{{- end }}

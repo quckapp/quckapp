@@ -1,0 +1,29 @@
+{
+  "id": "api-reference/openapi",
+  "title": "OpenAPI Specification",
+  "description": "OpenAPI/Swagger specification for QuckChat API",
+  "source": "@site/docs/api-reference/openapi.md",
+  "sourceDirName": "api-reference",
+  "slug": "/api-reference/openapi",
+  "permalink": "/docs/api-reference/openapi",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/quckchat/backend/tree/main/docs/docs/api-reference/openapi.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 1,
+  "frontMatter": {
+    "sidebar_position": 1,
+    "title": "OpenAPI Specification",
+    "description": "OpenAPI/Swagger specification for QuckChat API"
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Implementation Summary",
+    "permalink": "/docs/features/implementation-summary"
+  },
+  "next": {
+    "title": "Postman Collection",
+    "permalink": "/docs/api-reference/postman"
+  }
+}

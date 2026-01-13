@@ -1,0 +1,379 @@
+# =============================================================================
+# TERRAFORM INFRASTRUCTURE DEPLOYMENT PIPELINE
+# =============================================================================
+# Deploys Azure infrastructure using Terraform modules (AKS, ACR, Key Vault)
+#
+# Environments: dev -> qa -> staging -> prod
+# Each environment requires approval before apply
+# =============================================================================
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    include:
+      - infrastructure/terraform/**
+    exclude:
+      - infrastructure/terraform/README.md
+      - infrastructure/terraform/**/*.md
+
+pr:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    include:
+      - infrastructure/terraform/**
+
+# =============================================================================
+# PARAMETERS
+# =============================================================================
+
+parameters:
+  - name: environment
+    displayName: 'Target Environment'
+    type: string
+    default: 'dev'
+    values:
+      - dev
+      - qa
+      - uat1
+      - uat2
+      - uat3
+      - staging
+      - prod
+      - live
+
+  - name: action
+    displayName: 'Terraform Action'
+    type: string
+    default: 'plan'
+    values:
+      - plan
+      - apply
+      - destroy
+
+  - name: autoApprove
+    displayName: 'Auto-approve apply (non-prod only)'
+    type: boolean
+    default: false
+
+  - name: destroyConfirm
+    displayName: 'Confirm destroy (type environment name)'
+    type: string
+    default: ''
+
+# =============================================================================
+# VARIABLES
+# =============================================================================
+
+variables:
+  - group: quikapp-terraform-common
+  - name: terraformVersion
+    value: '1.5.7'
+  - name: terraformWorkingDir
+    value: '$(System.DefaultWorkingDirectory)/infrastructure/terraform'
+  - name: tfStateResourceGroup
+    value: 'rg-quikapp-tfstate'
+  - name: tfStateStorageAccount
+    value: 'stquikapptfstate'
+  - name: tfStateContainer
+    value: 'tfstate'
+  - name: tfStateKey
+    value: 'quikapp-${{ parameters.environment }}.tfstate'
+
+# =============================================================================
+# STAGES
+# =============================================================================
+
+stages:
+  # ===========================================================================
+  # VALIDATION STAGE
+  # ===========================================================================
+  - stage: Validate
+    displayName: 'Validate Terraform'
+    jobs:
+      - job: Validate
+        displayName: 'Validate Configuration'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - checkout: self
+            fetchDepth: 1
+
+          - task: TerraformInstaller@1
+            displayName: 'Install Terraform ${{ variables.terraformVersion }}'
+            inputs:
+              terraformVersion: '${{ variables.terraformVersion }}'
+
+          - task: AzureCLI@2
+            displayName: 'Terraform Init (Validation)'
+            inputs:
+              azureSubscription: '$(azureServiceConnection)'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              workingDirectory: '$(terraformWorkingDir)'
+              inlineScript: |
+                terraform init \
+                  -backend-config="resource_group_name=$(tfStateResourceGroup)" \
+                  -backend-config="storage_account_name=$(tfStateStorageAccount)" \
+                  -backend-config="container_name=$(tfStateContainer)" \
+                  -backend-config="key=$(tfStateKey)"
+
+          - script: |
+              terraform fmt -check -recursive
+            displayName: 'Terraform Format Check'
+            workingDirectory: '$(terraformWorkingDir)'
+
+          - script: |
+              terraform validate
+            displayName: 'Terraform Validate'
+            workingDirectory: '$(terraformWorkingDir)'
+
+          - task: TerraformTaskV4@4
+            displayName: 'Security Scan (tfsec)'
+            inputs:
+              provider: 'azurerm'
+              command: 'custom'
+              customCommand: 'version'
+              workingDirectory: '$(terraformWorkingDir)'
+            continueOnError: true
+
+  # ===========================================================================
+  # PLAN STAGE
+  # ===========================================================================
+  - stage: Plan
+    displayName: 'Plan - ${{ parameters.environment }}'
+    dependsOn: Validate
+    condition: succeeded()
+    jobs:
+      - job: Plan
+        displayName: 'Terraform Plan'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - checkout: self
+            fetchDepth: 1
+
+          - task: TerraformInstaller@1
+            displayName: 'Install Terraform'
+            inputs:
+              terraformVersion: '${{ variables.terraformVersion }}'
+
+          - template: templates/terraform-init.yml
+            parameters:
+              workingDirectory: '$(terraformWorkingDir)'
+              azureServiceConnection: '$(azureServiceConnection)'
+              backendResourceGroup: '$(tfStateResourceGroup)'
+              backendStorageAccount: '$(tfStateStorageAccount)'
+              backendContainer: '$(tfStateContainer)'
+              backendKey: '$(tfStateKey)'
+
+          - template: templates/terraform-plan.yml
+            parameters:
+              workingDirectory: '$(terraformWorkingDir)'
+              azureServiceConnection: '$(azureServiceConnection)'
+              environment: '${{ parameters.environment }}'
+              publishPlan: true
+
+  # ===========================================================================
+  # APPLY STAGE (with approval)
+  # ===========================================================================
+  - stage: Apply
+    displayName: 'Apply - ${{ parameters.environment }}'
+    dependsOn: Plan
+    condition: |
+      and(
+        succeeded(),
+        eq('${{ parameters.action }}', 'apply'),
+        or(
+          eq('${{ parameters.autoApprove }}', 'true'),
+          in('${{ parameters.environment }}', 'dev', 'qa')
+        )
+      )
+    jobs:
+      - deployment: Apply
+        displayName: 'Terraform Apply'
+        pool:
+          vmImage: 'ubuntu-latest'
+        environment: 'terraform-${{ parameters.environment }}'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                  fetchDepth: 1
+
+                - task: TerraformInstaller@1
+                  displayName: 'Install Terraform'
+                  inputs:
+                    terraformVersion: '${{ variables.terraformVersion }}'
+
+                - template: templates/terraform-init.yml
+                  parameters:
+                    workingDirectory: '$(terraformWorkingDir)'
+                    azureServiceConnection: '$(azureServiceConnection)'
+                    backendResourceGroup: '$(tfStateResourceGroup)'
+                    backendStorageAccount: '$(tfStateStorageAccount)'
+                    backendContainer: '$(tfStateContainer)'
+                    backendKey: '$(tfStateKey)'
+
+                - template: templates/terraform-apply.yml
+                  parameters:
+                    workingDirectory: '$(terraformWorkingDir)'
+                    azureServiceConnection: '$(azureServiceConnection)'
+                    environment: '${{ parameters.environment }}'
+
+  # ===========================================================================
+  # APPLY WITH APPROVAL (staging/prod)
+  # ===========================================================================
+  - stage: ApplyWithApproval
+    displayName: 'Apply (Approval Required) - ${{ parameters.environment }}'
+    dependsOn: Plan
+    condition: |
+      and(
+        succeeded(),
+        eq('${{ parameters.action }}', 'apply'),
+        eq('${{ parameters.autoApprove }}', 'false'),
+        in('${{ parameters.environment }}', 'uat1', 'uat2', 'uat3', 'staging', 'prod', 'live')
+      )
+    jobs:
+      - deployment: ApplyWithApproval
+        displayName: 'Terraform Apply (Approved)'
+        pool:
+          vmImage: 'ubuntu-latest'
+        environment: 'terraform-${{ parameters.environment }}-approval'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                  fetchDepth: 1
+
+                - task: TerraformInstaller@1
+                  displayName: 'Install Terraform'
+                  inputs:
+                    terraformVersion: '${{ variables.terraformVersion }}'
+
+                - template: templates/terraform-init.yml
+                  parameters:
+                    workingDirectory: '$(terraformWorkingDir)'
+                    azureServiceConnection: '$(azureServiceConnection)'
+                    backendResourceGroup: '$(tfStateResourceGroup)'
+                    backendStorageAccount: '$(tfStateStorageAccount)'
+                    backendContainer: '$(tfStateContainer)'
+                    backendKey: '$(tfStateKey)'
+
+                - template: templates/terraform-apply.yml
+                  parameters:
+                    workingDirectory: '$(terraformWorkingDir)'
+                    azureServiceConnection: '$(azureServiceConnection)'
+                    environment: '${{ parameters.environment }}'
+
+  # ===========================================================================
+  # DESTROY STAGE (requires explicit confirmation)
+  # ===========================================================================
+  - stage: Destroy
+    displayName: 'DESTROY - ${{ parameters.environment }}'
+    dependsOn: Validate
+    condition: |
+      and(
+        succeeded(),
+        eq('${{ parameters.action }}', 'destroy'),
+        eq('${{ parameters.destroyConfirm }}', '${{ parameters.environment }}')
+      )
+    jobs:
+      - deployment: Destroy
+        displayName: 'Terraform Destroy'
+        pool:
+          vmImage: 'ubuntu-latest'
+        environment: 'terraform-${{ parameters.environment }}-destroy'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                  fetchDepth: 1
+
+                - task: TerraformInstaller@1
+                  displayName: 'Install Terraform'
+                  inputs:
+                    terraformVersion: '${{ variables.terraformVersion }}'
+
+                - template: templates/terraform-init.yml
+                  parameters:
+                    workingDirectory: '$(terraformWorkingDir)'
+                    azureServiceConnection: '$(azureServiceConnection)'
+                    backendResourceGroup: '$(tfStateResourceGroup)'
+                    backendStorageAccount: '$(tfStateStorageAccount)'
+                    backendContainer: '$(tfStateContainer)'
+                    backendKey: '$(tfStateKey)'
+
+                - template: templates/terraform-destroy.yml
+                  parameters:
+                    workingDirectory: '$(terraformWorkingDir)'
+                    azureServiceConnection: '$(azureServiceConnection)'
+                    environment: '${{ parameters.environment }}'
+
+  # ===========================================================================
+  # OUTPUT STAGE
+  # ===========================================================================
+  - stage: Outputs
+    displayName: 'Show Outputs - ${{ parameters.environment }}'
+    dependsOn:
+      - Apply
+      - ApplyWithApproval
+    condition: |
+      or(
+        succeeded('Apply'),
+        succeeded('ApplyWithApproval')
+      )
+    jobs:
+      - job: ShowOutputs
+        displayName: 'Display Terraform Outputs'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - checkout: self
+            fetchDepth: 1
+
+          - task: TerraformInstaller@1
+            displayName: 'Install Terraform'
+            inputs:
+              terraformVersion: '${{ variables.terraformVersion }}'
+
+          - template: templates/terraform-init.yml
+            parameters:
+              workingDirectory: '$(terraformWorkingDir)'
+              azureServiceConnection: '$(azureServiceConnection)'
+              backendResourceGroup: '$(tfStateResourceGroup)'
+              backendStorageAccount: '$(tfStateStorageAccount)'
+              backendContainer: '$(tfStateContainer)'
+              backendKey: '$(tfStateKey)'
+
+          - task: AzureCLI@2
+            displayName: 'Show Terraform Outputs'
+            inputs:
+              azureSubscription: '$(azureServiceConnection)'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              workingDirectory: '$(terraformWorkingDir)'
+              inlineScript: |
+                echo "=========================================="
+                echo "TERRAFORM OUTPUTS - ${{ parameters.environment }}"
+                echo "=========================================="
+                terraform output -json | jq '.'
+
+                echo ""
+                echo "=========================================="
+                echo "KEY OUTPUTS"
+                echo "=========================================="
+                echo "AKS Cluster: $(terraform output -raw aks_name 2>/dev/null || echo 'N/A')"
+                echo "ACR Login Server: $(terraform output -raw acr_login_server 2>/dev/null || echo 'N/A')"
+                echo "Key Vault URI: $(terraform output -raw keyvault_uri 2>/dev/null || echo 'N/A')"
+                echo ""
+                echo "Get AKS credentials:"
+                terraform output -raw aks_kube_config_command 2>/dev/null || echo 'N/A'

@@ -1,0 +1,8 @@
+dist
+node_modules
+coverage
+*.md
+.git
+.husky
+*.lock
+package-lock.json

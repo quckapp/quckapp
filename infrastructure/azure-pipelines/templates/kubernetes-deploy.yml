@@ -1,0 +1,120 @@
+# =============================================================================
+# KUBERNETES DEPLOY TEMPLATE
+# =============================================================================
+# Reusable template for deploying to Kubernetes
+# =============================================================================
+
+parameters:
+  - name: environment
+    type: string
+  - name: kubernetesServiceConnection
+    type: string
+  - name: namespace
+    type: string
+  - name: kustomizeOverlay
+    type: string
+  - name: imageTag
+    type: string
+    default: ''
+  - name: services
+    type: string
+    default: 'all'
+  - name: timeout
+    type: number
+    default: 600
+
+steps:
+  - checkout: self
+    fetchDepth: 1
+
+  - bash: |
+      echo "=== Deployment Configuration ==="
+      echo "Environment: ${{ parameters.environment }}"
+      echo "Namespace: ${{ parameters.namespace }}"
+      echo "Overlay: ${{ parameters.kustomizeOverlay }}"
+      echo "Image Tag: ${{ parameters.imageTag }}"
+      echo "Services: ${{ parameters.services }}"
+      echo "================================"
+    displayName: 'Display Configuration'
+
+  # Install Kustomize
+  - bash: |
+      curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+      sudo mv kustomize /usr/local/bin/
+      kustomize version
+    displayName: 'Install Kustomize'
+
+  # Build manifests with Kustomize
+  - bash: |
+      mkdir -p $(Pipeline.Workspace)/manifests
+
+      cd $(System.DefaultWorkingDirectory)/k8s/overlays/${{ parameters.kustomizeOverlay }}
+
+      # Update image tags if specified
+      if [ -n "${{ parameters.imageTag }}" ]; then
+        echo "Updating image tags to ${{ parameters.imageTag }}"
+        kustomize edit set image "quikapp.azurecr.io/*:${{ parameters.imageTag }}"
+      fi
+
+      # Build manifests
+      kustomize build . > $(Pipeline.Workspace)/manifests/deployment.yaml
+
+      echo "=== Generated Manifests ==="
+      cat $(Pipeline.Workspace)/manifests/deployment.yaml | head -100
+      echo "..."
+    displayName: 'Build Kustomize Manifests'
+
+  # Update namespace if environment-specific
+  - bash: |
+      if [ "${{ parameters.namespace }}" != "quikapp" ]; then
+        echo "Updating namespace to ${{ parameters.namespace }}"
+        sed -i 's/namespace: quikapp/namespace: ${{ parameters.namespace }}/g' \
+          $(Pipeline.Workspace)/manifests/deployment.yaml
+      fi
+    displayName: 'Update Namespace'
+    condition: ne('${{ parameters.namespace }}', 'quikapp')
+
+  # Create namespace if not exists
+  - task: Kubernetes@1
+    displayName: 'Ensure Namespace Exists'
+    inputs:
+      connectionType: 'Kubernetes Service Connection'
+      kubernetesServiceEndpoint: '${{ parameters.kubernetesServiceConnection }}'
+      command: 'apply'
+      useConfigurationFile: true
+      configurationType: 'inline'
+      inline: |
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: ${{ parameters.namespace }}
+          labels:
+            app.kubernetes.io/part-of: quikapp
+            environment: ${{ parameters.environment }}
+
+  # Deploy manifests
+  - task: KubernetesManifest@0
+    displayName: 'Deploy to Kubernetes'
+    inputs:
+      action: 'deploy'
+      kubernetesServiceConnection: '${{ parameters.kubernetesServiceConnection }}'
+      namespace: '${{ parameters.namespace }}'
+      manifests: |
+        $(Pipeline.Workspace)/manifests/deployment.yaml
+      rolloutStatusTimeout: '${{ parameters.timeout }}'
+
+  # Wait for rollout
+  - task: Kubernetes@1
+    displayName: 'Wait for Rollout'
+    inputs:
+      connectionType: 'Kubernetes Service Connection'
+      kubernetesServiceEndpoint: '${{ parameters.kubernetesServiceConnection }}'
+      namespace: '${{ parameters.namespace }}'
+      command: 'rollout'
+      arguments: 'status deployment --timeout=${{ parameters.timeout }}s'
+    continueOnError: true
+
+  # Publish manifests as artifact
+  - publish: $(Pipeline.Workspace)/manifests
+    artifact: 'manifests-${{ parameters.environment }}-$(Build.BuildId)'
+    displayName: 'Publish Manifests'

@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "quck-480609-2e86a",
+  "private_key_id": "bbcae31e303b3d8564091d34249c9f3fa5e6d73b",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7iBNjnHVDpgn9\n6WR4a2jR0ayOqDjDVvRAxuHsJJDMlEmenskmhoCTykC+IWpIxSWtwQrUIjPkOuin\nipN+JdxC62zlQfaG3UvKrDYRHDYk3O6YcKWuBKFv6XMof3VchA+sOdAtxncns3H5\n24Cz5Tpu/cQUmboj6mrLYOgiARkIQwdTeUfjinJveVJHFJZLFDWv8i3tq//FcxWR\nk6ufiTMdjTI2TQlYPQSiJ6FNg5p/s9JvO/R2ewLg2LvQkefvd4N0lN7mHGXoxRNg\nEG/Wp3IylWZ8xpMijpwjkZ9DKnQE1ijc626AjyGFXzsLvT/3n2Yzf7tGrF4PjeyD\nSwLUXsBRAgMBAAECggEACXZeGsEaw6KS+ikMJO1ag80eIAafR+/7xsb3la2UptX2\npFZ5FNoQOSTT686406+AQrUCYbN7cHvZIGxkG9HiPCLamEjMnSp5DWLEyaE69Co3\nryEZTbS1xp/+FmA0C5/YQJrxhQBwzmPbZOhCpWZ0HS9DH7z6q57uQOaEtVkz1Pr4\nArpH9zjnbewzbg0Jy/15Jm0sMVxLrWQKoZBcoEG5PqYkAvpbmSE4vuVfVWZ6f8SL\nvrt8U3KjZ5jpQvUfwITBaB93e7rmueUnKFnCd1aLwOdLCeu5fHq8uBm9ClT1WVF7\nzdopBAskhJO9pnQfNP+Bg0FuBhEcc+QeYpucRMRXKQKBgQDr9PpkyILKkcb/ltns\n28Z4sz84FbtYoCc6ecjI/FRiAEhEw9Av/Yfg0EpMfFyZRcNKcc7QRi4Nj6+xdC1S\n8PPQ3sedbvRM05EsAGrk4x6p0WB0zH3T/zT4VyvjRISNhDbhMc39qkIkTVn8yNyd\nQhUOedhks0UP+sXCs6qIFNGHdQKBgQDLdg8Y3s+OdhrH4Dqsc6gfcQeNo8adB06D\nFtaZWshsFYlc/mM0qrRgGrqrjYTJ2u820vjOplYNmCbRupCTk6ecesSNGRfHlIJI\naeKCPAhvCIYXxfqTvmv8HcBdMa2GVL2XbpQxgiaZZoBXjFLc0CRVhkEW5t9tLRxR\nfqaQ7/DV7QKBgC2Gzg1GFt5I9FF6ZL/rw8akJy2GG+jEtez1dIU7Enj6PvdtpKyt\nyVraNYu+bwtvx3eEr/fForshHzApD1myfgiuA2vf7akpJRiNWBKjs9XmPSssDZcq\n5aiJAUHPhZfci841kt4/zJU+i39XriF1j6SEY/lCEbA8nY2sptms0qTFAoGAL9J0\nAfh8+JMyAEDoCZi1r441pEkWadpJze4USr9X1G/LdZwlXT+yXdRqg+Ajkf5vs4cr\nDAd0uoVEuo8LZGSUROdmQ3Pebv6tELAymUHbCZ4LRpM2LnvXjc7AZCdFDgnk9i77\njhd1UyEQkYNeBqC1qZSAwA1L/rFXsp/+Lpr3FJECgYEAwviV7Oc5Zug02A4iKyFP\nHJ/bca4PqJ/2TT88wMxQ/y/INI/xUdisx1Sn8BIJdXF66vFX20Avnt7/0KV0hx65\nvZWL3rfXlp05yfV8zGQiX5JGY3c9p7+IvTDkuaUvowdT14djtLtzfBtyY7ka1y3X\n8ULIdoQS0M5AvotnITE7HSE=\n-----END PRIVATE KEY-----\n",
+  "client_email": "quckchat-backup@quck-480609-2e86a.iam.gserviceaccount.com",
+  "client_id": "115359326662444994547",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/quckchat-backup%40quck-480609-2e86a.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

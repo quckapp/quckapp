@@ -1,0 +1,29 @@
+{
+  "id": "getting-started/integration-status",
+  "title": "Integration Status",
+  "description": "Backend and MongoDB integration status for all features",
+  "source": "@site/docs/getting-started/integration-status.md",
+  "sourceDirName": "getting-started",
+  "slug": "/getting-started/integration-status",
+  "permalink": "/docs/getting-started/integration-status",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/quckchat/backend/tree/main/docs/docs/getting-started/integration-status.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 4,
+  "frontMatter": {
+    "sidebar_position": 4,
+    "title": "Integration Status",
+    "description": "Backend and MongoDB integration status for all features"
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Configuration",
+    "permalink": "/docs/getting-started/configuration"
+  },
+  "next": {
+    "title": "Testing Guide",
+    "permalink": "/docs/getting-started/testing-guide"
+  }
+}

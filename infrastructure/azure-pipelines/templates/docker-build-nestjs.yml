@@ -1,0 +1,159 @@
+# =============================================================================
+# DOCKER BUILD TEMPLATE - NESTJS
+# =============================================================================
+# Build and push NestJS service Docker images
+# =============================================================================
+
+parameters:
+  - name: serviceName
+    type: string
+  - name: serviceDir
+    type: string
+  - name: imageTag
+    type: string
+  - name: acrLoginServer
+    type: string
+  - name: pushImage
+    type: boolean
+    default: true
+  - name: scanImage
+    type: boolean
+    default: true
+  - name: nodeVersion
+    type: string
+    default: '20'
+  - name: condition
+    type: string
+    default: 'true'
+
+steps:
+  - bash: |
+      echo "=== Building NestJS Service ==="
+      echo "Service: ${{ parameters.serviceName }}"
+      echo "Directory: ${{ parameters.serviceDir }}"
+      echo "Tag: ${{ parameters.imageTag }}"
+      echo "Node Version: ${{ parameters.nodeVersion }}"
+      echo "==============================="
+    displayName: 'Display Build Info'
+    condition: ${{ parameters.condition }}
+
+  # Setup Node.js
+  - task: NodeTool@0
+    displayName: 'Setup Node.js ${{ parameters.nodeVersion }}'
+    condition: ${{ parameters.condition }}
+    inputs:
+      versionSpec: '${{ parameters.nodeVersion }}'
+
+  # Cache npm dependencies
+  - task: Cache@2
+    displayName: 'Cache npm Dependencies'
+    condition: ${{ parameters.condition }}
+    inputs:
+      key: 'npm | "$(Agent.OS)" | ${{ parameters.serviceDir }}/package-lock.json'
+      restoreKeys: |
+        npm | "$(Agent.OS)"
+      path: ${{ parameters.serviceDir }}/node_modules
+
+  # Install dependencies
+  - bash: |
+      cd ${{ parameters.serviceDir }}
+      npm ci
+    displayName: 'Install Dependencies'
+    condition: ${{ parameters.condition }}
+
+  # Lint
+  - bash: |
+      cd ${{ parameters.serviceDir }}
+      npm run lint || true
+    displayName: 'Lint Code'
+    condition: ${{ parameters.condition }}
+    continueOnError: true
+
+  # Run tests
+  - bash: |
+      cd ${{ parameters.serviceDir }}
+      npm run test -- --passWithNoTests
+    displayName: 'Run Unit Tests'
+    condition: ${{ parameters.condition }}
+    continueOnError: true
+
+  # Build
+  - bash: |
+      cd ${{ parameters.serviceDir }}
+      npm run build
+    displayName: 'Build Application'
+    condition: ${{ parameters.condition }}
+
+  # Login to ACR
+  - task: Docker@2
+    displayName: 'Login to ACR'
+    condition: and(${{ parameters.condition }}, ${{ parameters.pushImage }})
+    inputs:
+      containerRegistry: 'quikapp-acr-connection'
+      command: 'login'
+
+  # Build Docker image
+  - bash: |
+      cd ${{ parameters.serviceDir }}
+
+      # Check for custom Dockerfile
+      if [ -f "Dockerfile" ]; then
+        DOCKERFILE="Dockerfile"
+      else
+        DOCKERFILE="$(System.DefaultWorkingDirectory)/infrastructure/docker/dockerfiles/nestjs/Dockerfile"
+      fi
+
+      docker build \
+        -t ${{ parameters.acrLoginServer }}/${{ parameters.serviceName }}:${{ parameters.imageTag }} \
+        -t ${{ parameters.acrLoginServer }}/${{ parameters.serviceName }}:$(Build.BuildId) \
+        --build-arg NODE_VERSION=${{ parameters.nodeVersion }} \
+        --label "org.opencontainers.image.source=$(Build.Repository.Uri)" \
+        --label "org.opencontainers.image.revision=$(Build.SourceVersion)" \
+        --label "org.opencontainers.image.created=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+        --label "com.quikapp.service=${{ parameters.serviceName }}" \
+        --label "com.quikapp.technology=nestjs" \
+        -f $DOCKERFILE \
+        .
+
+      echo "Image built: ${{ parameters.acrLoginServer }}/${{ parameters.serviceName }}:${{ parameters.imageTag }}"
+    displayName: 'Build Docker Image'
+    condition: ${{ parameters.condition }}
+
+  # Security scan with Trivy
+  - bash: |
+      # Install Trivy
+      wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+      echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/trivy.list
+      sudo apt-get update && sudo apt-get install -y trivy
+
+      # Scan image
+      trivy image \
+        --exit-code 0 \
+        --severity HIGH,CRITICAL \
+        --format table \
+        ${{ parameters.acrLoginServer }}/${{ parameters.serviceName }}:${{ parameters.imageTag }}
+
+      # Generate SARIF report
+      trivy image \
+        --format sarif \
+        --output $(Build.ArtifactStagingDirectory)/${{ parameters.serviceName }}-trivy.sarif \
+        ${{ parameters.acrLoginServer }}/${{ parameters.serviceName }}:${{ parameters.imageTag }}
+    displayName: 'Security Scan'
+    condition: and(${{ parameters.condition }}, ${{ parameters.scanImage }})
+    continueOnError: true
+
+  # Push to ACR
+  - bash: |
+      docker push ${{ parameters.acrLoginServer }}/${{ parameters.serviceName }}:${{ parameters.imageTag }}
+      docker push ${{ parameters.acrLoginServer }}/${{ parameters.serviceName }}:$(Build.BuildId)
+
+      echo "Pushed: ${{ parameters.acrLoginServer }}/${{ parameters.serviceName }}:${{ parameters.imageTag }}"
+    displayName: 'Push to ACR'
+    condition: and(${{ parameters.condition }}, ${{ parameters.pushImage }})
+
+  # Publish scan results
+  - publish: $(Build.ArtifactStagingDirectory)/${{ parameters.serviceName }}-trivy.sarif
+    artifact: 'security-scan-${{ parameters.serviceName }}'
+    displayName: 'Publish Security Report'
+    condition: and(${{ parameters.condition }}, ${{ parameters.scanImage }})
+    continueOnError: true

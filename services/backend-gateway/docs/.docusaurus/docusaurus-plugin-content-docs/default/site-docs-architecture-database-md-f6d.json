@@ -1,0 +1,29 @@
+{
+  "id": "architecture/database",
+  "title": "Database Architecture",
+  "description": "MongoDB schema design and data modeling",
+  "source": "@site/docs/architecture/database.md",
+  "sourceDirName": "architecture",
+  "slug": "/architecture/database",
+  "permalink": "/docs/architecture/database",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/quckchat/backend/tree/main/docs/docs/architecture/database.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 4,
+  "frontMatter": {
+    "sidebar_position": 4,
+    "title": "Database Architecture",
+    "description": "MongoDB schema design and data modeling"
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "API Gateway",
+    "permalink": "/docs/architecture/gateway"
+  },
+  "next": {
+    "title": "WebSocket Architecture",
+    "permalink": "/docs/architecture/websockets"
+  }
+}

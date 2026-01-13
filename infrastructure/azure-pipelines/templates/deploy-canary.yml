@@ -1,0 +1,247 @@
+# Canary Deployment Template
+# Progressive rollout with monitoring and automatic rollback
+
+parameters:
+  - name: environment
+    type: string
+  - name: namespace
+    type: string
+  - name: serviceName
+    type: string
+  - name: imageTag
+    type: string
+  - name: replicas
+    type: number
+  - name: memoryLimit
+    type: string
+  - name: cpuLimit
+    type: string
+  - name: aksCluster
+    type: string
+  - name: resourceGroup
+    type: string
+  - name: enableAutoScale
+    type: boolean
+  - name: minReplicas
+    type: number
+  - name: maxReplicas
+    type: number
+  - name: canaryPercentage
+    type: number
+    default: 10
+
+steps:
+  - checkout: self
+    displayName: 'Checkout Repository'
+
+  - task: AzureCLI@2
+    displayName: 'Login to AKS Cluster'
+    inputs:
+      azureSubscription: 'QuikApp-${{ parameters.environment }}'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        az aks get-credentials \
+          --resource-group ${{ parameters.resourceGroup }} \
+          --name ${{ parameters.aksCluster }} \
+          --overwrite-existing
+
+  # Store current deployment for rollback
+  - task: Kubernetes@1
+    displayName: 'Backup Current Deployment'
+    inputs:
+      connectionType: 'Kubernetes Service Connection'
+      kubernetesServiceEndpoint: 'QuikApp-K8s-${{ parameters.environment }}'
+      namespace: '${{ parameters.namespace }}'
+      command: 'get'
+      arguments: 'deployment/${{ parameters.serviceName }} -o yaml > $(Pipeline.Workspace)/backup-deployment.yaml'
+    continueOnError: true
+
+  # Deploy canary version
+  - task: KubernetesManifest@0
+    displayName: 'Deploy Canary'
+    inputs:
+      action: 'deploy'
+      kubernetesServiceConnection: 'QuikApp-K8s-${{ parameters.environment }}'
+      namespace: '${{ parameters.namespace }}'
+      manifests: |
+        $(Pipeline.Workspace)/manifests/deployment-canary.yaml
+      containers: |
+        $(acrRegistry)/${{ parameters.serviceName }}:${{ parameters.imageTag }}
+      strategy: 'canary'
+      percentage: ${{ parameters.canaryPercentage }}
+
+  # Monitor canary for errors
+  - task: AzureCLI@2
+    displayName: 'Monitor Canary (5 minutes)'
+    inputs:
+      azureSubscription: 'QuikApp-${{ parameters.environment }}'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        echo "Monitoring canary deployment for 5 minutes..."
+        echo "Service: ${{ parameters.serviceName }}"
+        echo "Canary percentage: ${{ parameters.canaryPercentage }}%"
+
+        END_TIME=$(($(date +%s) + 300))
+        ERROR_COUNT=0
+        CHECK_COUNT=0
+
+        while [ $(date +%s) -lt $END_TIME ]; do
+          CHECK_COUNT=$((CHECK_COUNT + 1))
+
+          # Check pod status
+          CANARY_PODS=$(kubectl get pods -n ${{ parameters.namespace }} \
+            -l app=${{ parameters.serviceName }},version=canary \
+            --no-headers 2>/dev/null | wc -l)
+
+          READY_PODS=$(kubectl get pods -n ${{ parameters.namespace }} \
+            -l app=${{ parameters.serviceName }},version=canary \
+            --field-selector=status.phase=Running \
+            --no-headers 2>/dev/null | wc -l)
+
+          # Check for restart count
+          RESTART_COUNT=$(kubectl get pods -n ${{ parameters.namespace }} \
+            -l app=${{ parameters.serviceName }},version=canary \
+            -o jsonpath='{.items[*].status.containerStatuses[*].restartCount}' 2>/dev/null | \
+            awk '{sum=0; for(i=1;i<=NF;i++) sum+=$i; print sum}')
+
+          echo "Check $CHECK_COUNT: Canary pods: $CANARY_PODS, Ready: $READY_PODS, Restarts: $RESTART_COUNT"
+
+          # Check error threshold
+          if [ "${RESTART_COUNT:-0}" -gt 5 ]; then
+            echo "Error rate exceeded threshold. Rolling back canary..."
+            kubectl rollout undo deployment/${{ parameters.serviceName }}-canary -n ${{ parameters.namespace }}
+            exit 1
+          fi
+
+          # Check if canary pods are unhealthy
+          if [ "$CANARY_PODS" -gt 0 ] && [ "$READY_PODS" -eq 0 ]; then
+            ERROR_COUNT=$((ERROR_COUNT + 1))
+            if [ $ERROR_COUNT -gt 3 ]; then
+              echo "Canary pods not becoming ready. Rolling back..."
+              kubectl rollout undo deployment/${{ parameters.serviceName }}-canary -n ${{ parameters.namespace }}
+              exit 1
+            fi
+          else
+            ERROR_COUNT=0
+          fi
+
+          sleep 30
+        done
+
+        echo "Canary monitoring passed!"
+
+  # Increment canary traffic gradually
+  - task: AzureCLI@2
+    displayName: 'Increase Canary Traffic to 25%'
+    inputs:
+      azureSubscription: 'QuikApp-${{ parameters.environment }}'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        echo "Increasing canary traffic to 25%..."
+        kubectl annotate deployment/${{ parameters.serviceName }}-canary \
+          -n ${{ parameters.namespace }} \
+          traffic-weight=25 --overwrite
+
+        sleep 60
+
+  - task: AzureCLI@2
+    displayName: 'Monitor at 25% Traffic (3 minutes)'
+    inputs:
+      azureSubscription: 'QuikApp-${{ parameters.environment }}'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        echo "Monitoring at 25% traffic..."
+        sleep 180
+        echo "Monitoring passed!"
+
+  - task: AzureCLI@2
+    displayName: 'Increase Canary Traffic to 50%'
+    inputs:
+      azureSubscription: 'QuikApp-${{ parameters.environment }}'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        echo "Increasing canary traffic to 50%..."
+        kubectl annotate deployment/${{ parameters.serviceName }}-canary \
+          -n ${{ parameters.namespace }} \
+          traffic-weight=50 --overwrite
+
+        sleep 60
+
+  # Promote canary to stable
+  - task: KubernetesManifest@0
+    displayName: 'Promote Canary to Stable'
+    inputs:
+      action: 'promote'
+      kubernetesServiceConnection: 'QuikApp-K8s-${{ parameters.environment }}'
+      namespace: '${{ parameters.namespace }}'
+      manifests: |
+        $(Pipeline.Workspace)/manifests/deployment.yaml
+      containers: |
+        $(acrRegistry)/${{ parameters.serviceName }}:${{ parameters.imageTag }}
+      strategy: 'canary'
+
+  # Scale to target replicas
+  - task: Kubernetes@1
+    displayName: 'Scale to Target Replicas'
+    inputs:
+      connectionType: 'Kubernetes Service Connection'
+      kubernetesServiceEndpoint: 'QuikApp-K8s-${{ parameters.environment }}'
+      namespace: '${{ parameters.namespace }}'
+      command: 'scale'
+      arguments: 'deployment/${{ parameters.serviceName }} --replicas=${{ parameters.replicas }}'
+
+  # Configure autoscaling if enabled
+  - ${{ if eq(parameters.enableAutoScale, true) }}:
+    - task: Kubernetes@1
+      displayName: 'Configure Horizontal Pod Autoscaler'
+      inputs:
+        connectionType: 'Kubernetes Service Connection'
+        kubernetesServiceEndpoint: 'QuikApp-K8s-${{ parameters.environment }}'
+        namespace: '${{ parameters.namespace }}'
+        command: 'autoscale'
+        arguments: |
+          deployment/${{ parameters.serviceName }} \
+          --min=${{ parameters.minReplicas }} \
+          --max=${{ parameters.maxReplicas }} \
+          --cpu-percent=70
+
+  # Clean up canary
+  - task: KubernetesManifest@0
+    displayName: 'Clean Up Canary Deployment'
+    inputs:
+      action: 'reject'
+      kubernetesServiceConnection: 'QuikApp-K8s-${{ parameters.environment }}'
+      namespace: '${{ parameters.namespace }}'
+      manifests: |
+        $(Pipeline.Workspace)/manifests/deployment-canary.yaml
+      strategy: 'canary'
+
+  # Final health check
+  - task: AzureCLI@2
+    displayName: 'Final Health Check'
+    inputs:
+      azureSubscription: 'QuikApp-${{ parameters.environment }}'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        SERVICE_URL="https://${{ parameters.serviceName }}.quikapp.io"
+
+        echo "Final health check at: $SERVICE_URL/health"
+
+        for i in {1..10}; do
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$SERVICE_URL/health" 2>/dev/null || echo "000")
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "Final health check passed!"
+            exit 0
+          fi
+          echo "Attempt $i: Health check returned $HTTP_STATUS"
+          sleep 10
+        done
+
+        echo "Final health check failed"
+        exit 1

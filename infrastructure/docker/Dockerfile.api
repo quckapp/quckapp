@@ -1,0 +1,68 @@
+# =============================================================================
+# QuikApp API Dockerfile (Standalone)
+# =============================================================================
+# Alternative standalone Dockerfile for the API service.
+# Use if you prefer separate Dockerfiles per service.
+#
+# Build:
+#   docker build -f docker/Dockerfile.api -t quikapp/api .
+# =============================================================================
+
+FROM node:20-alpine AS base
+RUN apk add --no-cache libc6-compat curl tini
+WORKDIR /app
+
+# -----------------------------------------------------------------------------
+# Dependencies
+# -----------------------------------------------------------------------------
+FROM base AS deps
+COPY package.json package-lock.json* yarn.lock* pnpm-lock.yaml* ./
+RUN \
+    if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
+    elif [ -f package-lock.json ]; then npm ci; \
+    elif [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm i --frozen-lockfile; \
+    else echo "No lockfile found." && exit 1; fi
+
+# -----------------------------------------------------------------------------
+# Builder
+# -----------------------------------------------------------------------------
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npm run build && npm prune --production
+
+# -----------------------------------------------------------------------------
+# Production
+# -----------------------------------------------------------------------------
+FROM base AS production
+
+LABEL org.opencontainers.image.title="QuikApp API"
+LABEL org.opencontainers.image.version="1.0.0"
+
+# Create non-root user
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 quikapp
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV PORT=3000
+
+# Copy application
+COPY --from=builder --chown=quikapp:nodejs /app/dist ./dist
+COPY --from=builder --chown=quikapp:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=quikapp:nodejs /app/package.json ./
+
+# Setup runtime directories
+RUN mkdir -p .cache /tmp && chown -R quikapp:nodejs .cache /tmp
+
+USER quikapp
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:3000/health/live || exit 1
+
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["node", "dist/main.js"]

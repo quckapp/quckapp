@@ -1,0 +1,52 @@
+# Elixir CD Pipeline
+# Deploys Elixir/Phoenix services through all environments
+
+trigger: none
+
+resources:
+  pipelines:
+    - pipeline: ElixirCI
+      source: 'Elixir CI'
+      trigger:
+        branches:
+          include:
+            - main
+            - develop
+
+parameters:
+  - name: serviceName
+    type: string
+    displayName: 'Service Name'
+    values:
+      - presence-service
+      - message-service
+      - call-service
+      - notification-orchestrator
+      - huddle-service
+      - event-broadcast-service
+  - name: deployToEnvironments
+    type: object
+    displayName: 'Environments to Deploy'
+    default:
+      - local
+      - dev
+      - qa
+      - uat1
+      - uat2
+      - uat3
+      - staging
+      - live
+
+variables:
+  - group: QuikApp-Global-Variables
+  - group: QuikApp-Elixir-Variables
+  - name: techStack
+    value: 'elixir'
+
+extends:
+  template: cd-main.yml
+  parameters:
+    techStack: 'elixir'
+    serviceName: ${{ parameters.serviceName }}
+    imageTag: $(resources.pipeline.ElixirCI.runID)
+    deployToEnvironments: ${{ parameters.deployToEnvironments }}

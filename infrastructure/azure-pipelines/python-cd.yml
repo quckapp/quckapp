@@ -1,0 +1,54 @@
+# Python CD Pipeline
+# Deploys Python/FastAPI services through all environments
+
+trigger: none
+
+resources:
+  pipelines:
+    - pipeline: PythonCI
+      source: 'Python CI'
+      trigger:
+        branches:
+          include:
+            - main
+            - develop
+
+parameters:
+  - name: serviceName
+    type: string
+    displayName: 'Service Name'
+    values:
+      - analytics-service
+      - ml-service
+      - moderation-service
+      - export-service
+      - integration-service
+      - sentiment-service
+      - insights-service
+      - smart-reply-service
+  - name: deployToEnvironments
+    type: object
+    displayName: 'Environments to Deploy'
+    default:
+      - local
+      - dev
+      - qa
+      - uat1
+      - uat2
+      - uat3
+      - staging
+      - live
+
+variables:
+  - group: QuikApp-Global-Variables
+  - group: QuikApp-Python-Variables
+  - name: techStack
+    value: 'python'
+
+extends:
+  template: cd-main.yml
+  parameters:
+    techStack: 'python'
+    serviceName: ${{ parameters.serviceName }}
+    imageTag: $(resources.pipeline.PythonCI.runID)
+    deployToEnvironments: ${{ parameters.deployToEnvironments }}

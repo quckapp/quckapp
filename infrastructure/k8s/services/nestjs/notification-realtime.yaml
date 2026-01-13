@@ -1,0 +1,350 @@
+# =============================================================================
+# NOTIFICATION SERVICE (NestJS)
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  namespace: quikapp
+  labels:
+    app.kubernetes.io/name: notification-service
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: quikapp
+    app.kubernetes.io/technology: nestjs
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: notification-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: notification-service
+        app.kubernetes.io/component: backend
+        app.kubernetes.io/part-of: quikapp
+        app.kubernetes.io/technology: nestjs
+        app.kubernetes.io/uses-broker: "true"
+        app.kubernetes.io/uses-external-api: "true"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
+    spec:
+      serviceAccountName: quikapp-backend-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: notification-service
+          image: quikapp.azurecr.io/notification-service:latest
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-common-config
+                  key: NODE_ENV
+            - name: PORT
+              value: "3000"
+            # Database
+            - name: MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: quikapp-database-secrets
+                  key: MONGODB_URI
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-database-config
+                  key: REDIS_HOST
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: quikapp-database-secrets
+                  key: REDIS_PASSWORD
+            # Kafka
+            - name: KAFKA_BROKERS
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-broker-config
+                  key: KAFKA_BROKERS
+            # Firebase Push Notifications
+            - name: FIREBASE_PROJECT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: quikapp-external-secrets
+                  key: FIREBASE_PROJECT_ID
+            - name: FIREBASE_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: quikapp-external-secrets
+                  key: FIREBASE_PRIVATE_KEY
+            - name: FIREBASE_CLIENT_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: quikapp-external-secrets
+                  key: FIREBASE_CLIENT_EMAIL
+            # Twilio SMS
+            - name: TWILIO_ACCOUNT_SID
+              valueFrom:
+                secretKeyRef:
+                  name: quikapp-external-secrets
+                  key: TWILIO_ACCOUNT_SID
+            - name: TWILIO_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: quikapp-external-secrets
+                  key: TWILIO_AUTH_TOKEN
+            # Monitoring
+            - name: OTEL_SERVICE_NAME
+              value: "notification-service"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  namespace: quikapp
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+  selector:
+    app.kubernetes.io/name: notification-service
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: notification-service-hpa
+  namespace: quikapp
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: notification-service
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+---
+# =============================================================================
+# REALTIME SERVICE (NestJS + Socket.io)
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: realtime-service
+  namespace: quikapp
+  labels:
+    app.kubernetes.io/name: realtime-service
+    app.kubernetes.io/component: websocket
+    app.kubernetes.io/part-of: quikapp
+    app.kubernetes.io/technology: nestjs
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: realtime-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: realtime-service
+        app.kubernetes.io/component: websocket
+        app.kubernetes.io/part-of: quikapp
+        app.kubernetes.io/technology: nestjs
+        app.kubernetes.io/uses-broker: "true"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
+    spec:
+      serviceAccountName: quikapp-backend-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: realtime-service
+          image: quikapp.azurecr.io/realtime-service:latest
+          ports:
+            - name: http
+              containerPort: 3000
+            - name: websocket
+              containerPort: 3001
+          env:
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-common-config
+                  key: NODE_ENV
+            - name: HTTP_PORT
+              value: "3000"
+            - name: WS_PORT
+              value: "3001"
+            # Redis for Socket.io adapter (sticky sessions)
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-database-config
+                  key: REDIS_HOST
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: quikapp-database-secrets
+                  key: REDIS_PASSWORD
+            # JWT for WebSocket auth
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: quikapp-jwt-secrets
+                  key: JWT_SECRET
+            # Kafka for events
+            - name: KAFKA_BROKERS
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-broker-config
+                  key: KAFKA_BROKERS
+            # CORS
+            - name: CORS_ORIGIN
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-common-config
+                  key: CORS_ORIGIN
+            # Monitoring
+            - name: OTEL_SERVICE_NAME
+              value: "realtime-service"
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: realtime-service
+                topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: realtime-service
+  namespace: quikapp
+  annotations:
+    # Enable sticky sessions for WebSocket
+    service.kubernetes.io/topology-aware-hints: auto
+spec:
+  type: ClusterIP
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+    - name: websocket
+      port: 3001
+      targetPort: websocket
+  selector:
+    app.kubernetes.io/name: realtime-service
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: realtime-service-hpa
+  namespace: quikapp
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: realtime-service
+  minReplicas: 3
+  maxReplicas: 15
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 70
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: realtime-service-pdb
+  namespace: quikapp
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: realtime-service

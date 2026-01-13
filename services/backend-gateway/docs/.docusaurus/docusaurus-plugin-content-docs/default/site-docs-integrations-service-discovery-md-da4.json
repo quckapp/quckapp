@@ -1,0 +1,25 @@
+{
+  "id": "integrations/service-discovery",
+  "title": "Service Discovery & Secrets",
+  "description": "Consul and HashiCorp Vault configuration",
+  "source": "@site/docs/integrations/service-discovery.md",
+  "sourceDirName": "integrations",
+  "slug": "/integrations/service-discovery",
+  "permalink": "/docs/integrations/service-discovery",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/quckchat/backend/tree/main/docs/docs/integrations/service-discovery.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 6,
+  "frontMatter": {
+    "sidebar_position": 6,
+    "title": "Service Discovery & Secrets",
+    "description": "Consul and HashiCorp Vault configuration"
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Message Brokers",
+    "permalink": "/docs/integrations/message-brokers"
+  }
+}

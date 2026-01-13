@@ -1,0 +1,29 @@
+{
+  "id": "architecture/gateway",
+  "title": "API Gateway",
+  "description": "API Gateway architecture and features",
+  "source": "@site/docs/architecture/gateway.md",
+  "sourceDirName": "architecture",
+  "slug": "/architecture/gateway",
+  "permalink": "/docs/architecture/gateway",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/quckchat/backend/tree/main/docs/docs/architecture/gateway.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 3,
+  "frontMatter": {
+    "sidebar_position": 3,
+    "title": "API Gateway",
+    "description": "API Gateway architecture and features"
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Microservices Architecture",
+    "permalink": "/docs/architecture/microservices"
+  },
+  "next": {
+    "title": "Database Architecture",
+    "permalink": "/docs/architecture/database"
+  }
+}

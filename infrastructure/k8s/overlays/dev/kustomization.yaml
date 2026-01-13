@@ -1,0 +1,128 @@
+# =============================================================================
+# DEVELOPMENT ENVIRONMENT OVERLAY
+# =============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: quikapp-dev
+
+namespace: quikapp-dev
+
+# Reference base configuration
+resources:
+  - ../../base
+
+# Environment-specific labels
+commonLabels:
+  environment: dev
+
+# Environment-specific annotations
+commonAnnotations:
+  quikapp.io/environment: development
+
+# Namespace transformation
+nameSuffix: ""
+
+# Patches for development environment
+patches:
+  # Reduce replica counts for dev
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+
+  # Reduce HPA min replicas
+  - target:
+      kind: HorizontalPodAutoscaler
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 3
+
+  # Reduce resource requests for dev
+  - target:
+      kind: Deployment
+      name: backend-gateway
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: "50m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: "128Mi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: "500m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: "256Mi"
+
+# ConfigMap patches
+configMapGenerator:
+  - name: quikapp-common-config
+    behavior: merge
+    literals:
+      - NODE_ENV=development
+      - ENVIRONMENT=dev
+      - LOG_LEVEL=debug
+      - CORS_ORIGIN=*
+
+  - name: quikapp-version
+    behavior: replace
+    literals:
+      - VERSION=dev
+      - BUILD_DATE=unknown
+      - ENVIRONMENT=dev
+
+# Image tags for dev (using latest for dev)
+images:
+  - name: quikapp.azurecr.io/backend-gateway
+    newTag: dev
+  - name: quikapp.azurecr.io/auth-service
+    newTag: dev
+  - name: quikapp.azurecr.io/user-service
+    newTag: dev
+  - name: quikapp.azurecr.io/workspace-service
+    newTag: dev
+  - name: quikapp.azurecr.io/channel-service
+    newTag: dev
+  - name: quikapp.azurecr.io/thread-service
+    newTag: dev
+  - name: quikapp.azurecr.io/search-service
+    newTag: dev
+  - name: quikapp.azurecr.io/file-service
+    newTag: dev
+  - name: quikapp.azurecr.io/media-service
+    newTag: dev
+  - name: quikapp.azurecr.io/notification-service
+    newTag: dev
+  - name: quikapp.azurecr.io/realtime-service
+    newTag: dev
+  - name: quikapp.azurecr.io/presence-service
+    newTag: dev
+  - name: quikapp.azurecr.io/message-service
+    newTag: dev
+  - name: quikapp.azurecr.io/call-service
+    newTag: dev
+  - name: quikapp.azurecr.io/huddle-service
+    newTag: dev
+  - name: quikapp.azurecr.io/analytics-service
+    newTag: dev
+  - name: quikapp.azurecr.io/ml-service
+    newTag: dev
+  - name: quikapp.azurecr.io/moderation-service
+    newTag: dev
+  - name: quikapp.azurecr.io/sentiment-service
+    newTag: dev
+  - name: quikapp.azurecr.io/permission-service
+    newTag: dev
+  - name: quikapp.azurecr.io/audit-service
+    newTag: dev
+  - name: quikapp.azurecr.io/admin-service
+    newTag: dev

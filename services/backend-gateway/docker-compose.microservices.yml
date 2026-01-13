@@ -1,0 +1,397 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # Infrastructure Services
+  # ============================================
+
+  mongodb:
+    image: mongo:7.0
+    container_name: quickchat-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-password}
+      MONGO_INITDB_DATABASE: quickchat
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - quickchat-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: quickchat-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redispass}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - quickchat-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redispass}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # API Gateway
+  # ============================================
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway
+    container_name: quickchat-api-gateway
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+      - "3001:3001"  # WebSocket port
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3000
+      MONGODB_URI: mongodb://${MONGO_USERNAME:-admin}:${MONGO_PASSWORD:-password}@mongodb:27017/quickchat?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redispass}
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-your-refresh-secret-key}
+      # Service Hosts
+      AUTH_SERVICE_HOST: auth-service
+      AUTH_SERVICE_TCP_PORT: 4001
+      USERS_SERVICE_HOST: users-service
+      USERS_SERVICE_TCP_PORT: 4002
+      MESSAGES_SERVICE_HOST: messages-service
+      MESSAGES_SERVICE_TCP_PORT: 4003
+      CONVERSATIONS_SERVICE_HOST: conversations-service
+      CONVERSATIONS_SERVICE_TCP_PORT: 4004
+      NOTIFICATIONS_SERVICE_HOST: notifications-service
+      NOTIFICATIONS_SERVICE_TCP_PORT: 4005
+      MEDIA_SERVICE_HOST: media-service
+      MEDIA_SERVICE_TCP_PORT: 4006
+      CALLS_SERVICE_HOST: calls-service
+      CALLS_SERVICE_TCP_PORT: 4007
+      ANALYTICS_SERVICE_HOST: analytics-service
+      ANALYTICS_SERVICE_TCP_PORT: 4008
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      users-service:
+        condition: service_started
+    networks:
+      - quickchat-network
+
+  # ============================================
+  # Auth Service
+  # ============================================
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE_NAME: auth-service
+    container_name: quickchat-auth-service
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      SERVICE_NAME: auth-service
+      MONGODB_URI: mongodb://${MONGO_USERNAME:-admin}:${MONGO_PASSWORD:-password}@mongodb:27017/quickchat?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redispass}
+      AUTH_SERVICE_HOST: 0.0.0.0
+      AUTH_SERVICE_TCP_PORT: 4001
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-your-refresh-secret-key}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      USERS_SERVICE_HOST: users-service
+      USERS_SERVICE_TCP_PORT: 4002
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-default-encryption-key-32-chars!}
+    ports:
+      - "4001:4001"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - quickchat-network
+
+  # ============================================
+  # Users Service
+  # ============================================
+
+  users-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE_NAME: users-service
+    container_name: quickchat-users-service
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      SERVICE_NAME: users-service
+      MONGODB_URI: mongodb://${MONGO_USERNAME:-admin}:${MONGO_PASSWORD:-password}@mongodb:27017/quickchat?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redispass}
+      USERS_SERVICE_HOST: 0.0.0.0
+      USERS_SERVICE_TCP_PORT: 4002
+    ports:
+      - "4002:4002"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - quickchat-network
+
+  # ============================================
+  # Messages Service
+  # ============================================
+
+  messages-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE_NAME: messages-service
+    container_name: quickchat-messages-service
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      SERVICE_NAME: messages-service
+      MONGODB_URI: mongodb://${MONGO_USERNAME:-admin}:${MONGO_PASSWORD:-password}@mongodb:27017/quickchat?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redispass}
+      MESSAGES_SERVICE_HOST: 0.0.0.0
+      MESSAGES_SERVICE_TCP_PORT: 4003
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-default-encryption-key-32-chars!}
+      CONVERSATIONS_SERVICE_HOST: conversations-service
+      CONVERSATIONS_SERVICE_TCP_PORT: 4004
+      NOTIFICATIONS_SERVICE_HOST: notifications-service
+      NOTIFICATIONS_SERVICE_TCP_PORT: 4005
+    ports:
+      - "4003:4003"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - quickchat-network
+
+  # ============================================
+  # Conversations Service
+  # ============================================
+
+  conversations-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE_NAME: conversations-service
+    container_name: quickchat-conversations-service
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      SERVICE_NAME: conversations-service
+      MONGODB_URI: mongodb://${MONGO_USERNAME:-admin}:${MONGO_PASSWORD:-password}@mongodb:27017/quickchat?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redispass}
+      CONVERSATIONS_SERVICE_HOST: 0.0.0.0
+      CONVERSATIONS_SERVICE_TCP_PORT: 4004
+      USERS_SERVICE_HOST: users-service
+      USERS_SERVICE_TCP_PORT: 4002
+      MESSAGES_SERVICE_HOST: messages-service
+      MESSAGES_SERVICE_TCP_PORT: 4003
+    ports:
+      - "4004:4004"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - quickchat-network
+
+  # ============================================
+  # Notifications Service
+  # ============================================
+
+  notifications-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE_NAME: notifications-service
+    container_name: quickchat-notifications-service
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      SERVICE_NAME: notifications-service
+      MONGODB_URI: mongodb://${MONGO_USERNAME:-admin}:${MONGO_PASSWORD:-password}@mongodb:27017/quickchat?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redispass}
+      NOTIFICATIONS_SERVICE_HOST: 0.0.0.0
+      NOTIFICATIONS_SERVICE_TCP_PORT: 4005
+      USERS_SERVICE_HOST: users-service
+      USERS_SERVICE_TCP_PORT: 4002
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      FIREBASE_PRIVATE_KEY: ${FIREBASE_PRIVATE_KEY:-}
+      FIREBASE_CLIENT_EMAIL: ${FIREBASE_CLIENT_EMAIL:-}
+    ports:
+      - "4005:4005"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - quickchat-network
+
+  # ============================================
+  # Media Service
+  # ============================================
+
+  media-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE_NAME: media-service
+    container_name: quickchat-media-service
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      SERVICE_NAME: media-service
+      MONGODB_URI: mongodb://${MONGO_USERNAME:-admin}:${MONGO_PASSWORD:-password}@mongodb:27017/quickchat?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redispass}
+      MEDIA_SERVICE_HOST: 0.0.0.0
+      MEDIA_SERVICE_TCP_PORT: 4006
+      UPLOAD_PATH: /uploads
+      MAX_FILE_SIZE: 104857600  # 100MB
+    ports:
+      - "4006:4006"
+    volumes:
+      - uploads_data:/uploads
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - quickchat-network
+
+  # ============================================
+  # Calls Service
+  # ============================================
+
+  calls-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE_NAME: calls-service
+    container_name: quickchat-calls-service
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      SERVICE_NAME: calls-service
+      MONGODB_URI: mongodb://${MONGO_USERNAME:-admin}:${MONGO_PASSWORD:-password}@mongodb:27017/quickchat?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redispass}
+      CALLS_SERVICE_HOST: 0.0.0.0
+      CALLS_SERVICE_TCP_PORT: 4007
+      USERS_SERVICE_HOST: users-service
+      USERS_SERVICE_TCP_PORT: 4002
+      NOTIFICATIONS_SERVICE_HOST: notifications-service
+      NOTIFICATIONS_SERVICE_TCP_PORT: 4005
+      STUN_SERVERS: ${STUN_SERVERS:-stun:stun.l.google.com:19302}
+      TURN_SERVER_URL: ${TURN_SERVER_URL:-}
+      TURN_USERNAME: ${TURN_USERNAME:-}
+      TURN_CREDENTIAL: ${TURN_CREDENTIAL:-}
+    ports:
+      - "4007:4007"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - quickchat-network
+
+  # ============================================
+  # Analytics Service
+  # ============================================
+
+  analytics-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        SERVICE_NAME: analytics-service
+    container_name: quickchat-analytics-service
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      SERVICE_NAME: analytics-service
+      MONGODB_URI: mongodb://${MONGO_USERNAME:-admin}:${MONGO_PASSWORD:-password}@mongodb:27017/quickchat?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redispass}
+      ANALYTICS_SERVICE_HOST: 0.0.0.0
+      ANALYTICS_SERVICE_TCP_PORT: 4008
+    ports:
+      - "4008:4008"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - quickchat-network
+
+# ============================================
+# Networks
+# ============================================
+
+networks:
+  quickchat-network:
+    driver: bridge
+    name: quickchat-network
+
+# ============================================
+# Volumes
+# ============================================
+
+volumes:
+  mongodb_data:
+    name: quickchat-mongodb-data
+  redis_data:
+    name: quickchat-redis-data
+  uploads_data:
+    name: quickchat-uploads-data

@@ -1,0 +1,135 @@
+# =============================================================================
+# TERRAFORM ENVIRONMENT STAGE TEMPLATE
+# =============================================================================
+# Complete stage template for deploying infrastructure to a single environment
+# Includes: plan, approval (if required), apply, and output display
+# =============================================================================
+
+parameters:
+  - name: environment
+    type: string
+
+  - name: displayName
+    type: string
+    default: ''
+
+  - name: azureServiceConnection
+    type: string
+
+  - name: dependsOn
+    type: object
+    default: []
+
+  - name: condition
+    type: string
+    default: 'succeeded()'
+
+  - name: requiresApproval
+    type: boolean
+    default: false
+
+  - name: terraformVersion
+    type: string
+    default: '1.5.7'
+
+  - name: workingDirectory
+    type: string
+    default: '$(System.DefaultWorkingDirectory)/infrastructure/terraform'
+
+  - name: backendResourceGroup
+    type: string
+    default: 'rg-quikapp-tfstate'
+
+  - name: backendStorageAccount
+    type: string
+    default: 'stquikapptfstate'
+
+  - name: backendContainer
+    type: string
+    default: 'tfstate'
+
+stages:
+  # ===========================================================================
+  # PLAN STAGE
+  # ===========================================================================
+  - stage: Plan_${{ parameters.environment }}
+    displayName: 'Plan - ${{ coalesce(parameters.displayName, parameters.environment) }}'
+    dependsOn: ${{ parameters.dependsOn }}
+    condition: ${{ parameters.condition }}
+    variables:
+      tfStateKey: 'quikapp-${{ parameters.environment }}.tfstate'
+    jobs:
+      - job: Plan
+        displayName: 'Terraform Plan'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - checkout: self
+            fetchDepth: 1
+
+          - task: TerraformInstaller@1
+            displayName: 'Install Terraform'
+            inputs:
+              terraformVersion: '${{ parameters.terraformVersion }}'
+
+          - template: terraform-init.yml
+            parameters:
+              workingDirectory: '${{ parameters.workingDirectory }}'
+              azureServiceConnection: '${{ parameters.azureServiceConnection }}'
+              backendResourceGroup: '${{ parameters.backendResourceGroup }}'
+              backendStorageAccount: '${{ parameters.backendStorageAccount }}'
+              backendContainer: '${{ parameters.backendContainer }}'
+              backendKey: '$(tfStateKey)'
+
+          - template: terraform-plan.yml
+            parameters:
+              workingDirectory: '${{ parameters.workingDirectory }}'
+              azureServiceConnection: '${{ parameters.azureServiceConnection }}'
+              environment: '${{ parameters.environment }}'
+              publishPlan: true
+
+  # ===========================================================================
+  # APPLY STAGE (with optional approval)
+  # ===========================================================================
+  - stage: Apply_${{ parameters.environment }}
+    displayName: 'Apply - ${{ coalesce(parameters.displayName, parameters.environment) }}'
+    dependsOn: Plan_${{ parameters.environment }}
+    condition: succeeded()
+    variables:
+      tfStateKey: 'quikapp-${{ parameters.environment }}.tfstate'
+    jobs:
+      - deployment: Apply
+        displayName: 'Terraform Apply'
+        pool:
+          vmImage: 'ubuntu-latest'
+        # Use environment with approval if required
+        ${{ if eq(parameters.requiresApproval, true) }}:
+          environment: 'terraform-${{ parameters.environment }}-approval'
+        ${{ else }}:
+          environment: 'terraform-${{ parameters.environment }}'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                  fetchDepth: 1
+
+                - task: TerraformInstaller@1
+                  displayName: 'Install Terraform'
+                  inputs:
+                    terraformVersion: '${{ parameters.terraformVersion }}'
+
+                - template: terraform-init.yml
+                  parameters:
+                    workingDirectory: '${{ parameters.workingDirectory }}'
+                    azureServiceConnection: '${{ parameters.azureServiceConnection }}'
+                    backendResourceGroup: '${{ parameters.backendResourceGroup }}'
+                    backendStorageAccount: '${{ parameters.backendStorageAccount }}'
+                    backendContainer: '${{ parameters.backendContainer }}'
+                    backendKey: '$(tfStateKey)'
+
+                - template: terraform-apply.yml
+                  parameters:
+                    workingDirectory: '${{ parameters.workingDirectory }}'
+                    azureServiceConnection: '${{ parameters.azureServiceConnection }}'
+                    environment: '${{ parameters.environment }}'

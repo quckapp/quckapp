@@ -1,0 +1,69 @@
+# =============================================================================
+# TERRAFORM INIT TEMPLATE
+# =============================================================================
+# Initializes Terraform with Azure backend configuration
+# =============================================================================
+
+parameters:
+  - name: workingDirectory
+    type: string
+    default: '$(System.DefaultWorkingDirectory)/infrastructure/terraform'
+
+  - name: azureServiceConnection
+    type: string
+
+  - name: backendResourceGroup
+    type: string
+    default: 'rg-quikapp-tfstate'
+
+  - name: backendStorageAccount
+    type: string
+    default: 'stquikapptfstate'
+
+  - name: backendContainer
+    type: string
+    default: 'tfstate'
+
+  - name: backendKey
+    type: string
+    default: 'quikapp.tfstate'
+
+steps:
+  - task: AzureCLI@2
+    displayName: 'Terraform Init'
+    inputs:
+      azureSubscription: '${{ parameters.azureServiceConnection }}'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      workingDirectory: '${{ parameters.workingDirectory }}'
+      addSpnToEnvironment: true
+      inlineScript: |
+        set -e
+
+        echo "=========================================="
+        echo "TERRAFORM INIT"
+        echo "=========================================="
+        echo "Backend Resource Group: ${{ parameters.backendResourceGroup }}"
+        echo "Backend Storage Account: ${{ parameters.backendStorageAccount }}"
+        echo "Backend Container: ${{ parameters.backendContainer }}"
+        echo "Backend Key: ${{ parameters.backendKey }}"
+        echo "=========================================="
+
+        # Export ARM credentials for Terraform
+        export ARM_CLIENT_ID=$servicePrincipalId
+        export ARM_CLIENT_SECRET=$servicePrincipalKey
+        export ARM_TENANT_ID=$tenantId
+        export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+
+        # Initialize Terraform with backend configuration
+        terraform init \
+          -backend-config="resource_group_name=${{ parameters.backendResourceGroup }}" \
+          -backend-config="storage_account_name=${{ parameters.backendStorageAccount }}" \
+          -backend-config="container_name=${{ parameters.backendContainer }}" \
+          -backend-config="key=${{ parameters.backendKey }}" \
+          -input=false \
+          -no-color
+
+        echo ""
+        echo "Terraform initialized successfully!"
+        terraform version

@@ -1,0 +1,38 @@
+apiVersion: v2
+name: quikapp
+description: QuikApp - Enterprise Communication Platform Helm Chart
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+keywords:
+  - microservices
+  - communication
+  - enterprise
+  - messaging
+  - collaboration
+
+home: https://github.com/quikapp/quikapp
+sources:
+  - https://github.com/quikapp/quikapp
+
+maintainers:
+  - name: QuikApp Team
+    email: team@quikapp.io
+
+dependencies:
+  # Infrastructure sub-chart
+  - name: infrastructure
+    version: 1.0.0
+    repository: "file://charts/infrastructure"
+    condition: infrastructure.enabled
+
+  # Monitoring sub-chart
+  - name: monitoring
+    version: 1.0.0
+    repository: "file://charts/monitoring"
+    condition: monitoring.enabled
+
+annotations:
+  category: Communication
+  licenses: Apache-2.0

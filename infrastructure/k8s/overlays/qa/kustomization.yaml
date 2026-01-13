@@ -1,0 +1,121 @@
+# =============================================================================
+# QA ENVIRONMENT OVERLAY
+# =============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: quikapp-qa
+
+namespace: quikapp-qa
+
+resources:
+  - ../../base
+
+commonLabels:
+  environment: qa
+
+commonAnnotations:
+  quikapp.io/environment: qa
+
+patches:
+  # QA replicas (moderate)
+  - target:
+      kind: Deployment
+      name: backend-gateway
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+
+  - target:
+      kind: Deployment
+      name: realtime-service
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+
+  # Reduce HPA for QA
+  - target:
+      kind: HorizontalPodAutoscaler
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 5
+
+  # Moderate resources for QA
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: "100m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: "256Mi"
+
+configMapGenerator:
+  - name: quikapp-common-config
+    behavior: merge
+    literals:
+      - NODE_ENV=qa
+      - ENVIRONMENT=qa
+      - LOG_LEVEL=info
+      - CORS_ORIGIN=https://qa.quikapp.io
+
+  - name: quikapp-version
+    behavior: replace
+    literals:
+      - VERSION=qa
+      - BUILD_DATE=unknown
+      - ENVIRONMENT=qa
+
+images:
+  - name: quikapp.azurecr.io/backend-gateway
+    newTag: qa
+  - name: quikapp.azurecr.io/auth-service
+    newTag: qa
+  - name: quikapp.azurecr.io/user-service
+    newTag: qa
+  - name: quikapp.azurecr.io/workspace-service
+    newTag: qa
+  - name: quikapp.azurecr.io/channel-service
+    newTag: qa
+  - name: quikapp.azurecr.io/thread-service
+    newTag: qa
+  - name: quikapp.azurecr.io/search-service
+    newTag: qa
+  - name: quikapp.azurecr.io/file-service
+    newTag: qa
+  - name: quikapp.azurecr.io/media-service
+    newTag: qa
+  - name: quikapp.azurecr.io/notification-service
+    newTag: qa
+  - name: quikapp.azurecr.io/realtime-service
+    newTag: qa
+  - name: quikapp.azurecr.io/presence-service
+    newTag: qa
+  - name: quikapp.azurecr.io/message-service
+    newTag: qa
+  - name: quikapp.azurecr.io/call-service
+    newTag: qa
+  - name: quikapp.azurecr.io/huddle-service
+    newTag: qa
+  - name: quikapp.azurecr.io/analytics-service
+    newTag: qa
+  - name: quikapp.azurecr.io/ml-service
+    newTag: qa
+  - name: quikapp.azurecr.io/moderation-service
+    newTag: qa
+  - name: quikapp.azurecr.io/sentiment-service
+    newTag: qa
+  - name: quikapp.azurecr.io/permission-service
+    newTag: qa
+  - name: quikapp.azurecr.io/audit-service
+    newTag: qa
+  - name: quikapp.azurecr.io/admin-service
+    newTag: qa

@@ -1,0 +1,478 @@
+# =============================================================================
+# KUBERNETES DEPLOYMENT PIPELINE
+# =============================================================================
+# Deploy QuikApp microservices to AKS using Kustomize
+# =============================================================================
+
+trigger: none
+
+pr: none
+
+parameters:
+  - name: environment
+    displayName: 'Target Environment'
+    type: string
+    default: 'dev'
+    values:
+      - dev
+      - qa
+      - uat1
+      - uat2
+      - uat3
+      - staging
+      - prod
+      - live
+
+  - name: action
+    displayName: 'Deployment Action'
+    type: string
+    default: 'deploy'
+    values:
+      - deploy
+      - preview
+      - rollback
+      - restart
+      - scale
+
+  - name: services
+    displayName: 'Services to Deploy (comma-separated, or "all")'
+    type: string
+    default: 'all'
+
+  - name: imageTag
+    displayName: 'Image Tag (leave empty for environment default)'
+    type: string
+    default: ''
+
+  - name: rollbackRevision
+    displayName: 'Rollback Revision (for rollback action)'
+    type: number
+    default: 0
+
+  - name: replicaCount
+    displayName: 'Replica Count (for scale action)'
+    type: number
+    default: 0
+
+variables:
+  - group: quikapp-common
+  - group: quikapp-${{ parameters.environment }}
+  - group: quikapp-kubernetes-common
+  - ${{ if in(parameters.environment, 'dev', 'qa') }}:
+    - group: quikapp-kubernetes-nonprod
+  - ${{ if in(parameters.environment, 'uat1', 'uat2', 'uat3', 'staging') }}:
+    - group: quikapp-kubernetes-preprod
+  - ${{ if in(parameters.environment, 'prod', 'live') }}:
+    - group: quikapp-kubernetes-prod
+
+  - name: kubernetesServiceConnection
+    ${{ if eq(parameters.environment, 'dev') }}:
+      value: 'quikapp-aks-dev'
+    ${{ elseif eq(parameters.environment, 'qa') }}:
+      value: 'quikapp-aks-qa'
+    ${{ elseif in(parameters.environment, 'uat1', 'uat2', 'uat3') }}:
+      value: 'quikapp-aks-uat'
+    ${{ elseif eq(parameters.environment, 'staging') }}:
+      value: 'quikapp-aks-staging'
+    ${{ elseif in(parameters.environment, 'prod', 'live') }}:
+      value: 'quikapp-aks-prod'
+
+  - name: namespace
+    ${{ if eq(parameters.environment, 'live') }}:
+      value: 'quikapp'
+    ${{ else }}:
+      value: 'quikapp-${{ parameters.environment }}'
+
+  - name: kustomizeOverlay
+    ${{ if in(parameters.environment, 'dev') }}:
+      value: 'dev'
+    ${{ elseif eq(parameters.environment, 'qa') }}:
+      value: 'qa'
+    ${{ elseif in(parameters.environment, 'uat1', 'uat2', 'uat3') }}:
+      value: 'staging'
+    ${{ elseif eq(parameters.environment, 'staging') }}:
+      value: 'staging'
+    ${{ elseif in(parameters.environment, 'prod', 'live') }}:
+      value: 'prod'
+
+  - name: requiresApproval
+    ${{ if in(parameters.environment, 'prod', 'live') }}:
+      value: true
+    ${{ else }}:
+      value: false
+
+stages:
+  # =============================================================================
+  # VALIDATION STAGE
+  # =============================================================================
+  - stage: Validate
+    displayName: 'Validate Manifests'
+    jobs:
+      - job: ValidateManifests
+        displayName: 'Validate Kubernetes Manifests'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - checkout: self
+            fetchDepth: 1
+
+          - task: KubernetesManifest@0
+            displayName: 'Bake Kustomize Manifests'
+            inputs:
+              action: 'bake'
+              renderType: 'kustomize'
+              kustomizationPath: '$(System.DefaultWorkingDirectory)/k8s/overlays/${{ variables.kustomizeOverlay }}'
+              outputManifestFile: '$(Pipeline.Workspace)/manifests/baked-manifests.yaml'
+
+          - bash: |
+              echo "=== Validating manifests with kubeval ==="
+
+              # Install kubeval
+              wget -q https://github.com/instrumenta/kubeval/releases/latest/download/kubeval-linux-amd64.tar.gz
+              tar xf kubeval-linux-amd64.tar.gz
+              chmod +x kubeval
+
+              # Validate manifests
+              ./kubeval $(Pipeline.Workspace)/manifests/baked-manifests.yaml \
+                --kubernetes-version 1.27.0 \
+                --strict \
+                --ignore-missing-schemas || true
+
+              echo "=== Manifest validation complete ==="
+            displayName: 'Validate with kubeval'
+
+          - bash: |
+              echo "=== Scanning manifests with kubesec ==="
+
+              # Install kubesec
+              wget -q https://github.com/controlplaneio/kubesec/releases/download/v2.13.0/kubesec_linux_amd64.tar.gz
+              tar xf kubesec_linux_amd64.tar.gz
+              chmod +x kubesec
+
+              # Scan for security issues
+              ./kubesec scan $(Pipeline.Workspace)/manifests/baked-manifests.yaml || true
+
+              echo "=== Security scan complete ==="
+            displayName: 'Security Scan with kubesec'
+            condition: succeeded()
+
+          - publish: $(Pipeline.Workspace)/manifests
+            artifact: 'manifests-${{ parameters.environment }}'
+            displayName: 'Publish Manifests Artifact'
+
+  # =============================================================================
+  # PREVIEW STAGE (Dry Run)
+  # =============================================================================
+  - stage: Preview
+    displayName: 'Preview Changes'
+    dependsOn: Validate
+    condition: and(succeeded(), eq('${{ parameters.action }}', 'preview'))
+    jobs:
+      - job: PreviewChanges
+        displayName: 'Preview Deployment Changes'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - download: current
+            artifact: 'manifests-${{ parameters.environment }}'
+
+          - task: Kubernetes@1
+            displayName: 'Dry Run - Preview Changes'
+            inputs:
+              connectionType: 'Kubernetes Service Connection'
+              kubernetesServiceEndpoint: '${{ variables.kubernetesServiceConnection }}'
+              namespace: '${{ variables.namespace }}'
+              command: 'apply'
+              arguments: '-f $(Pipeline.Workspace)/manifests-${{ parameters.environment }}/baked-manifests.yaml --dry-run=server'
+              outputFormat: 'yaml'
+
+  # =============================================================================
+  # DEPLOYMENT STAGE
+  # =============================================================================
+  - stage: Deploy
+    displayName: 'Deploy to ${{ parameters.environment }}'
+    dependsOn: Validate
+    condition: and(succeeded(), eq('${{ parameters.action }}', 'deploy'))
+    ${{ if eq(variables.requiresApproval, true) }}:
+      variables:
+        - name: approvalRequired
+          value: true
+    jobs:
+      - ${{ if eq(variables.requiresApproval, true) }}:
+        - job: WaitForApproval
+          displayName: 'Wait for Approval'
+          pool: server
+          steps:
+            - task: ManualValidation@0
+              displayName: 'Approve Production Deployment'
+              inputs:
+                notifyUsers: |
+                  platform-team@quikapp.io
+                  devops@quikapp.io
+                instructions: |
+                  Please review and approve deployment to ${{ parameters.environment }}
+
+                  Services: ${{ parameters.services }}
+                  Image Tag: ${{ coalesce(parameters.imageTag, variables.kustomizeOverlay) }}
+
+                  Review the manifest artifact before approving.
+                onTimeout: 'reject'
+                timeoutInMinutes: 60
+
+      - deployment: DeployToKubernetes
+        displayName: 'Deploy to AKS'
+        ${{ if eq(variables.requiresApproval, true) }}:
+          dependsOn: WaitForApproval
+        pool:
+          vmImage: 'ubuntu-latest'
+        environment: 'quikapp-${{ parameters.environment }}'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: 'manifests-${{ parameters.environment }}'
+
+                - task: KubernetesManifest@0
+                  displayName: 'Create/Update Namespace'
+                  inputs:
+                    action: 'deploy'
+                    kubernetesServiceConnection: '${{ variables.kubernetesServiceConnection }}'
+                    namespace: '${{ variables.namespace }}'
+                    manifests: |
+                      $(System.DefaultWorkingDirectory)/k8s/base/namespace.yaml
+                  condition: eq('${{ parameters.services }}', 'all')
+
+                - ${{ if ne(parameters.imageTag, '') }}:
+                  - bash: |
+                      echo "=== Updating image tags to ${{ parameters.imageTag }} ==="
+
+                      # Update all image tags in the manifest
+                      sed -i 's|quikapp.azurecr.io/\([^:]*\):[^"]*|quikapp.azurecr.io/\1:${{ parameters.imageTag }}|g' \
+                        $(Pipeline.Workspace)/manifests-${{ parameters.environment }}/baked-manifests.yaml
+
+                      echo "Image tags updated successfully"
+                    displayName: 'Update Image Tags'
+
+                - task: KubernetesManifest@0
+                  displayName: 'Deploy Manifests'
+                  inputs:
+                    action: 'deploy'
+                    kubernetesServiceConnection: '${{ variables.kubernetesServiceConnection }}'
+                    namespace: '${{ variables.namespace }}'
+                    manifests: |
+                      $(Pipeline.Workspace)/manifests-${{ parameters.environment }}/baked-manifests.yaml
+                    rolloutStatusTimeout: '600'
+
+                - task: Kubernetes@1
+                  displayName: 'Verify Deployment Status'
+                  inputs:
+                    connectionType: 'Kubernetes Service Connection'
+                    kubernetesServiceEndpoint: '${{ variables.kubernetesServiceConnection }}'
+                    namespace: '${{ variables.namespace }}'
+                    command: 'get'
+                    arguments: 'deployments -o wide'
+                    outputFormat: 'yaml'
+
+  # =============================================================================
+  # ROLLBACK STAGE
+  # =============================================================================
+  - stage: Rollback
+    displayName: 'Rollback Deployment'
+    dependsOn: []
+    condition: eq('${{ parameters.action }}', 'rollback')
+    jobs:
+      - deployment: RollbackDeployment
+        displayName: 'Rollback to Previous Version'
+        pool:
+          vmImage: 'ubuntu-latest'
+        environment: 'quikapp-${{ parameters.environment }}'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                  fetchDepth: 1
+
+                - ${{ if eq(parameters.services, 'all') }}:
+                  - bash: |
+                      echo "=== Rolling back all deployments ==="
+                      DEPLOYMENTS=$(cat <<'EOF'
+                      backend-gateway
+                      auth-service
+                      user-service
+                      workspace-service
+                      channel-service
+                      thread-service
+                      search-service
+                      file-service
+                      media-service
+                      notification-service
+                      realtime-service
+                      presence-service
+                      message-service
+                      call-service
+                      huddle-service
+                      analytics-service
+                      ml-service
+                      moderation-service
+                      sentiment-service
+                      permission-service
+                      audit-service
+                      admin-service
+                      EOF
+                      )
+                      echo "DEPLOYMENTS<<EOF" >> $GITHUB_ENV
+                      echo "$DEPLOYMENTS" >> $GITHUB_ENV
+                      echo "EOF" >> $GITHUB_ENV
+                    displayName: 'Get All Deployments'
+
+                - ${{ each service in split(parameters.services, ',') }}:
+                  - task: Kubernetes@1
+                    displayName: 'Rollback ${{ service }}'
+                    inputs:
+                      connectionType: 'Kubernetes Service Connection'
+                      kubernetesServiceEndpoint: '${{ variables.kubernetesServiceConnection }}'
+                      namespace: '${{ variables.namespace }}'
+                      command: 'rollout'
+                      ${{ if gt(parameters.rollbackRevision, 0) }}:
+                        arguments: 'undo deployment/${{ service }} --to-revision=${{ parameters.rollbackRevision }}'
+                      ${{ else }}:
+                        arguments: 'undo deployment/${{ service }}'
+                    continueOnError: true
+
+                - task: Kubernetes@1
+                  displayName: 'Verify Rollback Status'
+                  inputs:
+                    connectionType: 'Kubernetes Service Connection'
+                    kubernetesServiceEndpoint: '${{ variables.kubernetesServiceConnection }}'
+                    namespace: '${{ variables.namespace }}'
+                    command: 'rollout'
+                    arguments: 'status deployment --timeout=300s'
+
+  # =============================================================================
+  # RESTART STAGE
+  # =============================================================================
+  - stage: Restart
+    displayName: 'Restart Deployments'
+    dependsOn: []
+    condition: eq('${{ parameters.action }}', 'restart')
+    jobs:
+      - job: RestartPods
+        displayName: 'Rolling Restart'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - ${{ if eq(parameters.services, 'all') }}:
+            - task: Kubernetes@1
+              displayName: 'Restart All Deployments'
+              inputs:
+                connectionType: 'Kubernetes Service Connection'
+                kubernetesServiceEndpoint: '${{ variables.kubernetesServiceConnection }}'
+                namespace: '${{ variables.namespace }}'
+                command: 'rollout'
+                arguments: 'restart deployment'
+
+          - ${{ if ne(parameters.services, 'all') }}:
+            - ${{ each service in split(parameters.services, ',') }}:
+              - task: Kubernetes@1
+                displayName: 'Restart ${{ service }}'
+                inputs:
+                  connectionType: 'Kubernetes Service Connection'
+                  kubernetesServiceEndpoint: '${{ variables.kubernetesServiceConnection }}'
+                  namespace: '${{ variables.namespace }}'
+                  command: 'rollout'
+                  arguments: 'restart deployment/${{ service }}'
+                continueOnError: true
+
+          - task: Kubernetes@1
+            displayName: 'Wait for Restart'
+            inputs:
+              connectionType: 'Kubernetes Service Connection'
+              kubernetesServiceEndpoint: '${{ variables.kubernetesServiceConnection }}'
+              namespace: '${{ variables.namespace }}'
+              command: 'rollout'
+              arguments: 'status deployment --timeout=600s'
+
+  # =============================================================================
+  # SCALE STAGE
+  # =============================================================================
+  - stage: Scale
+    displayName: 'Scale Deployments'
+    dependsOn: []
+    condition: and(eq('${{ parameters.action }}', 'scale'), gt(${{ parameters.replicaCount }}, 0))
+    jobs:
+      - job: ScalePods
+        displayName: 'Scale Replicas'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - ${{ each service in split(parameters.services, ',') }}:
+            - task: Kubernetes@1
+              displayName: 'Scale ${{ service }} to ${{ parameters.replicaCount }}'
+              inputs:
+                connectionType: 'Kubernetes Service Connection'
+                kubernetesServiceEndpoint: '${{ variables.kubernetesServiceConnection }}'
+                namespace: '${{ variables.namespace }}'
+                command: 'scale'
+                arguments: 'deployment/${{ service }} --replicas=${{ parameters.replicaCount }}'
+              continueOnError: true
+
+          - task: Kubernetes@1
+            displayName: 'Verify Scale Status'
+            inputs:
+              connectionType: 'Kubernetes Service Connection'
+              kubernetesServiceEndpoint: '${{ variables.kubernetesServiceConnection }}'
+              namespace: '${{ variables.namespace }}'
+              command: 'get'
+              arguments: 'deployments -o wide'
+
+  # =============================================================================
+  # POST-DEPLOYMENT VERIFICATION
+  # =============================================================================
+  - stage: Verify
+    displayName: 'Post-Deployment Verification'
+    dependsOn: Deploy
+    condition: and(succeeded(), eq('${{ parameters.action }}', 'deploy'))
+    jobs:
+      - job: HealthChecks
+        displayName: 'Run Health Checks'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: Kubernetes@1
+            displayName: 'Check Pod Status'
+            inputs:
+              connectionType: 'Kubernetes Service Connection'
+              kubernetesServiceEndpoint: '${{ variables.kubernetesServiceConnection }}'
+              namespace: '${{ variables.namespace }}'
+              command: 'get'
+              arguments: 'pods -o wide'
+
+          - task: Kubernetes@1
+            displayName: 'Check Service Endpoints'
+            inputs:
+              connectionType: 'Kubernetes Service Connection'
+              kubernetesServiceEndpoint: '${{ variables.kubernetesServiceConnection }}'
+              namespace: '${{ variables.namespace }}'
+              command: 'get'
+              arguments: 'endpoints'
+
+          - task: Kubernetes@1
+            displayName: 'Check HPA Status'
+            inputs:
+              connectionType: 'Kubernetes Service Connection'
+              kubernetesServiceEndpoint: '${{ variables.kubernetesServiceConnection }}'
+              namespace: '${{ variables.namespace }}'
+              command: 'get'
+              arguments: 'hpa'
+
+          - bash: |
+              echo "=== Deployment Summary ==="
+              echo "Environment: ${{ parameters.environment }}"
+              echo "Namespace: ${{ variables.namespace }}"
+              echo "Services: ${{ parameters.services }}"
+              echo "Image Tag: ${{ coalesce(parameters.imageTag, variables.kustomizeOverlay) }}"
+              echo "Pipeline: $(Build.BuildNumber)"
+              echo "========================="
+            displayName: 'Deployment Summary'

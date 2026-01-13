@@ -1,0 +1,175 @@
+# =============================================================================
+# DOCKER BUILD TEMPLATE - GO
+# =============================================================================
+# Build and push Go service Docker images
+# =============================================================================
+
+parameters:
+  - name: serviceName
+    type: string
+  - name: serviceDir
+    type: string
+  - name: imageTag
+    type: string
+  - name: acrLoginServer
+    type: string
+  - name: pushImage
+    type: boolean
+    default: true
+  - name: scanImage
+    type: boolean
+    default: true
+  - name: goVersion
+    type: string
+    default: '1.21'
+  - name: condition
+    type: string
+    default: 'true'
+
+steps:
+  - bash: |
+      echo "=== Building Go Service ==="
+      echo "Service: ${{ parameters.serviceName }}"
+      echo "Directory: ${{ parameters.serviceDir }}"
+      echo "Tag: ${{ parameters.imageTag }}"
+      echo "Go Version: ${{ parameters.goVersion }}"
+      echo "==========================="
+    displayName: 'Display Build Info'
+    condition: ${{ parameters.condition }}
+
+  # Setup Go
+  - task: GoTool@0
+    displayName: 'Setup Go ${{ parameters.goVersion }}'
+    condition: ${{ parameters.condition }}
+    inputs:
+      version: '${{ parameters.goVersion }}'
+
+  # Cache Go modules
+  - task: Cache@2
+    displayName: 'Cache Go Modules'
+    condition: ${{ parameters.condition }}
+    inputs:
+      key: 'go | "$(Agent.OS)" | ${{ parameters.serviceDir }}/go.sum'
+      restoreKeys: |
+        go | "$(Agent.OS)"
+      path: $(GOPATH)/pkg/mod
+
+  # Download dependencies
+  - bash: |
+      cd ${{ parameters.serviceDir }}
+      go mod download
+    displayName: 'Download Dependencies'
+    condition: ${{ parameters.condition }}
+
+  # Lint with golangci-lint
+  - bash: |
+      # Install golangci-lint
+      curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.55.2
+
+      cd ${{ parameters.serviceDir }}
+      $(go env GOPATH)/bin/golangci-lint run --timeout=5m || true
+    displayName: 'Lint Code'
+    condition: ${{ parameters.condition }}
+    continueOnError: true
+
+  # Run tests
+  - bash: |
+      cd ${{ parameters.serviceDir }}
+      go test -v -race -coverprofile=coverage.out ./...
+    displayName: 'Run Unit Tests'
+    condition: ${{ parameters.condition }}
+    continueOnError: true
+
+  # Build binary
+  - bash: |
+      cd ${{ parameters.serviceDir }}
+      CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+        -ldflags="-w -s -X main.Version=${{ parameters.imageTag }} -X main.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        -o bin/${{ parameters.serviceName }} \
+        ./cmd/main.go
+    displayName: 'Build Binary'
+    condition: ${{ parameters.condition }}
+
+  # Login to ACR
+  - task: Docker@2
+    displayName: 'Login to ACR'
+    condition: and(${{ parameters.condition }}, ${{ parameters.pushImage }})
+    inputs:
+      containerRegistry: 'quikapp-acr-connection'
+      command: 'login'
+
+  # Build Docker image
+  - bash: |
+      cd ${{ parameters.serviceDir }}
+
+      # Check for custom Dockerfile
+      if [ -f "Dockerfile" ]; then
+        DOCKERFILE="Dockerfile"
+      else
+        DOCKERFILE="$(System.DefaultWorkingDirectory)/infrastructure/docker/dockerfiles/go/Dockerfile"
+      fi
+
+      docker build \
+        -t ${{ parameters.acrLoginServer }}/${{ parameters.serviceName }}:${{ parameters.imageTag }} \
+        -t ${{ parameters.acrLoginServer }}/${{ parameters.serviceName }}:$(Build.BuildId) \
+        --build-arg GO_VERSION=${{ parameters.goVersion }} \
+        --build-arg SERVICE_NAME=${{ parameters.serviceName }} \
+        --label "org.opencontainers.image.source=$(Build.Repository.Uri)" \
+        --label "org.opencontainers.image.revision=$(Build.SourceVersion)" \
+        --label "org.opencontainers.image.created=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+        --label "com.quikapp.service=${{ parameters.serviceName }}" \
+        --label "com.quikapp.technology=go" \
+        -f $DOCKERFILE \
+        .
+
+      echo "Image built: ${{ parameters.acrLoginServer }}/${{ parameters.serviceName }}:${{ parameters.imageTag }}"
+    displayName: 'Build Docker Image'
+    condition: ${{ parameters.condition }}
+
+  # Security scan with Trivy
+  - bash: |
+      # Install Trivy
+      wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+      echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/trivy.list
+      sudo apt-get update && sudo apt-get install -y trivy
+
+      # Scan image
+      trivy image \
+        --exit-code 0 \
+        --severity HIGH,CRITICAL \
+        --format table \
+        ${{ parameters.acrLoginServer }}/${{ parameters.serviceName }}:${{ parameters.imageTag }}
+
+      # Generate SARIF report
+      trivy image \
+        --format sarif \
+        --output $(Build.ArtifactStagingDirectory)/${{ parameters.serviceName }}-trivy.sarif \
+        ${{ parameters.acrLoginServer }}/${{ parameters.serviceName }}:${{ parameters.imageTag }}
+    displayName: 'Security Scan'
+    condition: and(${{ parameters.condition }}, ${{ parameters.scanImage }})
+    continueOnError: true
+
+  # Push to ACR
+  - bash: |
+      docker push ${{ parameters.acrLoginServer }}/${{ parameters.serviceName }}:${{ parameters.imageTag }}
+      docker push ${{ parameters.acrLoginServer }}/${{ parameters.serviceName }}:$(Build.BuildId)
+
+      echo "Pushed: ${{ parameters.acrLoginServer }}/${{ parameters.serviceName }}:${{ parameters.imageTag }}"
+    displayName: 'Push to ACR'
+    condition: and(${{ parameters.condition }}, ${{ parameters.pushImage }})
+
+  # Publish test coverage
+  - task: PublishCodeCoverageResults@1
+    displayName: 'Publish Coverage'
+    condition: ${{ parameters.condition }}
+    inputs:
+      codeCoverageTool: 'Cobertura'
+      summaryFileLocation: '${{ parameters.serviceDir }}/coverage.out'
+    continueOnError: true
+
+  # Publish scan results
+  - publish: $(Build.ArtifactStagingDirectory)/${{ parameters.serviceName }}-trivy.sarif
+    artifact: 'security-scan-${{ parameters.serviceName }}'
+    displayName: 'Publish Security Report'
+    condition: and(${{ parameters.condition }}, ${{ parameters.scanImage }})
+    continueOnError: true

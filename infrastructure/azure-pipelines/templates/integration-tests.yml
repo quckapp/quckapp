@@ -1,0 +1,58 @@
+# Integration Tests Template
+# Runs integration tests against deployed service
+
+parameters:
+  - name: environment
+    type: string
+  - name: serviceName
+    type: string
+
+steps:
+  - checkout: self
+    displayName: 'Checkout Repository'
+
+  - task: NodeTool@0
+    displayName: 'Setup Node.js'
+    inputs:
+      versionSpec: '20.x'
+
+  - task: AzureCLI@2
+    displayName: 'Run Integration Tests'
+    inputs:
+      azureSubscription: 'QuikApp-${{ parameters.environment }}'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        # Determine service URL based on environment
+        case "${{ parameters.environment }}" in
+          dev)
+            BASE_URL="https://${{ parameters.serviceName }}.dev.quikapp.io"
+            ;;
+          qa)
+            BASE_URL="https://${{ parameters.serviceName }}.qa.quikapp.io"
+            ;;
+          *)
+            BASE_URL="https://${{ parameters.serviceName }}.${{ parameters.environment }}.quikapp.io"
+            ;;
+        esac
+
+        export BASE_URL
+        export TEST_ENV="${{ parameters.environment }}"
+
+        echo "Running integration tests against: $BASE_URL"
+
+        # Install test dependencies
+        npm ci --prefix tests/integration
+
+        # Run integration tests
+        npm run test:integration --prefix tests/integration -- \
+          --reporter=junit \
+          --reporter-options="mochaFile=test-results/integration-results.xml"
+
+  - task: PublishTestResults@2
+    displayName: 'Publish Integration Test Results'
+    inputs:
+      testResultsFormat: 'JUnit'
+      testResultsFiles: '**/integration-results.xml'
+      testRunTitle: 'Integration Tests - ${{ parameters.serviceName }} (${{ parameters.environment }})'
+    condition: always()

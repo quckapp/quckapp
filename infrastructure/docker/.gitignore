@@ -1,0 +1,17 @@
+# Environment files (contain secrets)
+.env
+!.env.example
+
+# Docker volumes (if mounted locally)
+data/
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.bak
+
+# OS files
+.DS_Store
+Thumbs.db

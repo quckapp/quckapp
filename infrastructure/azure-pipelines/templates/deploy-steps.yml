@@ -1,0 +1,217 @@
+# Deploy Steps Template
+# Standard deployment steps for all environments
+
+parameters:
+  - name: environment
+    type: string
+  - name: namespace
+    type: string
+  - name: serviceName
+    type: string
+  - name: imageTag
+    type: string
+  - name: replicas
+    type: number
+    default: 2
+  - name: memoryLimit
+    type: string
+    default: '512Mi'
+  - name: cpuLimit
+    type: string
+    default: '500m'
+  - name: aksCluster
+    type: string
+    default: ''
+  - name: resourceGroup
+    type: string
+    default: ''
+  - name: enableAutoScale
+    type: boolean
+    default: false
+  - name: minReplicas
+    type: number
+    default: 2
+  - name: maxReplicas
+    type: number
+    default: 10
+
+steps:
+  - checkout: self
+    displayName: 'Checkout Repository'
+
+  - task: DownloadPipelineArtifact@2
+    displayName: 'Download Kubernetes Manifests'
+    inputs:
+      artifact: 'k8s-manifests'
+      path: '$(Pipeline.Workspace)/manifests'
+    continueOnError: true
+
+  - task: DownloadPipelineArtifact@2
+    displayName: 'Download Environment Configs'
+    inputs:
+      artifact: 'configs'
+      path: '$(Pipeline.Workspace)/configs'
+    continueOnError: true
+
+  - ${{ if ne(parameters.aksCluster, '') }}:
+    - task: AzureCLI@2
+      displayName: 'Login to AKS Cluster'
+      inputs:
+        azureSubscription: 'QuikApp-${{ parameters.environment }}'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          az aks get-credentials \
+            --resource-group ${{ parameters.resourceGroup }} \
+            --name ${{ parameters.aksCluster }} \
+            --overwrite-existing
+
+  - task: KubernetesManifest@0
+    displayName: 'Create Namespace'
+    inputs:
+      action: 'createSecret'
+      kubernetesServiceConnection: 'QuikApp-K8s-${{ parameters.environment }}'
+      namespace: '${{ parameters.namespace }}'
+      secretType: 'generic'
+      secretName: 'namespace-placeholder'
+    continueOnError: true
+
+  - task: KubernetesManifest@0
+    displayName: 'Create/Update ConfigMap'
+    inputs:
+      action: 'createSecret'
+      kubernetesServiceConnection: 'QuikApp-K8s-${{ parameters.environment }}'
+      namespace: '${{ parameters.namespace }}'
+      secretType: 'generic'
+      secretName: '${{ parameters.serviceName }}-config'
+      secretArguments: '--from-env-file=$(Pipeline.Workspace)/configs/${{ parameters.environment }}.env'
+    continueOnError: true
+
+  - task: KubernetesManifest@0
+    displayName: 'Deploy to Kubernetes'
+    inputs:
+      action: 'deploy'
+      kubernetesServiceConnection: 'QuikApp-K8s-${{ parameters.environment }}'
+      namespace: '${{ parameters.namespace }}'
+      manifests: |
+        $(Pipeline.Workspace)/manifests/deployment.yaml
+        $(Pipeline.Workspace)/manifests/service.yaml
+        $(Pipeline.Workspace)/manifests/ingress.yaml
+      containers: |
+        $(acrRegistry)/${{ parameters.serviceName }}:${{ parameters.imageTag }}
+      imagePullSecrets: |
+        acr-secret
+
+  - task: Kubernetes@1
+    displayName: 'Scale Deployment'
+    inputs:
+      connectionType: 'Kubernetes Service Connection'
+      kubernetesServiceEndpoint: 'QuikApp-K8s-${{ parameters.environment }}'
+      namespace: '${{ parameters.namespace }}'
+      command: 'scale'
+      arguments: 'deployment/${{ parameters.serviceName }} --replicas=${{ parameters.replicas }}'
+
+  - task: Kubernetes@1
+    displayName: 'Set Resource Limits'
+    inputs:
+      connectionType: 'Kubernetes Service Connection'
+      kubernetesServiceEndpoint: 'QuikApp-K8s-${{ parameters.environment }}'
+      namespace: '${{ parameters.namespace }}'
+      command: 'set'
+      arguments: |
+        resources deployment/${{ parameters.serviceName }} \
+        --limits=memory=${{ parameters.memoryLimit }},cpu=${{ parameters.cpuLimit }} \
+        --requests=memory=$(echo "${{ parameters.memoryLimit }}" | sed 's/Gi/Gi/;s/Mi/Mi/' | awk '{print $1/2}'),cpu=$(echo "${{ parameters.cpuLimit }}" | sed 's/m//' | awk '{print $1/2"m"}')
+    continueOnError: true
+
+  - ${{ if eq(parameters.enableAutoScale, true) }}:
+    - task: Kubernetes@1
+      displayName: 'Configure Horizontal Pod Autoscaler'
+      inputs:
+        connectionType: 'Kubernetes Service Connection'
+        kubernetesServiceEndpoint: 'QuikApp-K8s-${{ parameters.environment }}'
+        namespace: '${{ parameters.namespace }}'
+        command: 'autoscale'
+        arguments: |
+          deployment/${{ parameters.serviceName }} \
+          --min=${{ parameters.minReplicas }} \
+          --max=${{ parameters.maxReplicas }} \
+          --cpu-percent=70
+
+  - task: Kubernetes@1
+    displayName: 'Wait for Rollout'
+    inputs:
+      connectionType: 'Kubernetes Service Connection'
+      kubernetesServiceEndpoint: 'QuikApp-K8s-${{ parameters.environment }}'
+      namespace: '${{ parameters.namespace }}'
+      command: 'rollout'
+      arguments: 'status deployment/${{ parameters.serviceName }} --timeout=300s'
+
+  - task: AzureCLI@2
+    displayName: 'Health Check'
+    inputs:
+      azureSubscription: 'QuikApp-${{ parameters.environment }}'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        # Determine service URL based on environment
+        case "${{ parameters.environment }}" in
+          local)
+            SERVICE_URL="http://localhost:3000"
+            ;;
+          dev)
+            SERVICE_URL="https://${{ parameters.serviceName }}.dev.quikapp.io"
+            ;;
+          qa)
+            SERVICE_URL="https://${{ parameters.serviceName }}.qa.quikapp.io"
+            ;;
+          uat1)
+            SERVICE_URL="https://${{ parameters.serviceName }}.uat1.quikapp.io"
+            ;;
+          uat2)
+            SERVICE_URL="https://${{ parameters.serviceName }}.uat2.quikapp.io"
+            ;;
+          uat3)
+            SERVICE_URL="https://${{ parameters.serviceName }}.uat3.quikapp.io"
+            ;;
+          staging)
+            SERVICE_URL="https://${{ parameters.serviceName }}.staging.quikapp.io"
+            ;;
+          live)
+            SERVICE_URL="https://${{ parameters.serviceName }}.quikapp.io"
+            ;;
+          *)
+            SERVICE_URL="https://${{ parameters.serviceName }}.${{ parameters.environment }}.quikapp.io"
+            ;;
+        esac
+
+        echo "Checking health at: $SERVICE_URL/health"
+
+        for i in {1..10}; do
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$SERVICE_URL/health" 2>/dev/null || echo "000")
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "Health check passed!"
+            exit 0
+          fi
+          echo "Attempt $i: Health check returned $HTTP_STATUS"
+          sleep 10
+        done
+
+        echo "Health check failed after 10 attempts"
+        exit 1
+
+  - task: PowerShell@2
+    displayName: 'Record Deployment Metrics'
+    inputs:
+      targetType: 'inline'
+      script: |
+        $metrics = @{
+          serviceName = "${{ parameters.serviceName }}"
+          environment = "${{ parameters.environment }}"
+          imageTag = "${{ parameters.imageTag }}"
+          replicas = ${{ parameters.replicas }}
+          timestamp = Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ"
+        }
+
+        Write-Host "##vso[task.setvariable variable=deploymentMetrics]$($metrics | ConvertTo-Json -Compress)"
+        Write-Host "Deployment completed successfully for ${{ parameters.serviceName }} to ${{ parameters.environment }}"

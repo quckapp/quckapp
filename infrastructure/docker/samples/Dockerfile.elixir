@@ -1,0 +1,143 @@
+# =============================================================================
+# QuikApp Elixir/Phoenix Service Dockerfile
+# Multi-stage build with OTP release for minimal production image
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Stage 1: Build Dependencies
+# -----------------------------------------------------------------------------
+FROM hexpm/elixir:1.15.7-erlang-26.1.2-alpine-3.18.4 AS deps
+
+# Install build dependencies
+RUN apk add --no-cache \
+    build-base \
+    git \
+    npm \
+    python3
+
+WORKDIR /app
+
+# Install hex and rebar
+RUN mix local.hex --force && \
+    mix local.rebar --force
+
+# Set build ENV
+ENV MIX_ENV=prod
+
+# Copy mix files
+COPY mix.exs mix.lock ./
+COPY config config
+
+# Install mix dependencies
+RUN mix deps.get --only $MIX_ENV
+
+# Compile dependencies
+RUN mix deps.compile
+
+# -----------------------------------------------------------------------------
+# Stage 2: Build Assets (if using Phoenix with assets)
+# -----------------------------------------------------------------------------
+FROM deps AS assets
+
+WORKDIR /app
+
+# Copy assets
+COPY assets assets
+COPY priv priv
+
+# Install Node.js dependencies (if assets exist)
+RUN if [ -d "assets" ] && [ -f "assets/package.json" ]; then \
+        cd assets && npm ci; \
+    fi
+
+# Build assets (if assets exist)
+RUN if [ -d "assets" ]; then \
+        mix assets.deploy; \
+    fi
+
+# -----------------------------------------------------------------------------
+# Stage 3: Build Release
+# -----------------------------------------------------------------------------
+FROM deps AS builder
+
+WORKDIR /app
+
+# Build arguments
+ARG VERSION=dev
+ARG BUILD_DATE
+ARG GIT_COMMIT
+
+# Copy compiled assets from assets stage
+COPY --from=assets /app/priv/static priv/static
+
+# Copy application code
+COPY lib lib
+
+# Compile application
+RUN mix compile
+
+# Build release
+RUN mix release
+
+# -----------------------------------------------------------------------------
+# Stage 4: Production Runner
+# -----------------------------------------------------------------------------
+FROM alpine:3.18 AS runner
+
+# Install runtime dependencies
+RUN apk update && \
+    apk upgrade && \
+    apk add --no-cache \
+    libstdc++ \
+    openssl \
+    ncurses-libs \
+    libgcc \
+    curl \
+    tzdata && \
+    rm -rf /var/cache/apk/*
+
+# Create non-root user
+RUN addgroup --system --gid 1001 elixir && \
+    adduser --system --uid 1001 elixir
+
+WORKDIR /app
+
+# Set environment variables
+ENV MIX_ENV=prod
+ENV PORT=4000
+ENV PHX_SERVER=true
+ENV RELEASE_DISTRIBUTION=name
+ENV TZ=UTC
+
+# Copy release from builder
+COPY --from=builder --chown=elixir:elixir /app/_build/prod/rel/app ./
+
+# Build metadata labels
+ARG VERSION=dev
+ARG BUILD_DATE
+ARG GIT_COMMIT
+
+LABEL org.opencontainers.image.title="QuikApp Elixir Service" \
+      org.opencontainers.image.description="QuikApp microservice built with Elixir/Phoenix" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.revision="${GIT_COMMIT}" \
+      org.opencontainers.image.vendor="QuikApp" \
+      org.opencontainers.image.source="https://github.com/quikapp/quikapp"
+
+# Switch to non-root user
+USER elixir
+
+# Expose port
+EXPOSE 4000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:4000/health || exit 1
+
+# Set the release to run
+ENV RELEASE_NAME=app
+
+# Start the release
+ENTRYPOINT ["bin/app"]
+CMD ["start"]

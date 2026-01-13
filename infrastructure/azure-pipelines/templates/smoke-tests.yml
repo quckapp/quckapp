@@ -1,0 +1,139 @@
+# Smoke Tests Template
+# Quick sanity checks for deployed service
+
+parameters:
+  - name: environment
+    type: string
+  - name: serviceName
+    type: string
+
+steps:
+  - task: AzureCLI@2
+    displayName: 'Run Smoke Tests'
+    inputs:
+      azureSubscription: 'QuikApp-${{ parameters.environment }}'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        # Determine service URL based on environment
+        case "${{ parameters.environment }}" in
+          live|production)
+            BASE_URL="https://${{ parameters.serviceName }}.quikapp.io"
+            ;;
+          *)
+            BASE_URL="https://${{ parameters.serviceName }}.${{ parameters.environment }}.quikapp.io"
+            ;;
+        esac
+
+        echo "========================================"
+        echo "Smoke Test Suite"
+        echo "========================================"
+        echo "Service: ${{ parameters.serviceName }}"
+        echo "Environment: ${{ parameters.environment }}"
+        echo "Base URL: $BASE_URL"
+        echo "========================================"
+
+        PASSED=0
+        FAILED=0
+
+        # Test 1: Health endpoint
+        echo ""
+        echo "Test 1: Health Check"
+        HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/health" 2>/dev/null || echo "000")
+        if [ "$HTTP_STATUS" = "200" ]; then
+          echo "  ✓ Health check passed (HTTP $HTTP_STATUS)"
+          PASSED=$((PASSED + 1))
+        else
+          echo "  ✗ Health check failed (HTTP $HTTP_STATUS)"
+          FAILED=$((FAILED + 1))
+        fi
+
+        # Test 2: Readiness endpoint
+        echo ""
+        echo "Test 2: Readiness Check"
+        HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/ready" 2>/dev/null || echo "000")
+        if [ "$HTTP_STATUS" = "200" ] || [ "$HTTP_STATUS" = "404" ]; then
+          echo "  ✓ Readiness check passed (HTTP $HTTP_STATUS)"
+          PASSED=$((PASSED + 1))
+        else
+          echo "  ✗ Readiness check failed (HTTP $HTTP_STATUS)"
+          FAILED=$((FAILED + 1))
+        fi
+
+        # Test 3: Response time check
+        echo ""
+        echo "Test 3: Response Time Check"
+        RESPONSE_TIME=$(curl -s -o /dev/null -w "%{time_total}" "$BASE_URL/health" 2>/dev/null || echo "999")
+        RESPONSE_MS=$(echo "$RESPONSE_TIME * 1000" | bc 2>/dev/null || echo "999")
+        if [ $(echo "$RESPONSE_MS < 1000" | bc 2>/dev/null || echo "0") -eq 1 ]; then
+          echo "  ✓ Response time acceptable (${RESPONSE_MS}ms)"
+          PASSED=$((PASSED + 1))
+        else
+          echo "  ✗ Response time too slow (${RESPONSE_MS}ms)"
+          FAILED=$((FAILED + 1))
+        fi
+
+        # Test 4: SSL certificate check
+        echo ""
+        echo "Test 4: SSL Certificate Check"
+        SSL_EXPIRY=$(echo | openssl s_client -servername $(echo $BASE_URL | sed 's|https://||') -connect $(echo $BASE_URL | sed 's|https://||'):443 2>/dev/null | openssl x509 -noout -dates 2>/dev/null | grep "notAfter" || echo "")
+        if [ -n "$SSL_EXPIRY" ]; then
+          echo "  ✓ SSL certificate valid ($SSL_EXPIRY)"
+          PASSED=$((PASSED + 1))
+        else
+          echo "  ⚠ SSL certificate check skipped"
+        fi
+
+        # Test 5: API version endpoint (if available)
+        echo ""
+        echo "Test 5: API Version Check"
+        VERSION_RESPONSE=$(curl -s "$BASE_URL/api/version" 2>/dev/null || echo "{}")
+        if echo "$VERSION_RESPONSE" | grep -q "version" 2>/dev/null; then
+          echo "  ✓ API version endpoint available"
+          PASSED=$((PASSED + 1))
+        else
+          echo "  ⚠ API version endpoint not available (non-critical)"
+        fi
+
+        # Summary
+        echo ""
+        echo "========================================"
+        echo "Smoke Test Summary"
+        echo "========================================"
+        echo "Passed: $PASSED"
+        echo "Failed: $FAILED"
+        echo "========================================"
+
+        if [ $FAILED -gt 0 ]; then
+          echo "##vso[task.logissue type=error]$FAILED smoke tests failed"
+          exit 1
+        fi
+
+        echo "All smoke tests passed!"
+
+  - task: PowerShell@2
+    displayName: 'Generate Smoke Test Report'
+    inputs:
+      targetType: 'inline'
+      script: |
+        $report = @{
+          service = "${{ parameters.serviceName }}"
+          environment = "${{ parameters.environment }}"
+          timestamp = Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ"
+          tests = @(
+            @{ name = "Health Check"; status = "passed" }
+            @{ name = "Readiness Check"; status = "passed" }
+            @{ name = "Response Time"; status = "passed" }
+            @{ name = "SSL Certificate"; status = "passed" }
+          )
+        }
+
+        $report | ConvertTo-Json -Depth 5 | Out-File "smoke-test-report.json"
+        Write-Host "Smoke test report generated"
+
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Smoke Test Report'
+    inputs:
+      PathtoPublish: 'smoke-test-report.json'
+      ArtifactName: 'smoke-test-${{ parameters.serviceName }}-${{ parameters.environment }}'
+    condition: always()

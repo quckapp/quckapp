@@ -1,0 +1,1254 @@
+openapi: 3.0.3
+info:
+  title: QuckChat API
+  description: |
+    Real-time messaging platform API with audio/video calling capabilities.
+
+    ## Features
+    - Phone OTP authentication
+    - JWT-based authorization
+    - Real-time messaging via WebSocket
+    - Voice and video calls with WebRTC
+    - File uploads (S3/local storage)
+    - Push notifications (Firebase FCM)
+
+    ## Authentication
+    Most endpoints require a valid JWT token in the Authorization header:
+    ```
+    Authorization: Bearer <your-token>
+    ```
+
+    ## Rate Limiting
+    - Default: 100 requests per minute
+    - Auth endpoints: 10 requests per minute
+    - OTP: 3 requests per minute
+
+    ## WebSocket Endpoints
+    - Chat: `ws://localhost:3000/chat`
+    - WebRTC: `ws://localhost:3000/webrtc`
+  version: 1.0.0
+  contact:
+    name: QuckChat Support
+    email: support@quckchat.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Development server
+  - url: https://api.quckchat.com/api/v1
+    description: Production server
+
+tags:
+  - name: Auth
+    description: Authentication and authorization
+  - name: Users
+    description: User profile management
+  - name: Conversations
+    description: Chat conversations
+  - name: Messages
+    description: Messaging operations
+  - name: Calls
+    description: Voice and video calls
+  - name: Upload
+    description: File upload operations
+  - name: Notifications
+    description: Push notifications
+  - name: Health
+    description: Health check endpoints
+
+paths:
+  # ==================== AUTH ====================
+  /auth/send-otp:
+    post:
+      tags: [Auth]
+      summary: Send OTP code
+      description: Send a one-time password to the specified phone number
+      operationId: sendOtp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phoneNumber]
+              properties:
+                phoneNumber:
+                  type: string
+                  pattern: '^\+[1-9]\d{1,14}$'
+                  example: '+1234567890'
+      responses:
+        '200':
+          description: OTP sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: OTP sent successfully
+                  expiresIn:
+                    type: integer
+                    example: 300
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /auth/verify-otp:
+    post:
+      tags: [Auth]
+      summary: Verify OTP code
+      description: Verify the OTP code and receive JWT tokens
+      operationId: verifyOtp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phoneNumber, code]
+              properties:
+                phoneNumber:
+                  type: string
+                  example: '+1234567890'
+                code:
+                  type: string
+                  pattern: '^\d{6}$'
+                  example: '123456'
+      responses:
+        '200':
+          description: OTP verified successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Invalid or expired OTP
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh access token
+      description: Get a new access token using a refresh token
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout user
+      description: Invalidate the current session
+      operationId: logout
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logged out successfully
+
+  /auth/2fa/setup:
+    post:
+      tags: [Auth]
+      summary: Setup 2FA
+      description: Initialize two-factor authentication
+      operationId: setup2FA
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 2FA setup initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  secret:
+                    type: string
+                  qrCode:
+                    type: string
+                    description: Base64 QR code image
+                  backupCodes:
+                    type: array
+                    items:
+                      type: string
+
+  /auth/sessions:
+    get:
+      tags: [Auth]
+      summary: Get active sessions
+      description: List all active login sessions
+      operationId: getSessions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Session'
+
+  /auth/sessions/{sessionId}:
+    delete:
+      tags: [Auth]
+      summary: Terminate session
+      description: Terminate a specific session
+      operationId: terminateSession
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session terminated
+
+  # ==================== USERS ====================
+  /users/me:
+    get:
+      tags: [Users]
+      summary: Get current user
+      description: Get the authenticated user's profile
+      operationId: getCurrentUser
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+    put:
+      tags: [Users]
+      summary: Update profile
+      description: Update the authenticated user's profile
+      operationId: updateProfile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserDto'
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  /users/search:
+    get:
+      tags: [Users]
+      summary: Search users
+      description: Search users by name or phone number
+      operationId: searchUsers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 2
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSearchResponse'
+
+  /users/{userId}:
+    get:
+      tags: [Users]
+      summary: Get user by ID
+      description: Get a user's public profile
+      operationId: getUserById
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==================== CONVERSATIONS ====================
+  /conversations:
+    get:
+      tags: [Conversations]
+      summary: List conversations
+      description: Get all conversations for the authenticated user
+      operationId: getConversations
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: List of conversations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Conversation'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+    post:
+      tags: [Conversations]
+      summary: Create conversation
+      description: Create a new conversation
+      operationId: createConversation
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateConversationDto'
+      responses:
+        '201':
+          description: Conversation created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+
+  /conversations/{conversationId}:
+    get:
+      tags: [Conversations]
+      summary: Get conversation
+      description: Get conversation details
+      operationId: getConversation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ConversationIdParam'
+      responses:
+        '200':
+          description: Conversation details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+    put:
+      tags: [Conversations]
+      summary: Update conversation
+      description: Update conversation settings (group name, avatar, etc.)
+      operationId: updateConversation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ConversationIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateConversationDto'
+      responses:
+        '200':
+          description: Conversation updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+
+  /conversations/{conversationId}/members:
+    post:
+      tags: [Conversations]
+      summary: Add members
+      description: Add members to a group conversation
+      operationId: addMembers
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ConversationIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userIds]
+              properties:
+                userIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Members added
+
+  /conversations/{conversationId}/members/{userId}:
+    delete:
+      tags: [Conversations]
+      summary: Remove member
+      description: Remove a member from a group conversation
+      operationId: removeMember
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ConversationIdParam'
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Member removed
+
+  # ==================== MESSAGES ====================
+  /messages/conversation/{conversationId}:
+    get:
+      tags: [Messages]
+      summary: Get messages
+      description: Get messages from a conversation
+      operationId: getMessages
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ConversationIdParam'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: before
+          in: query
+          description: Get messages before this timestamp
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: List of messages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Message'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /messages/{messageId}:
+    get:
+      tags: [Messages]
+      summary: Get message
+      description: Get a specific message
+      operationId: getMessage
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MessageIdParam'
+      responses:
+        '200':
+          description: Message details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+    put:
+      tags: [Messages]
+      summary: Edit message
+      description: Edit a message (within time limit)
+      operationId: editMessage
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MessageIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+                  maxLength: 10000
+      responses:
+        '200':
+          description: Message updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+    delete:
+      tags: [Messages]
+      summary: Delete message
+      description: Delete a message
+      operationId: deleteMessage
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MessageIdParam'
+      responses:
+        '200':
+          description: Message deleted
+
+  /messages/{messageId}/reactions:
+    post:
+      tags: [Messages]
+      summary: Add reaction
+      description: Add an emoji reaction to a message
+      operationId: addReaction
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MessageIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [emoji]
+              properties:
+                emoji:
+                  type: string
+                  example: '👍'
+      responses:
+        '200':
+          description: Reaction added
+
+  /messages/{messageId}/reactions/{emoji}:
+    delete:
+      tags: [Messages]
+      summary: Remove reaction
+      description: Remove an emoji reaction from a message
+      operationId: removeReaction
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MessageIdParam'
+        - name: emoji
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Reaction removed
+
+  /messages/search/query:
+    get:
+      tags: [Messages]
+      summary: Search messages
+      description: Search messages by content
+      operationId: searchMessages
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: conversationId
+          in: query
+          schema:
+            type: string
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Message'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  # ==================== CALLS ====================
+  /calls:
+    post:
+      tags: [Calls]
+      summary: Initiate call
+      description: Start a voice or video call
+      operationId: initiateCall
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [conversationId, type]
+              properties:
+                conversationId:
+                  type: string
+                type:
+                  type: string
+                  enum: [audio, video]
+      responses:
+        '201':
+          description: Call initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Call'
+
+  /calls/{callId}:
+    get:
+      tags: [Calls]
+      summary: Get call details
+      description: Get details of a specific call
+      operationId: getCall
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: callId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Call details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Call'
+
+  /calls/{callId}/answer:
+    put:
+      tags: [Calls]
+      summary: Answer call
+      description: Answer an incoming call
+      operationId: answerCall
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: callId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Call answered
+
+  /calls/{callId}/reject:
+    put:
+      tags: [Calls]
+      summary: Reject call
+      description: Reject an incoming call
+      operationId: rejectCall
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: callId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Call rejected
+
+  /calls/{callId}/end:
+    put:
+      tags: [Calls]
+      summary: End call
+      description: End an active call
+      operationId: endCall
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: callId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Call ended
+
+  /calls/history/{conversationId}:
+    get:
+      tags: [Calls]
+      summary: Get call history
+      description: Get call history for a conversation
+      operationId: getCallHistory
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ConversationIdParam'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Call history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Call'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  # ==================== UPLOAD ====================
+  /upload/image:
+    post:
+      tags: [Upload]
+      summary: Upload image
+      description: Upload an image file
+      operationId: uploadImage
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Image uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+
+  /upload/video:
+    post:
+      tags: [Upload]
+      summary: Upload video
+      description: Upload a video file
+      operationId: uploadVideo
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Video uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+
+  /upload/audio:
+    post:
+      tags: [Upload]
+      summary: Upload audio
+      description: Upload an audio file
+      operationId: uploadAudio
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Audio uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+
+  /upload/file:
+    post:
+      tags: [Upload]
+      summary: Upload file
+      description: Upload a generic file
+      operationId: uploadFile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: File uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+
+  # ==================== HEALTH ====================
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      description: Check application health status
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Application is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  info:
+                    type: object
+                    properties:
+                      database:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: up
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    ConversationIdParam:
+      name: conversationId
+      in: path
+      required: true
+      schema:
+        type: string
+    MessageIdParam:
+      name: messageId
+      in: path
+      required: true
+      schema:
+        type: string
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    TooManyRequests:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+        message:
+          type: string
+        error:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        expiresIn:
+          type: integer
+        user:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      properties:
+        _id:
+          type: string
+        phoneNumber:
+          type: string
+        email:
+          type: string
+        username:
+          type: string
+        displayName:
+          type: string
+        avatar:
+          type: string
+        bio:
+          type: string
+        status:
+          type: string
+          enum: [online, offline, away, busy]
+        lastSeen:
+          type: string
+          format: date-time
+        isVerified:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    UpdateUserDto:
+      type: object
+      properties:
+        displayName:
+          type: string
+          maxLength: 100
+        username:
+          type: string
+          pattern: '^[a-zA-Z0-9_]+$'
+        bio:
+          type: string
+          maxLength: 500
+        avatar:
+          type: string
+
+    UserSearchResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    Conversation:
+      type: object
+      properties:
+        _id:
+          type: string
+        type:
+          type: string
+          enum: [single, group]
+        name:
+          type: string
+        avatar:
+          type: string
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        admins:
+          type: array
+          items:
+            type: string
+        lastMessage:
+          $ref: '#/components/schemas/Message'
+        lastMessageAt:
+          type: string
+          format: date-time
+        unreadCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateConversationDto:
+      type: object
+      required: [type, participants]
+      properties:
+        type:
+          type: string
+          enum: [single, group]
+        participants:
+          type: array
+          items:
+            type: string
+          minItems: 1
+        name:
+          type: string
+          description: Required for group conversations
+
+    UpdateConversationDto:
+      type: object
+      properties:
+        name:
+          type: string
+        avatar:
+          type: string
+
+    Message:
+      type: object
+      properties:
+        _id:
+          type: string
+        conversationId:
+          type: string
+        senderId:
+          $ref: '#/components/schemas/User'
+        type:
+          type: string
+          enum: [text, image, video, audio, file, location]
+        content:
+          type: string
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Attachment'
+        replyTo:
+          $ref: '#/components/schemas/Message'
+        reactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Reaction'
+        readBy:
+          type: array
+          items:
+            type: object
+            properties:
+              userId:
+                type: string
+              readAt:
+                type: string
+                format: date-time
+        isEdited:
+          type: boolean
+        isDeleted:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    Attachment:
+      type: object
+      properties:
+        type:
+          type: string
+        url:
+          type: string
+        filename:
+          type: string
+        size:
+          type: integer
+        mimeType:
+          type: string
+        thumbnailUrl:
+          type: string
+        duration:
+          type: integer
+        dimensions:
+          type: object
+          properties:
+            width:
+              type: integer
+            height:
+              type: integer
+
+    Reaction:
+      type: object
+      properties:
+        emoji:
+          type: string
+        userId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    Call:
+      type: object
+      properties:
+        _id:
+          type: string
+        conversationId:
+          type: string
+        initiatorId:
+          $ref: '#/components/schemas/User'
+        type:
+          type: string
+          enum: [audio, video]
+        status:
+          type: string
+          enum: [initiated, ringing, active, ended, missed, rejected]
+        participants:
+          type: array
+          items:
+            type: object
+            properties:
+              userId:
+                type: string
+              joinedAt:
+                type: string
+                format: date-time
+              status:
+                type: string
+        startedAt:
+          type: string
+          format: date-time
+        endedAt:
+          type: string
+          format: date-time
+        duration:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    UploadResponse:
+      type: object
+      properties:
+        url:
+          type: string
+        filename:
+          type: string
+        size:
+          type: integer
+        mimeType:
+          type: string
+        thumbnailUrl:
+          type: string
+
+    Session:
+      type: object
+      properties:
+        _id:
+          type: string
+        deviceInfo:
+          type: object
+          properties:
+            deviceName:
+              type: string
+            platform:
+              type: string
+            ip:
+              type: string
+        isActive:
+          type: boolean
+        lastActive:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        totalPages:
+          type: integer
+        totalDocs:
+          type: integer
+        hasNextPage:
+          type: boolean
+        hasPrevPage:
+          type: boolean

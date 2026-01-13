@@ -1,0 +1,167 @@
+# Rollback Template
+# Emergency rollback for failed deployments
+
+parameters:
+  - name: environment
+    type: string
+  - name: serviceName
+    type: string
+
+steps:
+  - task: AzureCLI@2
+    displayName: 'Emergency Rollback'
+    inputs:
+      azureSubscription: 'QuikApp-${{ parameters.environment }}'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        echo "============================================"
+        echo "INITIATING EMERGENCY ROLLBACK"
+        echo "============================================"
+        echo "Service: ${{ parameters.serviceName }}"
+        echo "Environment: ${{ parameters.environment }}"
+        echo "Time: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+        echo "============================================"
+
+        # Determine namespace based on environment
+        case "${{ parameters.environment }}" in
+          live|production)
+            NAMESPACE="quikapp-prod"
+            ;;
+          *)
+            NAMESPACE="quikapp-${{ parameters.environment }}"
+            ;;
+        esac
+
+        echo "Rolling back deployment in namespace: $NAMESPACE"
+
+        # Perform rollback
+        kubectl rollout undo deployment/${{ parameters.serviceName }} -n $NAMESPACE
+
+        # Wait for rollback to complete
+        echo "Waiting for rollback to complete..."
+        kubectl rollout status deployment/${{ parameters.serviceName }} -n $NAMESPACE --timeout=300s
+
+        # Verify rollback
+        echo "Verifying rollback..."
+        kubectl get deployment/${{ parameters.serviceName }} -n $NAMESPACE
+
+        echo "============================================"
+        echo "ROLLBACK COMPLETED"
+        echo "============================================"
+
+  - task: AzureCLI@2
+    displayName: 'Verify Service Health Post-Rollback'
+    inputs:
+      azureSubscription: 'QuikApp-${{ parameters.environment }}'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        # Determine service URL
+        case "${{ parameters.environment }}" in
+          live|production)
+            SERVICE_URL="https://${{ parameters.serviceName }}.quikapp.io"
+            ;;
+          *)
+            SERVICE_URL="https://${{ parameters.serviceName }}.${{ parameters.environment }}.quikapp.io"
+            ;;
+        esac
+
+        echo "Verifying health at: $SERVICE_URL/health"
+
+        for i in {1..10}; do
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$SERVICE_URL/health" 2>/dev/null || echo "000")
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "Service health restored after rollback!"
+            exit 0
+          fi
+          echo "Attempt $i: Health check returned $HTTP_STATUS"
+          sleep 10
+        done
+
+        echo "WARNING: Service may still be unhealthy after rollback"
+        exit 1
+
+  - task: PowerShell@2
+    displayName: 'Send Rollback Alert'
+    inputs:
+      targetType: 'inline'
+      script: |
+        $body = @{
+          "text" = "ALERT: Emergency Rollback Triggered"
+          "blocks" = @(
+            @{
+              "type" = "header"
+              "text" = @{
+                "type" = "plain_text"
+                "text" = "Emergency Rollback Triggered"
+                "emoji" = $true
+              }
+            }
+            @{
+              "type" = "section"
+              "fields" = @(
+                @{ "type" = "mrkdwn"; "text" = "*Service:*`n${{ parameters.serviceName }}" }
+                @{ "type" = "mrkdwn"; "text" = "*Environment:*`n${{ parameters.environment }}" }
+                @{ "type" = "mrkdwn"; "text" = "*Time:*`n$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')" }
+                @{ "type" = "mrkdwn"; "text" = "*Build:*`n$(Build.BuildNumber)" }
+              )
+            }
+            @{
+              "type" = "section"
+              "text" = @{
+                "type" = "mrkdwn"
+                "text" = "*Reason:* Deployment health check failed. Automatic rollback initiated.`n`n*Action Required:* Please investigate the deployment failure immediately."
+              }
+            }
+            @{
+              "type" = "actions"
+              "elements" = @(
+                @{
+                  "type" = "button"
+                  "text" = @{
+                    "type" = "plain_text"
+                    "text" = "View Pipeline"
+                  }
+                  "url" = "$(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)"
+                }
+              )
+            }
+          )
+        } | ConvertTo-Json -Depth 10
+
+        try {
+          Invoke-RestMethod -Uri "$(SLACK_WEBHOOK_URL)" -Method Post -Body $body -ContentType "application/json"
+          Write-Host "Rollback alert sent successfully"
+        } catch {
+          Write-Host "Failed to send Slack notification: $_"
+        }
+
+  - task: PowerShell@2
+    displayName: 'Create Incident Ticket'
+    inputs:
+      targetType: 'inline'
+      script: |
+        $incident = @{
+          title = "Emergency Rollback - ${{ parameters.serviceName }} (${{ parameters.environment }})"
+          severity = "High"
+          service = "${{ parameters.serviceName }}"
+          environment = "${{ parameters.environment }}"
+          buildId = "$(Build.BuildId)"
+          timestamp = Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ"
+          description = @"
+        An emergency rollback was triggered for ${{ parameters.serviceName }} in the ${{ parameters.environment }} environment.
+
+        Build: $(Build.BuildNumber)
+        Pipeline: $(Build.DefinitionName)
+        Triggered by: $(Build.RequestedFor)
+
+        Please investigate the root cause and document findings.
+        "@
+        }
+
+        Write-Host "Incident details:"
+        Write-Host ($incident | ConvertTo-Json -Depth 5)
+
+        # Note: Integration with ticketing system (Jira, ServiceNow, etc.) would go here
+        Write-Host "##vso[task.setvariable variable=incidentCreated]true"

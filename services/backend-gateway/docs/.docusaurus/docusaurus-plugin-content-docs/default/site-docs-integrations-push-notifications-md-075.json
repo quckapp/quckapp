@@ -1,0 +1,29 @@
+{
+  "id": "integrations/push-notifications",
+  "title": "Push Notifications",
+  "description": "Complete push notification implementation guide",
+  "source": "@site/docs/integrations/push-notifications.md",
+  "sourceDirName": "integrations",
+  "slug": "/integrations/push-notifications",
+  "permalink": "/docs/integrations/push-notifications",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/quckchat/backend/tree/main/docs/docs/integrations/push-notifications.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 3,
+  "frontMatter": {
+    "sidebar_position": 3,
+    "title": "Push Notifications",
+    "description": "Complete push notification implementation guide"
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Firebase Setup",
+    "permalink": "/docs/integrations/firebase-setup"
+  },
+  "next": {
+    "title": "Monitoring & Observability",
+    "permalink": "/docs/integrations/monitoring"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "id": "integrations/monitoring",
+  "title": "Monitoring & Observability",
+  "description": "Sentry, OpenTelemetry, Prometheus, and logging setup",
+  "source": "@site/docs/integrations/monitoring.md",
+  "sourceDirName": "integrations",
+  "slug": "/integrations/monitoring",
+  "permalink": "/docs/integrations/monitoring",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/quckchat/backend/tree/main/docs/docs/integrations/monitoring.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 4,
+  "frontMatter": {
+    "sidebar_position": 4,
+    "title": "Monitoring & Observability",
+    "description": "Sentry, OpenTelemetry, Prometheus, and logging setup"
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Push Notifications",
+    "permalink": "/docs/integrations/push-notifications"
+  },
+  "next": {
+    "title": "Message Brokers",
+    "permalink": "/docs/integrations/message-brokers"
+  }
+}

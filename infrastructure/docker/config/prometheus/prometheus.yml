@@ -1,0 +1,172 @@
+# =============================================================================
+# QUIKAPP - Prometheus Configuration
+# =============================================================================
+# Metrics collection configuration for all services
+# =============================================================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    environment: 'development'
+    cluster: 'local'
+
+# Alerting configuration
+alerting:
+  alertmanagers: []
+
+# Rule files
+rule_files: []
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # ==========================================================================
+  # Infrastructure Services
+  # ==========================================================================
+
+  # Redis
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    metrics_path: /metrics
+
+  # Elasticsearch
+  - job_name: 'elasticsearch'
+    static_configs:
+      - targets: ['elasticsearch:9200']
+    metrics_path: /_prometheus/metrics
+
+  # ==========================================================================
+  # NestJS Services
+  # ==========================================================================
+
+  - job_name: 'backend-gateway'
+    static_configs:
+      - targets: ['backend-gateway:3000']
+    metrics_path: /metrics
+
+  - job_name: 'auth-service'
+    static_configs:
+      - targets: ['auth-service:3001']
+    metrics_path: /metrics
+
+  - job_name: 'user-service'
+    static_configs:
+      - targets: ['user-service:3002']
+    metrics_path: /metrics
+
+  - job_name: 'notification-service'
+    static_configs:
+      - targets: ['notification-service:3010']
+    metrics_path: /metrics
+
+  # ==========================================================================
+  # Spring Boot Services
+  # ==========================================================================
+
+  - job_name: 'workspace-service'
+    static_configs:
+      - targets: ['workspace-service:3003']
+    metrics_path: /actuator/prometheus
+
+  - job_name: 'channel-service'
+    static_configs:
+      - targets: ['channel-service:3004']
+    metrics_path: /actuator/prometheus
+
+  - job_name: 'permission-service'
+    static_configs:
+      - targets: ['permission-service:3011']
+    metrics_path: /actuator/prometheus
+
+  - job_name: 'audit-service'
+    static_configs:
+      - targets: ['audit-service:3012']
+    metrics_path: /actuator/prometheus
+
+  - job_name: 'admin-service'
+    static_configs:
+      - targets: ['admin-service:3013']
+    metrics_path: /actuator/prometheus
+
+  # ==========================================================================
+  # Go Services
+  # ==========================================================================
+
+  - job_name: 'message-service'
+    static_configs:
+      - targets: ['message-service:3005']
+    metrics_path: /metrics
+
+  - job_name: 'thread-service'
+    static_configs:
+      - targets: ['thread-service:3006']
+    metrics_path: /metrics
+
+  - job_name: 'file-service'
+    static_configs:
+      - targets: ['file-service:3007']
+    metrics_path: /metrics
+
+  - job_name: 'media-service'
+    static_configs:
+      - targets: ['media-service:3008']
+    metrics_path: /metrics
+
+  - job_name: 'search-service'
+    static_configs:
+      - targets: ['search-service:3009']
+    metrics_path: /metrics
+
+  # ==========================================================================
+  # Elixir Services
+  # ==========================================================================
+
+  - job_name: 'realtime-service'
+    static_configs:
+      - targets: ['realtime-service:4000']
+    metrics_path: /metrics
+
+  - job_name: 'presence-service'
+    static_configs:
+      - targets: ['presence-service:4001']
+    metrics_path: /metrics
+
+  - job_name: 'call-service'
+    static_configs:
+      - targets: ['call-service:4002']
+    metrics_path: /metrics
+
+  - job_name: 'huddle-service'
+    static_configs:
+      - targets: ['huddle-service:4003']
+    metrics_path: /metrics
+
+  # ==========================================================================
+  # Python Services
+  # ==========================================================================
+
+  - job_name: 'analytics-service'
+    static_configs:
+      - targets: ['analytics-service:8000']
+    metrics_path: /metrics
+
+  - job_name: 'ml-service'
+    static_configs:
+      - targets: ['ml-service:8001']
+    metrics_path: /metrics
+
+  - job_name: 'moderation-service'
+    static_configs:
+      - targets: ['moderation-service:8002']
+    metrics_path: /metrics
+
+  - job_name: 'sentiment-service'
+    static_configs:
+      - targets: ['sentiment-service:8003']
+    metrics_path: /metrics

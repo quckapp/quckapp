@@ -1,0 +1,157 @@
+# =============================================================================
+# QuckChat Backend CI/CD Pipeline
+# =============================================================================
+# This workflow:
+# 1. Runs tests on all pushes/PRs
+# 2. Builds and pushes Docker image to ECR on main branch
+# 3. Deploys to EC2 on main branch
+# =============================================================================
+
+name: Backend CI/CD
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REPOSITORY: quckchat-backend
+  NODE_VERSION: '20'
+
+jobs:
+  # ==========================================================================
+  # Test Job
+  # ==========================================================================
+  test:
+    name: Test & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linting
+        run: npm run lint --if-present
+
+      - name: Build
+        run: npm run build
+
+  # ==========================================================================
+  # Build & Push Docker Image to ECR
+  # ==========================================================================
+  build-and-push:
+    name: Build & Push to ECR
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+    outputs:
+      image_tag: ${{ steps.build-image.outputs.image_tag }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image to ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+  # ==========================================================================
+  # Deploy to EC2
+  # ==========================================================================
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Deploy to EC2
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          # Write SSH key (base64 decode if encoded, otherwise use directly)
+          if echo "$EC2_SSH_KEY" | grep -q "BEGIN"; then
+            echo "$EC2_SSH_KEY" > ssh_key.pem
+          else
+            echo "$EC2_SSH_KEY" | base64 -d > ssh_key.pem
+          fi
+          chmod 600 ssh_key.pem
+
+          # Deploy via SSH
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ssh_key.pem ${EC2_USER}@${EC2_HOST} "
+            # Create Docker network if not exists
+            docker network create quckchat-network 2>/dev/null || true
+
+            # Start Redis container if not running
+            if ! docker ps | grep -q quckchat-redis; then
+              echo 'Starting Redis container...'
+              docker stop quckchat-redis 2>/dev/null || true
+              docker rm quckchat-redis 2>/dev/null || true
+              docker run -d --name quckchat-redis --restart unless-stopped --network quckchat-network -v redis_data:/data redis:7-alpine redis-server --appendonly yes
+            fi
+
+            # Login to ECR and pull backend
+            aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin ${ECR_REGISTRY}
+            docker pull ${ECR_REGISTRY}/quckchat-backend:latest
+
+            # Stop and remove old backend container
+            docker stop quckchat-backend || true
+            docker rm quckchat-backend || true
+
+            # Run backend container with Redis connection
+            docker run -d --name quckchat-backend --restart unless-stopped --network quckchat-network -p 3000:3000 --env-file /opt/quckchat/.env -e REDIS_HOST=quckchat-redis -e REDIS_PORT=6379 ${ECR_REGISTRY}/quckchat-backend:latest
+
+            docker image prune -af
+          "
+
+          rm -f ssh_key.pem
+
+      - name: Health check
+        run: |
+          sleep 30
+          curl -f http://${{ secrets.EC2_HOST }}:3000/health || echo "Health check pending..."

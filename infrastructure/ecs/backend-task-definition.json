@@ -1,0 +1,53 @@
+{
+  "family": "quckchat-backend",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "${EXECUTION_ROLE_ARN}",
+  "taskRoleArn": "${TASK_ROLE_ARN}",
+  "containerDefinitions": [
+    {
+      "name": "backend",
+      "image": "${ECR_BACKEND_URL}:${IMAGE_TAG}",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 3000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {"name": "NODE_ENV", "value": "production"},
+        {"name": "PORT", "value": "3000"},
+        {"name": "USE_SPRING_AUTH", "value": "true"},
+        {"name": "SPRING_AUTH_SERVICE_URL", "value": "http://auth-service.quckchat.local:8081/api/auth"}
+      ],
+      "secrets": [
+        {"name": "MONGODB_URI", "valueFrom": "${MONGODB_URI_SECRET_ARN}"},
+        {"name": "JWT_SECRET", "valueFrom": "${JWT_SECRET_ARN}"},
+        {"name": "JWT_REFRESH_SECRET", "valueFrom": "${JWT_REFRESH_SECRET_ARN}"},
+        {"name": "REDIS_HOST", "valueFrom": "${REDIS_HOST_SECRET_ARN}"},
+        {"name": "KAFKA_BROKERS", "valueFrom": "${KAFKA_BROKERS_SECRET_ARN}"},
+        {"name": "SPRING_AUTH_API_KEY", "valueFrom": "${SPRING_AUTH_API_KEY_ARN}"},
+        {"name": "AWS_ACCESS_KEY_ID", "valueFrom": "${AWS_ACCESS_KEY_SECRET_ARN}"},
+        {"name": "AWS_SECRET_ACCESS_KEY", "valueFrom": "${AWS_SECRET_KEY_SECRET_ARN}"}
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/quckchat-backend",
+          "awslogs-region": "${AWS_REGION}",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "curl -f http://localhost:3000/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      }
+    }
+  ]
+}

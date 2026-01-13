@@ -1,0 +1,62 @@
+# =============================================================================
+# QuikApp Dev Environment - Example Variables
+# =============================================================================
+# Copy this file to dev.tfvars and customize for your environment.
+# Never commit dev.tfvars with sensitive values to version control.
+# =============================================================================
+
+aws_region = "us-east-1"
+
+# -----------------------------------------------------------------------------
+# Feature Flags - Enable what you need for development
+# -----------------------------------------------------------------------------
+
+enable_vpc              = false
+enable_cloudfront       = false
+enable_lambda_thumbnails = false
+enable_sqs_queues       = false
+enable_sns_topics       = false
+enable_dynamodb         = false
+enable_api_gateway      = false
+enable_cognito          = false
+enable_rds              = false
+enable_elasticache      = false
+
+# -----------------------------------------------------------------------------
+# CORS - Add your local development URLs
+# -----------------------------------------------------------------------------
+
+cors_allowed_origins = [
+  "http://localhost:3000",
+  "http://localhost:5173"
+]
+
+# -----------------------------------------------------------------------------
+# Cognito OAuth URLs - Update with your local development setup
+# -----------------------------------------------------------------------------
+
+cognito_web_callback_urls = [
+  "http://localhost:3000/callback"
+]
+
+cognito_web_logout_urls = [
+  "http://localhost:3000"
+]
+
+cognito_mobile_callback_urls = [
+  "quikapp://callback"
+]
+
+cognito_mobile_logout_urls = [
+  "quikapp://logout"
+]
+
+# -----------------------------------------------------------------------------
+# Tags
+# -----------------------------------------------------------------------------
+
+tags = {
+  Environment = "dev"
+  Project     = "QuikApp"
+  Developer   = "YOUR_NAME"  # Replace with your name
+}

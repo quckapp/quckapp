@@ -1,0 +1,242 @@
+# =============================================================================
+# QUIKAPP INGRESS CONFIGURATION
+# =============================================================================
+# NGINX Ingress Controller with TLS termination
+# =============================================================================
+
+# =============================================================================
+# INGRESS CLASS
+# =============================================================================
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  name: nginx
+  annotations:
+    ingressclass.kubernetes.io/is-default-class: "true"
+spec:
+  controller: k8s.io/ingress-nginx
+---
+# =============================================================================
+# MAIN API INGRESS
+# =============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: quikapp-api-ingress
+  namespace: quikapp
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    # Rate limiting
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    nginx.ingress.kubernetes.io/limit-connections: "50"
+    # Timeouts
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "10"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    # Body size
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    # CORS
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,X-Workspace-Id,X-Request-Id"
+    # Security headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Frame-Options: DENY";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+      more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
+    # TLS - cert-manager
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - api.quikapp.io
+        - "*.api.quikapp.io"
+      secretName: quikapp-api-tls
+  rules:
+    - host: api.quikapp.io
+      http:
+        paths:
+          # Main API Gateway
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-gateway
+                port:
+                  number: 80
+---
+# =============================================================================
+# WEBSOCKET INGRESS (Separate for sticky sessions)
+# =============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: quikapp-websocket-ingress
+  namespace: quikapp
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # WebSocket support
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$remote_addr"
+    # Sticky sessions
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/affinity-mode: "persistent"
+    nginx.ingress.kubernetes.io/session-cookie-name: "QUIKAPP_WS_AFFINITY"
+    nginx.ingress.kubernetes.io/session-cookie-expires: "172800"
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "172800"
+    nginx.ingress.kubernetes.io/session-cookie-samesite: "Strict"
+    nginx.ingress.kubernetes.io/session-cookie-secure: "true"
+    # WebSocket headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+    # TLS
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - ws.quikapp.io
+      secretName: quikapp-ws-tls
+  rules:
+    - host: ws.quikapp.io
+      http:
+        paths:
+          # Socket.io realtime service
+          - path: /socket.io
+            pathType: Prefix
+            backend:
+              service:
+                name: realtime-service
+                port:
+                  number: 3001
+          # Phoenix channels
+          - path: /ws
+            pathType: Prefix
+            backend:
+              service:
+                name: presence-service
+                port:
+                  number: 4000
+          # Fallback
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: realtime-service
+                port:
+                  number: 80
+---
+# =============================================================================
+# INTERNAL SERVICES INGRESS (Admin/Monitoring)
+# =============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: quikapp-admin-ingress
+  namespace: quikapp
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # IP whitelist for admin access
+    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+    # Basic auth
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: quikapp-admin-auth
+    nginx.ingress.kubernetes.io/auth-realm: "QuikApp Admin"
+    # TLS
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - admin.quikapp.io
+      secretName: quikapp-admin-tls
+  rules:
+    - host: admin.quikapp.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: admin-service
+                port:
+                  number: 80
+---
+# =============================================================================
+# CERT-MANAGER CLUSTER ISSUERS
+# =============================================================================
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: devops@quikapp.io
+    privateKeySecretRef:
+      name: letsencrypt-staging-key
+    solvers:
+      - http01:
+          ingress:
+            class: nginx
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: devops@quikapp.io
+    privateKeySecretRef:
+      name: letsencrypt-prod-key
+    solvers:
+      - http01:
+          ingress:
+            class: nginx
+---
+# =============================================================================
+# NGINX INGRESS CONTROLLER CONFIG
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-configuration
+  namespace: ingress-nginx
+data:
+  # Performance
+  worker-processes: "auto"
+  worker-connections: "65536"
+  keepalive: "75"
+  upstream-keepalive-connections: "100"
+  # Security
+  ssl-protocols: "TLSv1.2 TLSv1.3"
+  ssl-ciphers: "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384"
+  ssl-prefer-server-ciphers: "true"
+  hsts: "true"
+  hsts-max-age: "31536000"
+  hsts-include-subdomains: "true"
+  # Proxy settings
+  proxy-buffer-size: "16k"
+  proxy-buffers-number: "4"
+  client-header-buffer-size: "16k"
+  large-client-header-buffers: "4 32k"
+  # Logging
+  log-format-upstream: '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" $request_length $request_time [$proxy_upstream_name] [$proxy_alternative_upstream_name] $upstream_addr $upstream_response_length $upstream_response_time $upstream_status $req_id'
+  # Real IP
+  use-forwarded-headers: "true"
+  compute-full-forwarded-for: "true"
+  # Timeouts
+  client-body-timeout: "60"
+  client-header-timeout: "60"
+  # Rate limiting
+  limit-req-status-code: "429"

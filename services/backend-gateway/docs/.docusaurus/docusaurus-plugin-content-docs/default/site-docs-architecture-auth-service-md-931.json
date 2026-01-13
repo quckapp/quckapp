@@ -1,0 +1,29 @@
+{
+  "id": "architecture/auth-service",
+  "title": "Auth Service (Spring Boot)",
+  "description": "Java/Spring Boot authentication microservice",
+  "source": "@site/docs/architecture/auth-service.md",
+  "sourceDirName": "architecture",
+  "slug": "/architecture/auth-service",
+  "permalink": "/docs/architecture/auth-service",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/quckchat/backend/tree/main/docs/docs/architecture/auth-service.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 8,
+  "frontMatter": {
+    "sidebar_position": 8,
+    "title": "Auth Service (Spring Boot)",
+    "description": "Java/Spring Boot authentication microservice"
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Algorithms & Patterns",
+    "permalink": "/docs/architecture/algorithms-patterns"
+  },
+  "next": {
+    "title": "Realtime Service (Elixir)",
+    "permalink": "/docs/architecture/realtime-service"
+  }
+}

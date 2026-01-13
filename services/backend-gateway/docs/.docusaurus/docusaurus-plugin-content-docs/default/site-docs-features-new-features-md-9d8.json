@@ -1,0 +1,29 @@
+{
+  "id": "features/new-features",
+  "title": "New Features",
+  "description": "Documentation for new QuckChat features",
+  "source": "@site/docs/features/new-features.md",
+  "sourceDirName": "features",
+  "slug": "/features/new-features",
+  "permalink": "/docs/features/new-features",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/quckchat/backend/tree/main/docs/docs/features/new-features.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 2,
+  "frontMatter": {
+    "sidebar_position": 2,
+    "title": "New Features",
+    "description": "Documentation for new QuckChat features"
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Features Overview",
+    "permalink": "/docs/features/"
+  },
+  "next": {
+    "title": "Implementation Summary",
+    "permalink": "/docs/features/implementation-summary"
+  }
+}

@@ -1,0 +1,149 @@
+# =============================================================================
+# DOCKER BUILD TEMPLATE - SPRING BOOT
+# =============================================================================
+# Build and push Spring Boot service Docker images
+# =============================================================================
+
+parameters:
+  - name: serviceName
+    type: string
+  - name: serviceDir
+    type: string
+  - name: imageTag
+    type: string
+  - name: acrLoginServer
+    type: string
+  - name: pushImage
+    type: boolean
+    default: true
+  - name: scanImage
+    type: boolean
+    default: true
+  - name: javaVersion
+    type: string
+    default: '21'
+  - name: mavenVersion
+    type: string
+    default: '3.9.5'
+  - name: condition
+    type: string
+    default: 'true'
+
+steps:
+  - bash: |
+      echo "=== Building Spring Boot Service ==="
+      echo "Service: ${{ parameters.serviceName }}"
+      echo "Directory: ${{ parameters.serviceDir }}"
+      echo "Tag: ${{ parameters.imageTag }}"
+      echo "Java Version: ${{ parameters.javaVersion }}"
+      echo "==================================="
+    displayName: 'Display Build Info'
+    condition: ${{ parameters.condition }}
+
+  # Setup Java
+  - task: JavaToolInstaller@0
+    displayName: 'Setup Java ${{ parameters.javaVersion }}'
+    condition: ${{ parameters.condition }}
+    inputs:
+      versionSpec: '${{ parameters.javaVersion }}'
+      jdkArchitectureOption: 'x64'
+      jdkSourceOption: 'PreInstalled'
+
+  # Cache Maven dependencies
+  - task: Cache@2
+    displayName: 'Cache Maven Dependencies'
+    condition: ${{ parameters.condition }}
+    inputs:
+      key: 'maven | "$(Agent.OS)" | ${{ parameters.serviceDir }}/pom.xml'
+      restoreKeys: |
+        maven | "$(Agent.OS)"
+      path: $(HOME)/.m2/repository
+
+  # Run tests
+  - bash: |
+      cd ${{ parameters.serviceDir }}
+      ./mvnw clean verify -DskipITs
+    displayName: 'Run Unit Tests'
+    condition: ${{ parameters.condition }}
+
+  # Build JAR
+  - bash: |
+      cd ${{ parameters.serviceDir }}
+      ./mvnw package -DskipTests -Dspring-boot.build-image.skip=true
+    displayName: 'Build JAR'
+    condition: ${{ parameters.condition }}
+
+  # Login to ACR
+  - task: Docker@2
+    displayName: 'Login to ACR'
+    condition: and(${{ parameters.condition }}, ${{ parameters.pushImage }})
+    inputs:
+      containerRegistry: 'quikapp-acr-connection'
+      command: 'login'
+
+  # Build Docker image
+  - bash: |
+      cd ${{ parameters.serviceDir }}
+
+      # Check for custom Dockerfile
+      if [ -f "Dockerfile" ]; then
+        DOCKERFILE="Dockerfile"
+      else
+        DOCKERFILE="$(System.DefaultWorkingDirectory)/infrastructure/docker/dockerfiles/springboot/Dockerfile"
+      fi
+
+      docker build \
+        -t ${{ parameters.acrLoginServer }}/${{ parameters.serviceName }}:${{ parameters.imageTag }} \
+        -t ${{ parameters.acrLoginServer }}/${{ parameters.serviceName }}:$(Build.BuildId) \
+        --build-arg JAR_FILE=target/*.jar \
+        --build-arg JAVA_VERSION=${{ parameters.javaVersion }} \
+        --label "org.opencontainers.image.source=$(Build.Repository.Uri)" \
+        --label "org.opencontainers.image.revision=$(Build.SourceVersion)" \
+        --label "org.opencontainers.image.created=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+        --label "com.quikapp.service=${{ parameters.serviceName }}" \
+        --label "com.quikapp.technology=spring-boot" \
+        -f $DOCKERFILE \
+        .
+
+      echo "Image built: ${{ parameters.acrLoginServer }}/${{ parameters.serviceName }}:${{ parameters.imageTag }}"
+    displayName: 'Build Docker Image'
+    condition: ${{ parameters.condition }}
+
+  # Security scan with Trivy
+  - bash: |
+      # Install Trivy
+      wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+      echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/trivy.list
+      sudo apt-get update && sudo apt-get install -y trivy
+
+      # Scan image
+      trivy image \
+        --exit-code 0 \
+        --severity HIGH,CRITICAL \
+        --format table \
+        ${{ parameters.acrLoginServer }}/${{ parameters.serviceName }}:${{ parameters.imageTag }}
+
+      # Generate SARIF report
+      trivy image \
+        --format sarif \
+        --output $(Build.ArtifactStagingDirectory)/${{ parameters.serviceName }}-trivy.sarif \
+        ${{ parameters.acrLoginServer }}/${{ parameters.serviceName }}:${{ parameters.imageTag }}
+    displayName: 'Security Scan'
+    condition: and(${{ parameters.condition }}, ${{ parameters.scanImage }})
+    continueOnError: true
+
+  # Push to ACR
+  - bash: |
+      docker push ${{ parameters.acrLoginServer }}/${{ parameters.serviceName }}:${{ parameters.imageTag }}
+      docker push ${{ parameters.acrLoginServer }}/${{ parameters.serviceName }}:$(Build.BuildId)
+
+      echo "Pushed: ${{ parameters.acrLoginServer }}/${{ parameters.serviceName }}:${{ parameters.imageTag }}"
+    displayName: 'Push to ACR'
+    condition: and(${{ parameters.condition }}, ${{ parameters.pushImage }})
+
+  # Publish scan results
+  - publish: $(Build.ArtifactStagingDirectory)/${{ parameters.serviceName }}-trivy.sarif
+    artifact: 'security-scan-${{ parameters.serviceName }}'
+    displayName: 'Publish Security Report'
+    condition: and(${{ parameters.condition }}, ${{ parameters.scanImage }})
+    continueOnError: true

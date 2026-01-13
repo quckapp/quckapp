@@ -1,0 +1,5 @@
+bucket         = "quikapp-terraform-state-ACCOUNT_ID"
+key            = "staging/terraform.tfstate"
+region         = "us-east-1"
+dynamodb_table = "quikapp-terraform-locks"
+encrypt        = true

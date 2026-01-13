@@ -1,0 +1,327 @@
+# =============================================================================
+# PERMISSION SERVICE (Spring Boot)
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: permission-service
+  namespace: quikapp
+  labels:
+    app.kubernetes.io/name: permission-service
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: quikapp
+    app.kubernetes.io/technology: spring-boot
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: permission-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: permission-service
+        app.kubernetes.io/component: backend
+        app.kubernetes.io/part-of: quikapp
+        app.kubernetes.io/technology: spring-boot
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      serviceAccountName: quikapp-backend-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: permission-service
+          image: quikapp.azurecr.io/permission-service:latest
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: management
+              containerPort: 8081
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-common-config
+                  key: ENVIRONMENT
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://$(POSTGRES_HOST):$(POSTGRES_PORT)/quikapp_permissions"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: quikapp-database-secrets
+                  key: POSTGRES_USERNAME
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: quikapp-database-secrets
+                  key: POSTGRES_PASSWORD
+            - name: SPRING_REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-database-config
+                  key: REDIS_HOST
+            - name: OTEL_SERVICE_NAME
+              value: "permission-service"
+          envFrom:
+            - configMapRef:
+                name: quikapp-database-config
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "384Mi"
+            limits:
+              cpu: "500m"
+              memory: "768Mi"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: management
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: management
+            initialDelaySeconds: 30
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: permission-service
+  namespace: quikapp
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+  selector:
+    app.kubernetes.io/name: permission-service
+---
+# =============================================================================
+# AUDIT SERVICE (Spring Boot)
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: audit-service
+  namespace: quikapp
+  labels:
+    app.kubernetes.io/name: audit-service
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: quikapp
+    app.kubernetes.io/technology: spring-boot
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: audit-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: audit-service
+        app.kubernetes.io/component: backend
+        app.kubernetes.io/part-of: quikapp
+        app.kubernetes.io/technology: spring-boot
+        app.kubernetes.io/uses-broker: "true"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      serviceAccountName: quikapp-backend-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: audit-service
+          image: quikapp.azurecr.io/audit-service:latest
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: management
+              containerPort: 8081
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-common-config
+                  key: ENVIRONMENT
+            - name: SPRING_DATA_MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: quikapp-database-secrets
+                  key: MONGODB_URI
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-broker-config
+                  key: KAFKA_BROKERS
+            - name: OTEL_SERVICE_NAME
+              value: "audit-service"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "384Mi"
+            limits:
+              cpu: "500m"
+              memory: "768Mi"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: management
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: management
+            initialDelaySeconds: 30
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: audit-service
+  namespace: quikapp
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+  selector:
+    app.kubernetes.io/name: audit-service
+---
+# =============================================================================
+# ADMIN SERVICE (Spring Boot)
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: admin-service
+  namespace: quikapp
+  labels:
+    app.kubernetes.io/name: admin-service
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: quikapp
+    app.kubernetes.io/technology: spring-boot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: admin-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: admin-service
+        app.kubernetes.io/component: backend
+        app.kubernetes.io/part-of: quikapp
+        app.kubernetes.io/technology: spring-boot
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      serviceAccountName: quikapp-backend-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: admin-service
+          image: quikapp.azurecr.io/admin-service:latest
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: management
+              containerPort: 8081
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-common-config
+                  key: ENVIRONMENT
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://$(POSTGRES_HOST):$(POSTGRES_PORT)/quikapp_admin"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: quikapp-database-secrets
+                  key: POSTGRES_USERNAME
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: quikapp-database-secrets
+                  key: POSTGRES_PASSWORD
+            - name: OTEL_SERVICE_NAME
+              value: "admin-service"
+          envFrom:
+            - configMapRef:
+                name: quikapp-database-config
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "384Mi"
+            limits:
+              cpu: "500m"
+              memory: "768Mi"
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: management
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: management
+            initialDelaySeconds: 30
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: admin-service
+  namespace: quikapp
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+  selector:
+    app.kubernetes.io/name: admin-service

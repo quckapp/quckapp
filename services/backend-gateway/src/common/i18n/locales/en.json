@@ -1,0 +1,53 @@
+{
+  "common": {
+    "success": "Success",
+    "error": "Error",
+    "notFound": "Not found",
+    "unauthorized": "Unauthorized",
+    "forbidden": "Forbidden",
+    "badRequest": "Bad request",
+    "internalError": "Internal server error"
+  },
+  "auth": {
+    "loginSuccess": "Login successful",
+    "logoutSuccess": "Logout successful",
+    "registerSuccess": "Registration successful",
+    "invalidCredentials": "Invalid credentials",
+    "tokenExpired": "Token expired",
+    "tokenInvalid": "Invalid token",
+    "userNotFound": "User not found",
+    "emailAlreadyExists": "Email already exists",
+    "phoneAlreadyExists": "Phone number already exists"
+  },
+  "user": {
+    "profileUpdated": "Profile updated successfully",
+    "avatarUpdated": "Avatar updated successfully",
+    "passwordChanged": "Password changed successfully",
+    "accountDeleted": "Account deleted successfully"
+  },
+  "message": {
+    "sent": "Message sent",
+    "deleted": "Message deleted",
+    "edited": "Message edited",
+    "notFound": "Message not found"
+  },
+  "conversation": {
+    "created": "Conversation created",
+    "updated": "Conversation updated",
+    "deleted": "Conversation deleted",
+    "notFound": "Conversation not found",
+    "memberAdded": "Member added",
+    "memberRemoved": "Member removed"
+  },
+  "notification": {
+    "newMessage": "New message from {sender}",
+    "missedCall": "Missed call from {caller}",
+    "incomingCall": "Incoming call from {caller}"
+  },
+  "validation": {
+    "required": "This field is required",
+    "email": "Invalid email format",
+    "minLength": "Minimum length is {min} characters",
+    "maxLength": "Maximum length is {max} characters"
+  }
+}

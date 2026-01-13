@@ -1,0 +1,137 @@
+{{/*
+ConfigMap for QuikApp shared configuration
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: quikapp-config
+  namespace: {{ .Values.global.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "quikapp.labels" . | nindent 4 }}
+data:
+  # Environment
+  ENVIRONMENT: {{ .Values.global.environment | quote }}
+
+  # Service URLs (internal)
+  AUTH_SERVICE_URL: "http://auth-service:8080"
+  USER_SERVICE_URL: "http://user-service:8081"
+  PERMISSION_SERVICE_URL: "http://permission-service:8082"
+  AUDIT_SERVICE_URL: "http://audit-service:8083"
+  ADMIN_SERVICE_URL: "http://admin-service:8084"
+
+  BACKEND_GATEWAY_URL: "http://backend-gateway:3000"
+  NOTIFICATION_SERVICE_URL: "http://notification-service:3001"
+  REALTIME_SERVICE_URL: "http://realtime-service:3002"
+
+  PRESENCE_SERVICE_URL: "http://presence-service:4000"
+  MESSAGE_SERVICE_URL: "http://message-service:4001"
+  CALL_SERVICE_URL: "http://call-service:4002"
+  NOTIFICATION_ORCHESTRATOR_URL: "http://notification-orchestrator:4003"
+  HUDDLE_SERVICE_URL: "http://huddle-service:4004"
+  EVENT_BROADCAST_SERVICE_URL: "http://event-broadcast-service:4005"
+
+  WORKSPACE_SERVICE_URL: "http://workspace-service:8090"
+  CHANNEL_SERVICE_URL: "http://channel-service:8091"
+  THREAD_SERVICE_URL: "http://thread-service:8092"
+  SEARCH_SERVICE_URL: "http://search-service:8093"
+  FILE_SERVICE_URL: "http://file-service:8094"
+  MEDIA_SERVICE_URL: "http://media-service:8095"
+  BOOKMARK_SERVICE_URL: "http://bookmark-service:8096"
+  REMINDER_SERVICE_URL: "http://reminder-service:8097"
+  ATTACHMENT_SERVICE_URL: "http://attachment-service:8098"
+  CDN_SERVICE_URL: "http://cdn-service:8099"
+
+  ANALYTICS_SERVICE_URL: "http://analytics-service:5000"
+  ML_SERVICE_URL: "http://ml-service:5001"
+  MODERATION_SERVICE_URL: "http://moderation-service:5002"
+  EXPORT_SERVICE_URL: "http://export-service:5003"
+  INTEGRATION_SERVICE_URL: "http://integration-service:5004"
+  SENTIMENT_SERVICE_URL: "http://sentiment-service:5005"
+  INSIGHTS_SERVICE_URL: "http://insights-service:5006"
+  SMART_REPLY_SERVICE_URL: "http://smart-reply-service:5007"
+
+  # Infrastructure URLs
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+
+  MYSQL_HOST: "mysql"
+  MYSQL_PORT: "3306"
+
+  POSTGRES_HOST: "postgresql"
+  POSTGRES_PORT: "5432"
+
+  MONGODB_HOST: "mongodb"
+  MONGODB_PORT: "27017"
+
+  KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+
+  ELASTICSEARCH_HOST: "elasticsearch"
+  ELASTICSEARCH_PORT: "9200"
+
+  MINIO_ENDPOINT: "minio:9000"
+
+  # Tracing configuration
+  OTEL_EXPORTER_OTLP_ENDPOINT: {{ .Values.global.tracing.endpoint | quote }}
+  OTEL_TRACES_SAMPLER: "parentbased_traceidratio"
+  OTEL_TRACES_SAMPLER_ARG: {{ .Values.global.tracing.samplingRatio | quote }}
+
+  # Logging configuration
+  LOG_LEVEL: {{ .Values.global.logging.level | quote }}
+  LOG_FORMAT: {{ .Values.global.logging.format | quote }}
+
+---
+{{/*
+ConfigMap for Spring Boot specific configuration
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: quikapp-spring-config
+  namespace: {{ .Values.global.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "quikapp.labels" . | nindent 4 }}
+data:
+  application.yml: |
+    spring:
+      profiles:
+        active: kubernetes
+      application:
+        name: ${SERVICE_NAME:unknown}
+
+    management:
+      endpoints:
+        web:
+          exposure:
+            include: health,info,prometheus,metrics
+      endpoint:
+        health:
+          show-details: always
+          probes:
+            enabled: true
+      metrics:
+        tags:
+          application: ${spring.application.name}
+          environment: {{ .Values.global.environment }}
+
+    logging:
+      level:
+        root: {{ .Values.global.logging.level | upper }}
+      pattern:
+        console: "%d{ISO8601} %highlight(%-5level) [%thread] %cyan(%logger{36}) - %msg%n"
+
+---
+{{/*
+ConfigMap for Elixir specific configuration
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: quikapp-elixir-config
+  namespace: {{ .Values.global.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "quikapp.labels" . | nindent 4 }}
+data:
+  RELEASE_DISTRIBUTION: "name"
+  RELEASE_NODE: "${POD_NAME}@${POD_IP}"
+  RELEASE_COOKIE: "quikapp-cookie"
+  ERL_AFLAGS: "-kernel inet_dist_listen_min 4370 -kernel inet_dist_listen_max 4370"

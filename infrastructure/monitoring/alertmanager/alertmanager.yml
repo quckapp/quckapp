@@ -1,0 +1,89 @@
+# QuikApp Alertmanager Configuration
+
+global:
+  # SMTP configuration for email alerts (configure for production)
+  # smtp_smarthost: 'smtp.example.com:587'
+  # smtp_from: 'alertmanager@quikapp.com'
+  # smtp_auth_username: 'alertmanager@quikapp.com'
+  # smtp_auth_password: 'password'
+
+  # Slack configuration (configure for production)
+  # slack_api_url: 'https://hooks.slack.com/services/xxx/xxx/xxx'
+
+  resolve_timeout: 5m
+
+# Route configuration
+route:
+  group_by: ['alertname', 'service', 'severity']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'default-receiver'
+
+  routes:
+    # Critical alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: 'critical-receiver'
+      group_wait: 10s
+      repeat_interval: 1h
+
+    # Warning alerts
+    - match:
+        severity: warning
+      receiver: 'warning-receiver'
+      group_wait: 1m
+      repeat_interval: 4h
+
+    # Database alerts
+    - match_re:
+        alertname: ^(Redis|MySQL|PostgreSQL|MongoDB|Elasticsearch|Kafka).*
+      receiver: 'database-receiver'
+      group_by: ['alertname', 'database']
+
+# Receivers configuration
+receivers:
+  - name: 'default-receiver'
+    # Configure webhook, email, or slack for production
+    webhook_configs:
+      - url: 'http://localhost:5001/alerts'
+        send_resolved: true
+
+  - name: 'critical-receiver'
+    # Configure for production - PagerDuty, OpsGenie, etc.
+    webhook_configs:
+      - url: 'http://localhost:5001/alerts/critical'
+        send_resolved: true
+    # email_configs:
+    #   - to: 'oncall@quikapp.com'
+    #     send_resolved: true
+
+  - name: 'warning-receiver'
+    webhook_configs:
+      - url: 'http://localhost:5001/alerts/warning'
+        send_resolved: true
+
+  - name: 'database-receiver'
+    webhook_configs:
+      - url: 'http://localhost:5001/alerts/database'
+        send_resolved: true
+
+# Inhibition rules - suppress certain alerts when others are firing
+inhibit_rules:
+  # If critical alert is firing, suppress warning for same service
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'service']
+
+  # If service is down, suppress other alerts for that service
+  - source_match:
+      alertname: 'ServiceDown'
+    target_match_re:
+      alertname: '.+'
+    equal: ['service']
+
+# Templates for notifications
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'

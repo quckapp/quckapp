@@ -1,0 +1,70 @@
+-- QuikApp User Service - Initial Schema
+
+CREATE TABLE users (
+    id CHAR(36) PRIMARY KEY,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    display_name VARCHAR(100),
+    avatar_url VARCHAR(500),
+    phone VARCHAR(20),
+    timezone VARCHAR(50) DEFAULT 'UTC',
+    locale VARCHAR(10) DEFAULT 'en',
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    email_verified BOOLEAN DEFAULT FALSE,
+    phone_verified BOOLEAN DEFAULT FALSE,
+    last_login_at TIMESTAMP NULL,
+    last_login_ip VARCHAR(45),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_users_email (email),
+    INDEX idx_users_username (username),
+    INDEX idx_users_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE user_profiles (
+    user_id CHAR(36) PRIMARY KEY,
+    title VARCHAR(100),
+    department VARCHAR(100),
+    location VARCHAR(100),
+    bio TEXT,
+    custom_status VARCHAR(200),
+    status_emoji VARCHAR(10),
+    status_expiry TIMESTAMP NULL,
+    pronouns VARCHAR(100),
+    birthday TIMESTAMP NULL,
+    linkedin_url VARCHAR(500),
+    twitter_url VARCHAR(500),
+    github_url VARCHAR(500),
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_profile_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE user_preferences (
+    user_id CHAR(36) PRIMARY KEY,
+    push_enabled BOOLEAN DEFAULT TRUE,
+    email_enabled BOOLEAN DEFAULT TRUE,
+    sms_enabled BOOLEAN DEFAULT FALSE,
+    desktop_notifications BOOLEAN DEFAULT TRUE,
+    sound_enabled BOOLEAN DEFAULT TRUE,
+    quiet_hours_start TIME NULL,
+    quiet_hours_end TIME NULL,
+    quiet_hours_enabled BOOLEAN DEFAULT FALSE,
+    theme VARCHAR(20) DEFAULT 'system',
+    language VARCHAR(10) DEFAULT 'en',
+    compact_mode BOOLEAN DEFAULT FALSE,
+    sidebar_collapsed BOOLEAN DEFAULT FALSE,
+    show_unread_only BOOLEAN DEFAULT FALSE,
+    message_preview BOOLEAN DEFAULT TRUE,
+    enter_to_send BOOLEAN DEFAULT TRUE,
+    markdown_enabled BOOLEAN DEFAULT TRUE,
+    emoji_suggestions_enabled BOOLEAN DEFAULT TRUE,
+    show_online_status BOOLEAN DEFAULT TRUE,
+    show_typing_indicator BOOLEAN DEFAULT TRUE,
+    show_read_receipts BOOLEAN DEFAULT TRUE,
+    reduced_motion BOOLEAN DEFAULT FALSE,
+    high_contrast BOOLEAN DEFAULT FALSE,
+    font_size INT DEFAULT 14,
+    custom_settings JSON,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_preferences_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

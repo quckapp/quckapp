@@ -1,0 +1,72 @@
+{{/*
+Generate services for all microservices
+*/}}
+
+{{- $services := dict
+  "backendGateway" .Values.backendGateway
+  "notificationService" .Values.notificationService
+  "realtimeService" .Values.realtimeService
+  "authService" .Values.authService
+  "userService" .Values.userService
+  "permissionService" .Values.permissionService
+  "auditService" .Values.auditService
+  "adminService" .Values.adminService
+  "presenceService" .Values.presenceService
+  "messageService" .Values.messageService
+  "callService" .Values.callService
+  "notificationOrchestrator" .Values.notificationOrchestrator
+  "huddleService" .Values.huddleService
+  "eventBroadcastService" .Values.eventBroadcastService
+  "workspaceService" .Values.workspaceService
+  "channelService" .Values.channelService
+  "threadService" .Values.threadService
+  "searchService" .Values.searchService
+  "fileService" .Values.fileService
+  "mediaService" .Values.mediaService
+  "bookmarkService" .Values.bookmarkService
+  "reminderService" .Values.reminderService
+  "attachmentService" .Values.attachmentService
+  "cdnService" .Values.cdnService
+  "analyticsService" .Values.analyticsService
+  "mlService" .Values.mlService
+  "moderationService" .Values.moderationService
+  "exportService" .Values.exportService
+  "integrationService" .Values.integrationService
+  "sentimentService" .Values.sentimentService
+  "insightsService" .Values.insightsService
+  "smartReplyService" .Values.smartReplyService
+-}}
+
+{{- range $key, $service := $services }}
+{{- if $service.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $service.name }}
+  namespace: {{ $.Values.global.namespace | default $.Release.Namespace }}
+  labels:
+    {{- include "quikapp.serviceLabels" (dict "root" $ "serviceName" $service.name "component" "backend") | nindent 4 }}
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: {{ $service.service.port | quote }}
+spec:
+  type: {{ $service.service.type | default "ClusterIP" }}
+  selector:
+    {{- include "quikapp.serviceSelectorLabels" (dict "root" $ "serviceName" $service.name) | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ $service.service.port }}
+      targetPort: {{ $service.service.port }}
+      protocol: TCP
+    {{- if $service.service.additionalPorts }}
+    {{- range $portName, $portConfig := $service.service.additionalPorts }}
+    - name: {{ $portName }}
+      port: {{ $portConfig.port }}
+      targetPort: {{ $portConfig.targetPort | default $portConfig.port }}
+      protocol: {{ $portConfig.protocol | default "TCP" }}
+    {{- end }}
+    {{- end }}
+  sessionAffinity: {{ $service.service.sessionAffinity | default "None" }}
+{{- end }}
+{{- end }}

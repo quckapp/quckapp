@@ -1,0 +1,202 @@
+# Policy format: p, subject, domain, object, action, effect
+# Role format: g, user, role, domain
+
+# ===========================================
+# ROLE DEFINITIONS (Role Hierarchy)
+# ===========================================
+
+# Role inheritance: moderator inherits from user, admin inherits from moderator, super_admin inherits from admin
+g, moderator, user, *
+g, admin, moderator, *
+g, super_admin, admin, *
+
+# ===========================================
+# USER POLICIES - Basic user permissions
+# ===========================================
+
+# Users can manage their own profile
+p, user, *, users/:userId, read, allow
+p, user, *, users/:userId, update, allow
+p, user, *, users/:userId/settings, read, allow
+p, user, *, users/:userId/settings, update, allow
+
+# Users can search other users
+p, user, *, users, search, allow
+
+# Users can manage their own devices
+p, user, *, users/:userId/devices, read, allow
+p, user, *, users/:userId/devices, create, allow
+p, user, *, users/:userId/devices, delete, allow
+
+# Users can manage blocked users
+p, user, *, users/:userId/blocked, read, allow
+p, user, *, users/:userId/blocked, create, allow
+p, user, *, users/:userId/blocked, delete, allow
+
+# ===========================================
+# CONVERSATION POLICIES
+# ===========================================
+
+# Users can view and manage their conversations
+p, user, *, conversations, read, allow
+p, user, *, conversations, create, allow
+p, user, *, conversations/:conversationId, read, allow
+p, user, *, conversations/:conversationId, update, allow
+p, user, *, conversations/:conversationId, delete, allow
+
+# Group conversation management
+p, user, *, conversations/:conversationId/participants, read, allow
+p, user, *, conversations/:conversationId/participants, create, allow
+p, user, *, conversations/:conversationId/participants, delete, allow
+
+# ===========================================
+# MESSAGE POLICIES
+# ===========================================
+
+# Users can send and read messages in their conversations
+p, user, *, messages, read, allow
+p, user, *, messages, create, allow
+p, user, *, messages/:messageId, read, allow
+p, user, *, messages/:messageId, update, allow
+p, user, *, messages/:messageId, delete, allow
+
+# Message reactions
+p, user, *, messages/:messageId/reactions, read, allow
+p, user, *, messages/:messageId/reactions, create, allow
+p, user, *, messages/:messageId/reactions, delete, allow
+
+# ===========================================
+# MEDIA POLICIES
+# ===========================================
+
+# Users can upload and manage media
+p, user, *, media, read, allow
+p, user, *, media, create, allow
+p, user, *, media/:mediaId, read, allow
+p, user, *, media/:mediaId, delete, allow
+
+# ===========================================
+# CALL POLICIES
+# ===========================================
+
+# Users can initiate and manage calls
+p, user, *, calls, read, allow
+p, user, *, calls, create, allow
+p, user, *, calls/:callId, read, allow
+p, user, *, calls/:callId, update, allow
+p, user, *, calls/:callId, delete, allow
+
+# Huddles (audio rooms)
+p, user, *, huddles, read, allow
+p, user, *, huddles, create, allow
+p, user, *, huddles/:huddleId, read, allow
+p, user, *, huddles/:huddleId, update, allow
+p, user, *, huddles/:huddleId, delete, allow
+
+# ===========================================
+# STATUS POLICIES
+# ===========================================
+
+# Users can manage their status/stories
+p, user, *, status, read, allow
+p, user, *, status, create, allow
+p, user, *, status/:statusId, read, allow
+p, user, *, status/:statusId, delete, allow
+
+# ===========================================
+# NOTIFICATION POLICIES
+# ===========================================
+
+# Users can manage their notifications
+p, user, *, notifications, read, allow
+p, user, *, notifications/:notificationId, read, allow
+p, user, *, notifications/:notificationId, update, allow
+p, user, *, notifications/:notificationId, delete, allow
+
+# ===========================================
+# MODERATOR POLICIES - Content moderation
+# ===========================================
+
+# Moderators can view reports
+p, moderator, *, reports, read, allow
+p, moderator, *, reports/:reportId, read, allow
+p, moderator, *, reports/:reportId, update, allow
+
+# Moderators can view any message for moderation
+p, moderator, *, admin/messages, read, allow
+p, moderator, *, admin/messages/:messageId, read, allow
+p, moderator, *, admin/messages/:messageId, delete, allow
+
+# Moderators can view user details for moderation
+p, moderator, *, admin/users, read, allow
+p, moderator, *, admin/users/:userId, read, allow
+
+# Moderators can delete content
+p, moderator, *, admin/content, delete, allow
+
+# ===========================================
+# ADMIN POLICIES - User management
+# ===========================================
+
+# Admins can manage users
+p, admin, *, admin/users, read, allow
+p, admin, *, admin/users, create, allow
+p, admin, *, admin/users/:userId, read, allow
+p, admin, *, admin/users/:userId, update, allow
+
+# Admins can ban/unban users
+p, admin, *, admin/users/:userId/ban, create, allow
+p, admin, *, admin/users/:userId/unban, create, allow
+
+# Admins can view analytics
+p, admin, *, analytics, read, allow
+p, admin, *, analytics/*, read, allow
+
+# Admins can manage communities
+p, admin, *, admin/communities, read, allow
+p, admin, *, admin/communities, create, allow
+p, admin, *, admin/communities/:communityId, read, allow
+p, admin, *, admin/communities/:communityId, update, allow
+p, admin, *, admin/communities/:communityId, delete, allow
+
+# Admins can view audit logs
+p, admin, *, admin/audit-logs, read, allow
+p, admin, *, admin/audit-logs/:logId, read, allow
+
+# Admins can manage reports
+p, admin, *, reports, read, allow
+p, admin, *, reports, create, allow
+p, admin, *, reports/:reportId, read, allow
+p, admin, *, reports/:reportId, update, allow
+p, admin, *, reports/:reportId, delete, allow
+
+# ===========================================
+# SUPER_ADMIN POLICIES - Full system access
+# ===========================================
+
+# Super admins can manage moderators and admins
+p, super_admin, *, admin/moderators, read, allow
+p, super_admin, *, admin/moderators, create, allow
+p, super_admin, *, admin/moderators/:userId, update, allow
+p, super_admin, *, admin/moderators/:userId, delete, allow
+
+# Super admins can manage system settings
+p, super_admin, *, admin/settings, read, allow
+p, super_admin, *, admin/settings, update, allow
+
+# Super admins can manage all user roles
+p, super_admin, *, admin/users/:userId/role, update, allow
+
+# Super admins have access to system metrics
+p, super_admin, *, admin/metrics, read, allow
+
+# Super admins can delete any user
+p, super_admin, *, admin/users/:userId, delete, allow
+
+# ===========================================
+# DENY POLICIES - Explicit denials
+# ===========================================
+
+# Banned users cannot do anything (handled in guard, but explicit here for clarity)
+# These would be added dynamically when a user is banned
+# p, banned_user_id, *, *, *, deny

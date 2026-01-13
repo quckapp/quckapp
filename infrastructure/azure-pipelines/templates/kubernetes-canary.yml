@@ -1,0 +1,169 @@
+# =============================================================================
+# KUBERNETES CANARY DEPLOYMENT TEMPLATE
+# =============================================================================
+# Progressive rollout with canary analysis
+# =============================================================================
+
+parameters:
+  - name: environment
+    type: string
+  - name: kubernetesServiceConnection
+    type: string
+  - name: namespace
+    type: string
+  - name: service
+    type: string
+  - name: imageTag
+    type: string
+  - name: canaryPercentage
+    type: number
+    default: 10
+  - name: analysisInterval
+    type: number
+    default: 300  # 5 minutes
+  - name: promotionSteps
+    type: object
+    default:
+      - 10
+      - 25
+      - 50
+      - 75
+      - 100
+
+steps:
+  - checkout: self
+    fetchDepth: 1
+
+  - bash: |
+      echo "=== Canary Deployment Configuration ==="
+      echo "Service: ${{ parameters.service }}"
+      echo "Image Tag: ${{ parameters.imageTag }}"
+      echo "Initial Canary %: ${{ parameters.canaryPercentage }}"
+      echo "Promotion Steps: ${{ join(',', parameters.promotionSteps) }}"
+      echo "========================================"
+    displayName: 'Display Canary Configuration'
+
+  # Create canary deployment
+  - bash: |
+      cat > $(Pipeline.Workspace)/canary-deployment.yaml << 'EOF'
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: ${{ parameters.service }}-canary
+        namespace: ${{ parameters.namespace }}
+        labels:
+          app.kubernetes.io/name: ${{ parameters.service }}
+          app.kubernetes.io/version: canary
+          deployment-type: canary
+      spec:
+        replicas: 1
+        selector:
+          matchLabels:
+            app.kubernetes.io/name: ${{ parameters.service }}
+            deployment-type: canary
+        template:
+          metadata:
+            labels:
+              app.kubernetes.io/name: ${{ parameters.service }}
+              deployment-type: canary
+          spec:
+            containers:
+              - name: ${{ parameters.service }}
+                image: quikapp.azurecr.io/${{ parameters.service }}:${{ parameters.imageTag }}
+      EOF
+
+      echo "Canary deployment manifest created"
+    displayName: 'Create Canary Manifest'
+
+  # Deploy canary
+  - task: KubernetesManifest@0
+    displayName: 'Deploy Canary'
+    inputs:
+      action: 'deploy'
+      kubernetesServiceConnection: '${{ parameters.kubernetesServiceConnection }}'
+      namespace: '${{ parameters.namespace }}'
+      manifests: |
+        $(Pipeline.Workspace)/canary-deployment.yaml
+
+  # Wait for canary to be ready
+  - task: Kubernetes@1
+    displayName: 'Wait for Canary Ready'
+    inputs:
+      connectionType: 'Kubernetes Service Connection'
+      kubernetesServiceEndpoint: '${{ parameters.kubernetesServiceConnection }}'
+      namespace: '${{ parameters.namespace }}'
+      command: 'rollout'
+      arguments: 'status deployment/${{ parameters.service }}-canary --timeout=300s'
+
+  # Run canary analysis
+  - bash: |
+      echo "=== Starting Canary Analysis ==="
+      echo "Monitoring for ${{ parameters.analysisInterval }} seconds..."
+
+      CANARY_POD=$(kubectl get pods -n ${{ parameters.namespace }} \
+        -l app.kubernetes.io/name=${{ parameters.service }},deployment-type=canary \
+        -o jsonpath='{.items[0].metadata.name}')
+
+      echo "Canary pod: $CANARY_POD"
+
+      # Monitor for errors
+      START_TIME=$(date +%s)
+      END_TIME=$((START_TIME + ${{ parameters.analysisInterval }}))
+
+      while [ $(date +%s) -lt $END_TIME ]; do
+        # Check pod status
+        POD_STATUS=$(kubectl get pod $CANARY_POD -n ${{ parameters.namespace }} \
+          -o jsonpath='{.status.phase}')
+
+        if [ "$POD_STATUS" != "Running" ]; then
+          echo "ERROR: Canary pod is not running (status: $POD_STATUS)"
+          exit 1
+        fi
+
+        # Check for restarts
+        RESTARTS=$(kubectl get pod $CANARY_POD -n ${{ parameters.namespace }} \
+          -o jsonpath='{.status.containerStatuses[0].restartCount}')
+
+        if [ "$RESTARTS" -gt "0" ]; then
+          echo "WARNING: Canary pod has restarted $RESTARTS times"
+        fi
+
+        echo "Canary healthy - $(($END_TIME - $(date +%s)))s remaining"
+        sleep 30
+      done
+
+      echo "=== Canary Analysis Complete ==="
+    displayName: 'Canary Analysis'
+    env:
+      KUBECONFIG: $(KUBECONFIG)
+
+  # Promote canary (update main deployment)
+  - task: Kubernetes@1
+    displayName: 'Promote Canary - Update Main Deployment'
+    inputs:
+      connectionType: 'Kubernetes Service Connection'
+      kubernetesServiceEndpoint: '${{ parameters.kubernetesServiceConnection }}'
+      namespace: '${{ parameters.namespace }}'
+      command: 'set'
+      arguments: 'image deployment/${{ parameters.service }} ${{ parameters.service }}=quikapp.azurecr.io/${{ parameters.service }}:${{ parameters.imageTag }}'
+
+  # Wait for main deployment rollout
+  - task: Kubernetes@1
+    displayName: 'Wait for Main Deployment'
+    inputs:
+      connectionType: 'Kubernetes Service Connection'
+      kubernetesServiceEndpoint: '${{ parameters.kubernetesServiceConnection }}'
+      namespace: '${{ parameters.namespace }}'
+      command: 'rollout'
+      arguments: 'status deployment/${{ parameters.service }} --timeout=600s'
+
+  # Cleanup canary
+  - task: Kubernetes@1
+    displayName: 'Cleanup Canary Deployment'
+    inputs:
+      connectionType: 'Kubernetes Service Connection'
+      kubernetesServiceEndpoint: '${{ parameters.kubernetesServiceConnection }}'
+      namespace: '${{ parameters.namespace }}'
+      command: 'delete'
+      arguments: 'deployment/${{ parameters.service }}-canary --ignore-not-found'
+    condition: always()

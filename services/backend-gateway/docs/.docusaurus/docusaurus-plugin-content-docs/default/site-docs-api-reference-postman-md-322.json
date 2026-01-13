@@ -1,0 +1,29 @@
+{
+  "id": "api-reference/postman",
+  "title": "Postman Collection",
+  "description": "Ready-to-use Postman collection for QuckChat API",
+  "source": "@site/docs/api-reference/postman.md",
+  "sourceDirName": "api-reference",
+  "slug": "/api-reference/postman",
+  "permalink": "/docs/api-reference/postman",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/quckchat/backend/tree/main/docs/docs/api-reference/postman.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 2,
+  "frontMatter": {
+    "sidebar_position": 2,
+    "title": "Postman Collection",
+    "description": "Ready-to-use Postman collection for QuckChat API"
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "OpenAPI Specification",
+    "permalink": "/docs/api-reference/openapi"
+  },
+  "next": {
+    "title": "Environments",
+    "permalink": "/docs/deployment/environments"
+  }
+}

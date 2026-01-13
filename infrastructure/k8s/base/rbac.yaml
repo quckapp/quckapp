@@ -1,0 +1,118 @@
+# =============================================================================
+# SERVICE ACCOUNTS
+# =============================================================================
+
+# Default service account for all services
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: quikapp-service-account
+  namespace: quikapp
+  labels:
+    app.kubernetes.io/name: quikapp
+  annotations:
+    azure.workload.identity/client-id: ""  # Set from Terraform
+---
+# Service account for backend services (database access)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: quikapp-backend-sa
+  namespace: quikapp
+  labels:
+    app.kubernetes.io/name: quikapp
+    app.kubernetes.io/component: backend
+---
+# Service account for worker services (queue processing)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: quikapp-worker-sa
+  namespace: quikapp
+  labels:
+    app.kubernetes.io/name: quikapp
+    app.kubernetes.io/component: worker
+---
+# =============================================================================
+# ROLES
+# =============================================================================
+
+# Role for reading ConfigMaps and Secrets
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: quikapp-config-reader
+  namespace: quikapp
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+---
+# Role for service discovery
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: quikapp-service-discovery
+  namespace: quikapp
+rules:
+  - apiGroups: [""]
+    resources: ["services", "endpoints", "pods"]
+    verbs: ["get", "list", "watch"]
+---
+# =============================================================================
+# ROLE BINDINGS
+# =============================================================================
+
+# Bind config reader to default service account
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: quikapp-config-reader-binding
+  namespace: quikapp
+subjects:
+  - kind: ServiceAccount
+    name: quikapp-service-account
+    namespace: quikapp
+  - kind: ServiceAccount
+    name: quikapp-backend-sa
+    namespace: quikapp
+  - kind: ServiceAccount
+    name: quikapp-worker-sa
+    namespace: quikapp
+roleRef:
+  kind: Role
+  name: quikapp-config-reader
+  apiGroup: rbac.authorization.k8s.io
+---
+# Bind service discovery to all service accounts
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: quikapp-service-discovery-binding
+  namespace: quikapp
+subjects:
+  - kind: ServiceAccount
+    name: quikapp-service-account
+    namespace: quikapp
+  - kind: ServiceAccount
+    name: quikapp-backend-sa
+    namespace: quikapp
+roleRef:
+  kind: Role
+  name: quikapp-service-discovery
+  apiGroup: rbac.authorization.k8s.io
+---
+# =============================================================================
+# POD SECURITY POLICIES (via Pod Security Standards)
+# =============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: quikapp
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted

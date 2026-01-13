@@ -1,0 +1,213 @@
+# =============================================================================
+# TERRAFORM INFRASTRUCTURE PROMOTION PIPELINE
+# =============================================================================
+# Promotes infrastructure changes through environments:
+# dev -> qa -> staging -> prod
+#
+# Each environment requires the previous to succeed
+# Staging and Production require manual approval
+# =============================================================================
+
+trigger: none  # Manual trigger only for promotions
+
+pr: none
+
+# =============================================================================
+# PARAMETERS
+# =============================================================================
+
+parameters:
+  - name: startEnvironment
+    displayName: 'Start from Environment'
+    type: string
+    default: 'dev'
+    values:
+      - dev
+      - qa
+      - staging
+      - prod
+
+  - name: stopEnvironment
+    displayName: 'Stop at Environment'
+    type: string
+    default: 'prod'
+    values:
+      - dev
+      - qa
+      - staging
+      - prod
+
+# =============================================================================
+# VARIABLES
+# =============================================================================
+
+variables:
+  - group: quikapp-terraform-common
+  - name: terraformVersion
+    value: '1.5.7'
+  - name: terraformWorkingDir
+    value: '$(System.DefaultWorkingDirectory)/infrastructure/terraform'
+  - name: tfStateResourceGroup
+    value: 'rg-quikapp-tfstate'
+  - name: tfStateStorageAccount
+    value: 'stquikapptfstate'
+  - name: tfStateContainer
+    value: 'tfstate'
+
+# =============================================================================
+# STAGES
+# =============================================================================
+
+stages:
+  # ===========================================================================
+  # VALIDATION
+  # ===========================================================================
+  - stage: Validate
+    displayName: 'Validate Configuration'
+    jobs:
+      - job: Validate
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - checkout: self
+            fetchDepth: 1
+
+          - task: TerraformInstaller@1
+            inputs:
+              terraformVersion: '$(terraformVersion)'
+
+          - script: |
+              terraform fmt -check -recursive
+              terraform init -backend=false
+              terraform validate
+            displayName: 'Validate Terraform'
+            workingDirectory: '$(terraformWorkingDir)'
+
+  # ===========================================================================
+  # DEV ENVIRONMENT
+  # ===========================================================================
+  - template: templates/terraform-environment-stage.yml
+    parameters:
+      environment: 'dev'
+      displayName: 'Development'
+      azureServiceConnection: '$(azureServiceConnection)'
+      dependsOn:
+        - Validate
+      condition: |
+        and(
+          succeeded(),
+          in('${{ parameters.startEnvironment }}', 'dev')
+        )
+      requiresApproval: false
+      terraformVersion: '$(terraformVersion)'
+      workingDirectory: '$(terraformWorkingDir)'
+      backendResourceGroup: '$(tfStateResourceGroup)'
+      backendStorageAccount: '$(tfStateStorageAccount)'
+      backendContainer: '$(tfStateContainer)'
+
+  # ===========================================================================
+  # QA ENVIRONMENT
+  # ===========================================================================
+  - template: templates/terraform-environment-stage.yml
+    parameters:
+      environment: 'qa'
+      displayName: 'QA'
+      azureServiceConnection: '$(azureServiceConnection)'
+      dependsOn:
+        - ${{ if eq(parameters.startEnvironment, 'dev') }}:
+          - Apply_dev
+        - ${{ if eq(parameters.startEnvironment, 'qa') }}:
+          - Validate
+      condition: |
+        and(
+          or(succeeded('Apply_dev'), eq('${{ parameters.startEnvironment }}', 'qa')),
+          in('${{ parameters.stopEnvironment }}', 'qa', 'staging', 'prod')
+        )
+      requiresApproval: false
+      terraformVersion: '$(terraformVersion)'
+      workingDirectory: '$(terraformWorkingDir)'
+      backendResourceGroup: '$(tfStateResourceGroup)'
+      backendStorageAccount: '$(tfStateStorageAccount)'
+      backendContainer: '$(tfStateContainer)'
+
+  # ===========================================================================
+  # STAGING ENVIRONMENT (requires approval)
+  # ===========================================================================
+  - template: templates/terraform-environment-stage.yml
+    parameters:
+      environment: 'staging'
+      displayName: 'Staging'
+      azureServiceConnection: '$(azureServiceConnection)'
+      dependsOn:
+        - ${{ if in(parameters.startEnvironment, 'dev', 'qa') }}:
+          - Apply_qa
+        - ${{ if eq(parameters.startEnvironment, 'staging') }}:
+          - Validate
+      condition: |
+        and(
+          or(succeeded('Apply_qa'), eq('${{ parameters.startEnvironment }}', 'staging')),
+          in('${{ parameters.stopEnvironment }}', 'staging', 'prod')
+        )
+      requiresApproval: true
+      terraformVersion: '$(terraformVersion)'
+      workingDirectory: '$(terraformWorkingDir)'
+      backendResourceGroup: '$(tfStateResourceGroup)'
+      backendStorageAccount: '$(tfStateStorageAccount)'
+      backendContainer: '$(tfStateContainer)'
+
+  # ===========================================================================
+  # PRODUCTION ENVIRONMENT (requires approval)
+  # ===========================================================================
+  - template: templates/terraform-environment-stage.yml
+    parameters:
+      environment: 'prod'
+      displayName: 'Production'
+      azureServiceConnection: '$(azureServiceConnection)'
+      dependsOn:
+        - ${{ if in(parameters.startEnvironment, 'dev', 'qa', 'staging') }}:
+          - Apply_staging
+        - ${{ if eq(parameters.startEnvironment, 'prod') }}:
+          - Validate
+      condition: |
+        and(
+          or(succeeded('Apply_staging'), eq('${{ parameters.startEnvironment }}', 'prod')),
+          eq('${{ parameters.stopEnvironment }}', 'prod')
+        )
+      requiresApproval: true
+      terraformVersion: '$(terraformVersion)'
+      workingDirectory: '$(terraformWorkingDir)'
+      backendResourceGroup: '$(tfStateResourceGroup)'
+      backendStorageAccount: '$(tfStateStorageAccount)'
+      backendContainer: '$(tfStateContainer)'
+
+  # ===========================================================================
+  # SUMMARY
+  # ===========================================================================
+  - stage: Summary
+    displayName: 'Deployment Summary'
+    dependsOn:
+      - Apply_dev
+      - Apply_qa
+      - Apply_staging
+      - Apply_prod
+    condition: always()
+    jobs:
+      - job: Summary
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - script: |
+              echo "=========================================="
+              echo "INFRASTRUCTURE DEPLOYMENT SUMMARY"
+              echo "=========================================="
+              echo "Pipeline: $(Build.BuildNumber)"
+              echo "Started from: ${{ parameters.startEnvironment }}"
+              echo "Stopped at: ${{ parameters.stopEnvironment }}"
+              echo ""
+              echo "Environment Status:"
+              echo "  Dev:     $(Agent.JobStatus)"
+              echo "  QA:      Check pipeline"
+              echo "  Staging: Check pipeline"
+              echo "  Prod:    Check pipeline"
+              echo "=========================================="
+            displayName: 'Display Summary'

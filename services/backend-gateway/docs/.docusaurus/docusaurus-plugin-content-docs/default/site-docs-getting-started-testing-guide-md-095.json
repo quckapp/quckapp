@@ -1,0 +1,29 @@
+{
+  "id": "getting-started/testing-guide",
+  "title": "Testing Guide",
+  "description": "Complete guide to testing QuckChat features",
+  "source": "@site/docs/getting-started/testing-guide.md",
+  "sourceDirName": "getting-started",
+  "slug": "/getting-started/testing-guide",
+  "permalink": "/docs/getting-started/testing-guide",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/quckchat/backend/tree/main/docs/docs/getting-started/testing-guide.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 5,
+  "frontMatter": {
+    "sidebar_position": 5,
+    "title": "Testing Guide",
+    "description": "Complete guide to testing QuckChat features"
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Integration Status",
+    "permalink": "/docs/getting-started/integration-status"
+  },
+  "next": {
+    "title": "Architecture Overview",
+    "permalink": "/docs/architecture/overview"
+  }
+}

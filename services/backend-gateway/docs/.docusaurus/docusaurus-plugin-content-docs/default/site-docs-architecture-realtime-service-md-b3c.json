@@ -1,0 +1,29 @@
+{
+  "id": "architecture/realtime-service",
+  "title": "Realtime Service (Elixir)",
+  "description": "Elixir/Phoenix real-time communication server",
+  "source": "@site/docs/architecture/realtime-service.md",
+  "sourceDirName": "architecture",
+  "slug": "/architecture/realtime-service",
+  "permalink": "/docs/architecture/realtime-service",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/quckchat/backend/tree/main/docs/docs/architecture/realtime-service.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 9,
+  "frontMatter": {
+    "sidebar_position": 9,
+    "title": "Realtime Service (Elixir)",
+    "description": "Elixir/Phoenix real-time communication server"
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Auth Service (Spring Boot)",
+    "permalink": "/docs/architecture/auth-service"
+  },
+  "next": {
+    "title": "Features Overview",
+    "permalink": "/docs/features/"
+  }
+}

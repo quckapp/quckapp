@@ -1,0 +1,51 @@
+# Spring Boot CD Pipeline
+# Deploys Spring Boot services through all environments
+
+trigger: none
+
+resources:
+  pipelines:
+    - pipeline: SpringBootCI
+      source: 'Spring Boot CI'
+      trigger:
+        branches:
+          include:
+            - main
+            - develop
+
+parameters:
+  - name: serviceName
+    type: string
+    displayName: 'Service Name'
+    values:
+      - auth-service
+      - user-service
+      - permission-service
+      - audit-service
+      - admin-service
+  - name: deployToEnvironments
+    type: object
+    displayName: 'Environments to Deploy'
+    default:
+      - local
+      - dev
+      - qa
+      - uat1
+      - uat2
+      - uat3
+      - staging
+      - live
+
+variables:
+  - group: QuikApp-Global-Variables
+  - group: QuikApp-SpringBoot-Variables
+  - name: techStack
+    value: 'spring-boot'
+
+extends:
+  template: cd-main.yml
+  parameters:
+    techStack: 'spring-boot'
+    serviceName: ${{ parameters.serviceName }}
+    imageTag: $(resources.pipeline.SpringBootCI.runID)
+    deployToEnvironments: ${{ parameters.deployToEnvironments }}

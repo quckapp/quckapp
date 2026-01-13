@@ -1,0 +1,174 @@
+================================================================================
+  QuikApp - Enterprise Communication Platform
+================================================================================
+
+Congratulations! QuikApp has been deployed to your Kubernetes cluster.
+
+DEPLOYMENT INFO
+---------------
+  Release:     {{ .Release.Name }}
+  Namespace:   {{ .Values.global.namespace | default .Release.Namespace }}
+  Environment: {{ .Values.global.environment }}
+  Domain:      {{ .Values.global.domain }}
+
+ACCESSING QUIKAPP
+-----------------
+{{- if .Values.ingress.enabled }}
+
+1. API Gateway:
+   {{- if .Values.global.tlsEnabled }}
+   https://api.{{ .Values.global.domain }}
+   {{- else }}
+   http://api.{{ .Values.global.domain }}
+   {{- end }}
+
+2. WebSocket (Realtime):
+   {{- if .Values.global.tlsEnabled }}
+   wss://ws.{{ .Values.global.domain }}
+   {{- else }}
+   ws://ws.{{ .Values.global.domain }}
+   {{- end }}
+
+3. CDN:
+   {{- if .Values.global.tlsEnabled }}
+   https://cdn.{{ .Values.global.domain }}
+   {{- else }}
+   http://cdn.{{ .Values.global.domain }}
+   {{- end }}
+
+{{- else }}
+
+To access QuikApp services, use port-forwarding:
+
+  # Backend Gateway
+  kubectl port-forward svc/backend-gateway 3000:3000 -n {{ .Values.global.namespace | default .Release.Namespace }}
+
+  # Auth Service
+  kubectl port-forward svc/auth-service 8080:8080 -n {{ .Values.global.namespace | default .Release.Namespace }}
+
+{{- end }}
+
+SERVICES DEPLOYED
+-----------------
+The following microservices have been deployed:
+
+NestJS Services:
+  {{- if .Values.backendGateway.enabled }}
+  - backend-gateway     (Port: {{ .Values.backendGateway.service.port }})
+  {{- end }}
+  {{- if .Values.notificationService.enabled }}
+  - notification-service (Port: {{ .Values.notificationService.service.port }})
+  {{- end }}
+  {{- if .Values.realtimeService.enabled }}
+  - realtime-service    (Port: {{ .Values.realtimeService.service.port }})
+  {{- end }}
+
+Spring Boot Services:
+  {{- if .Values.authService.enabled }}
+  - auth-service        (Port: {{ .Values.authService.service.port }})
+  {{- end }}
+  {{- if .Values.userService.enabled }}
+  - user-service        (Port: {{ .Values.userService.service.port }})
+  {{- end }}
+  {{- if .Values.permissionService.enabled }}
+  - permission-service  (Port: {{ .Values.permissionService.service.port }})
+  {{- end }}
+  {{- if .Values.auditService.enabled }}
+  - audit-service       (Port: {{ .Values.auditService.service.port }})
+  {{- end }}
+  {{- if .Values.adminService.enabled }}
+  - admin-service       (Port: {{ .Values.adminService.service.port }})
+  {{- end }}
+
+Elixir Services:
+  {{- if .Values.presenceService.enabled }}
+  - presence-service    (Port: {{ .Values.presenceService.service.port }})
+  {{- end }}
+  {{- if .Values.messageService.enabled }}
+  - message-service     (Port: {{ .Values.messageService.service.port }})
+  {{- end }}
+  {{- if .Values.callService.enabled }}
+  - call-service        (Port: {{ .Values.callService.service.port }})
+  {{- end }}
+  {{- if .Values.huddleService.enabled }}
+  - huddle-service      (Port: {{ .Values.huddleService.service.port }})
+  {{- end }}
+
+Go Services:
+  {{- if .Values.workspaceService.enabled }}
+  - workspace-service   (Port: {{ .Values.workspaceService.service.port }})
+  {{- end }}
+  {{- if .Values.channelService.enabled }}
+  - channel-service     (Port: {{ .Values.channelService.service.port }})
+  {{- end }}
+  {{- if .Values.searchService.enabled }}
+  - search-service      (Port: {{ .Values.searchService.service.port }})
+  {{- end }}
+  {{- if .Values.fileService.enabled }}
+  - file-service        (Port: {{ .Values.fileService.service.port }})
+  {{- end }}
+  {{- if .Values.mediaService.enabled }}
+  - media-service       (Port: {{ .Values.mediaService.service.port }})
+  {{- end }}
+  {{- if .Values.cdnService.enabled }}
+  - cdn-service         (Port: {{ .Values.cdnService.service.port }})
+  {{- end }}
+
+Python Services:
+  {{- if .Values.analyticsService.enabled }}
+  - analytics-service   (Port: {{ .Values.analyticsService.service.port }})
+  {{- end }}
+  {{- if .Values.mlService.enabled }}
+  - ml-service          (Port: {{ .Values.mlService.service.port }})
+  {{- end }}
+  {{- if .Values.moderationService.enabled }}
+  - moderation-service  (Port: {{ .Values.moderationService.service.port }})
+  {{- end }}
+
+{{- if .Values.monitoring.enabled }}
+
+MONITORING
+----------
+{{- if .Values.monitoring.enabled }}
+Monitoring stack has been deployed. Access:
+
+  # Grafana (default: admin/admin)
+  kubectl port-forward svc/prometheus-grafana 3030:80 -n {{ .Values.global.namespace | default .Release.Namespace }}
+
+  # Prometheus
+  kubectl port-forward svc/prometheus-kube-prometheus-prometheus 9090:9090 -n {{ .Values.global.namespace | default .Release.Namespace }}
+
+  # Jaeger UI
+  kubectl port-forward svc/jaeger-query 16686:16686 -n {{ .Values.global.namespace | default .Release.Namespace }}
+
+{{- end }}
+{{- end }}
+
+USEFUL COMMANDS
+---------------
+# Check deployment status
+kubectl get pods -n {{ .Values.global.namespace | default .Release.Namespace }}
+
+# View logs
+kubectl logs -f deployment/backend-gateway -n {{ .Values.global.namespace | default .Release.Namespace }}
+
+# Scale a service
+kubectl scale deployment/message-service --replicas=5 -n {{ .Values.global.namespace | default .Release.Namespace }}
+
+# Check HPA status
+kubectl get hpa -n {{ .Values.global.namespace | default .Release.Namespace }}
+
+# Check service endpoints
+kubectl get endpoints -n {{ .Values.global.namespace | default .Release.Namespace }}
+
+NEXT STEPS
+----------
+1. Configure secrets in quikapp-secrets (replace placeholder values)
+2. Set up DNS records pointing to your ingress controller
+3. Configure TLS certificates (if using HTTPS)
+4. Review and adjust resource limits based on your workload
+5. Set up external secret management for production
+
+For more information, visit: https://docs.quikapp.io
+
+================================================================================

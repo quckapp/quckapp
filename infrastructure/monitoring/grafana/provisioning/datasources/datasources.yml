@@ -1,0 +1,108 @@
+# QuikApp Grafana Datasources Configuration
+
+apiVersion: 1
+
+datasources:
+  # Prometheus - Primary metrics source
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: "15s"
+      httpMethod: POST
+
+  # Elasticsearch - Logs and search
+  - name: Elasticsearch
+    type: elasticsearch
+    access: proxy
+    url: http://elasticsearch:9200
+    database: "quikapp-*"
+    editable: false
+    jsonData:
+      esVersion: "8.0.0"
+      timeField: "@timestamp"
+      logMessageField: "message"
+      logLevelField: "level"
+
+  # Alertmanager - Alert status
+  - name: Alertmanager
+    type: alertmanager
+    access: proxy
+    url: http://alertmanager:9093
+    editable: false
+    jsonData:
+      implementation: prometheus
+
+  # Loki - Log aggregation
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    editable: false
+    jsonData:
+      maxLines: 1000
+      derivedFields:
+        # Link trace_id to Jaeger
+        - name: TraceID
+          matcherRegex: '"trace_id":"([a-f0-9]+)"'
+          url: '$${__value.raw}'
+          datasourceUid: jaeger
+          urlDisplayLabel: 'View Trace'
+        # Link to service in Prometheus
+        - name: Service
+          matcherRegex: 'service="([^"]+)"'
+          url: '/explore?orgId=1&left=["now-1h","now","Prometheus",{"expr":"up{service=\"$${__value.raw}\"}"}]'
+          urlDisplayLabel: 'View Metrics'
+
+  # Jaeger - Distributed tracing
+  - name: Jaeger
+    type: jaeger
+    uid: jaeger
+    access: proxy
+    url: http://jaeger:16686
+    editable: false
+    jsonData:
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: '-1h'
+        spanEndTimeShift: '1h'
+        filterByTraceID: true
+        filterBySpanID: true
+        tags:
+          - key: service
+            value: service
+        customQuery: true
+        query: '{service="$${__span.tags.service}"} | json | trace_id="${__span.traceId}"'
+      tracesToMetrics:
+        datasourceUid: prometheus
+        spanStartTimeShift: '-1h'
+        spanEndTimeShift: '1h'
+        tags:
+          - key: service.name
+            value: service
+        queries:
+          - name: 'Request Rate'
+            query: 'sum(rate(http_requests_total{service="$${__tags.service}"}[5m]))'
+          - name: 'Error Rate'
+            query: 'sum(rate(http_requests_total{service="$${__tags.service}",status=~"5.."}[5m]))'
+      nodeGraph:
+        enabled: true
+      traceQuery:
+        timeShiftEnabled: true
+        spanStartTimeShift: '-1h'
+        spanEndTimeShift: '1h'
+
+  # Tempo alternative (if using Tempo instead of Jaeger)
+  # - name: Tempo
+  #   type: tempo
+  #   access: proxy
+  #   url: http://tempo:3200
+  #   editable: false
+  #   jsonData:
+  #     tracesToLogsV2:
+  #       datasourceUid: loki
+  #     nodeGraph:
+  #       enabled: true

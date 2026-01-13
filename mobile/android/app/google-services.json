@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "358717507616",
+    "project_id": "quck-480609-2e86a",
+    "storage_bucket": "quck-480609-2e86a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:358717507616:android:81420bcc7f87d764e35445",
+        "android_client_info": {
+          "package_name": "com.quckchat.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD__CDye43NDWpeoVRwqXczUg7YxL6NyfU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

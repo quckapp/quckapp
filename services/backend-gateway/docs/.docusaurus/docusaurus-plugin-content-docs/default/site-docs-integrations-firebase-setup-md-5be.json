@@ -1,0 +1,29 @@
+{
+  "id": "integrations/firebase-setup",
+  "title": "Firebase Setup",
+  "description": "Complete guide to setting up Firebase for push notifications",
+  "source": "@site/docs/integrations/firebase-setup.md",
+  "sourceDirName": "integrations",
+  "slug": "/integrations/firebase-setup",
+  "permalink": "/docs/integrations/firebase-setup",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/quckchat/backend/tree/main/docs/docs/integrations/firebase-setup.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 2,
+  "frontMatter": {
+    "sidebar_position": 2,
+    "title": "Firebase Setup",
+    "description": "Complete guide to setting up Firebase for push notifications"
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Firebase Integration",
+    "permalink": "/docs/integrations/firebase"
+  },
+  "next": {
+    "title": "Push Notifications",
+    "permalink": "/docs/integrations/push-notifications"
+  }
+}

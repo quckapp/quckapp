@@ -1,0 +1,999 @@
+# Azure DevOps Variable Groups Configuration
+# Synced with .env.*.example files
+# Import these variable groups into your Azure DevOps project
+
+# =============================================================================
+# GLOBAL VARIABLES (All Environments)
+# =============================================================================
+# Variable Group: QuikApp-Global-Variables
+# variables:
+#   acrRegistry: 'quikapp.azurecr.io'
+#   aksSubscription: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+#   keyVaultName: 'kv-quikapp'
+#   appInsightsKey: '$(APP_INSIGHTS_KEY)'
+#   slackWebhookUrl: '$(SLACK_WEBHOOK_URL)'
+
+# =============================================================================
+# ENVIRONMENT-SPECIFIC VARIABLES
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Local/Mock Environment
+# Variable Group: QuikApp-Local-Variables
+# Source: .env.local.example
+# -----------------------------------------------------------------------------
+# variables:
+#   # Environment
+#   environment: 'local'
+#   nodeEnv: 'development'
+#   aksCluster: 'local'
+#   resourceGroup: 'local'
+#   namespace: 'quikapp-mock'
+#
+#   # Database - Local Docker
+#   mongodbUri: 'mongodb://localhost:27017/quikapp_local'
+#   mongoRootUser: 'admin'
+#   mongoRootPassword: '$(LOCAL_MONGO_ROOT_PASSWORD)'
+#   mysqlHost: 'localhost'
+#   mysqlPort: '3306'
+#   mysqlDatabase: 'quikapp_local'
+#   mysqlUser: 'quikapp'
+#   mysqlPassword: '$(LOCAL_MYSQL_PASSWORD)'
+#   mysqlRootPassword: '$(LOCAL_MYSQL_ROOT_PASSWORD)'
+#   postgresHost: 'localhost'
+#   postgresPort: '5432'
+#   postgresDb: 'quikapp_local'
+#   postgresUser: 'quikapp'
+#   postgresPassword: '$(LOCAL_POSTGRES_PASSWORD)'
+#   redisHost: 'localhost'
+#   redisPort: '6379'
+#   redisPassword: ''
+#   elasticsearchUrl: 'http://localhost:9200'
+#
+#   # Message Brokers
+#   kafkaBrokers: 'localhost:9092'
+#
+#   # Storage - Local MinIO
+#   s3Endpoint: 'http://localhost:9000'
+#   s3AccessKey: '$(LOCAL_S3_ACCESS_KEY)'
+#   s3SecretKey: '$(LOCAL_S3_SECRET_KEY)'
+#   s3Bucket: 'quikapp-local'
+#   s3Region: 'us-east-1'
+#   storageMode: 'local'
+#
+#   # Security
+#   jwtSecret: '$(LOCAL_JWT_SECRET)'
+#   jwtExpiresIn: '7d'
+#   jwtRefreshSecret: '$(LOCAL_JWT_REFRESH_SECRET)'
+#   jwtRefreshExpiresIn: '30d'
+#   encryptionKey: '$(LOCAL_ENCRYPTION_KEY)'
+#   secretKeyBase: '$(LOCAL_SECRET_KEY_BASE)'
+#
+#   # CORS
+#   corsOrigin: 'http://localhost:3000,http://localhost:3001,http://localhost:8080,http://localhost:19006'
+#
+#   # Logging
+#   logLevel: 'debug'
+#   logPretty: 'true'
+#
+#   # Monitoring (Disabled)
+#   sentryDsn: ''
+#   datadogEnabled: 'false'
+#   newrelicEnabled: 'false'
+#
+#   # Tracing (Disabled)
+#   otelEnabled: 'false'
+#   jaegerEnabled: 'false'
+
+# -----------------------------------------------------------------------------
+# Development Environment
+# Variable Group: QuikApp-Dev-Variables
+# Source: .env.dev.example
+# -----------------------------------------------------------------------------
+# variables:
+#   # Environment
+#   environment: 'dev'
+#   nodeEnv: 'development'
+#   aksCluster: 'aks-dev'
+#   resourceGroup: 'rg-quikapp-dev'
+#   namespace: 'quikapp-dev'
+#
+#   # Database - Dev Servers
+#   mongodbUri: '$(DEV_MONGODB_URI)'
+#   mysqlHost: 'quikapp-dev.xxxxx.us-east-1.rds.amazonaws.com'
+#   mysqlPort: '3306'
+#   mysqlDatabase: 'quikapp_dev'
+#   mysqlUser: 'quikapp_dev'
+#   mysqlPassword: '$(DEV_MYSQL_PASSWORD)'
+#   postgresHost: 'quikapp-pg-dev.xxxxx.us-east-1.rds.amazonaws.com'
+#   postgresPort: '5432'
+#   postgresDb: 'quikapp_dev'
+#   postgresUser: 'quikapp_dev'
+#   postgresPassword: '$(DEV_POSTGRES_PASSWORD)'
+#   redisHost: 'quikapp-dev.xxxxx.cache.amazonaws.com'
+#   redisPort: '6379'
+#   redisPassword: '$(DEV_REDIS_PASSWORD)'
+#   elasticsearchUrl: 'https://quikapp-dev.es.us-east-1.aws.found.io:9243'
+#
+#   # Message Brokers
+#   kafkaBrokers: 'quikapp-dev-kafka.xxxxx.amazonaws.com:9092'
+#
+#   # Storage - S3 Dev
+#   awsAccessKeyId: '$(DEV_AWS_ACCESS_KEY_ID)'
+#   awsSecretAccessKey: '$(DEV_AWS_SECRET_ACCESS_KEY)'
+#   awsRegion: 'us-east-1'
+#   s3Bucket: 'quikapp-dev-bucket'
+#   storageMode: 's3'
+#
+#   # Security
+#   jwtSecret: '$(DEV_JWT_SECRET)'
+#   jwtExpiresIn: '7d'
+#   jwtRefreshSecret: '$(DEV_JWT_REFRESH_SECRET)'
+#   jwtRefreshExpiresIn: '30d'
+#   encryptionKey: '$(DEV_ENCRYPTION_KEY)'
+#   secretKeyBase: '$(DEV_SECRET_KEY_BASE)'
+#
+#   # CORS
+#   corsOrigin: 'https://dev.quikapp.io,http://localhost:3000'
+#
+#   # Logging
+#   logLevel: 'debug'
+#   logPretty: 'false'
+#   logFormat: 'json'
+#
+#   # Monitoring
+#   sentryDsn: '$(DEV_SENTRY_DSN)'
+#   sentryEnvironment: 'dev'
+#   datadogEnabled: 'true'
+#   datadogApiKey: '$(DEV_DATADOG_API_KEY)'
+#   datadogEnv: 'dev'
+#
+#   # Tracing
+#   otelEnabled: 'true'
+#   otelExporterOtlpEndpoint: 'https://otel-dev.quikapp.io:4317'
+#   otelServiceName: 'quikapp-dev'
+#   tracingSampleRate: '1.0'
+#
+#   # External Services
+#   firebaseProjectId: 'quikapp-dev'
+#   firebasePrivateKey: '$(DEV_FIREBASE_PRIVATE_KEY)'
+#   firebaseClientEmail: 'firebase-adminsdk@quikapp-dev.iam.gserviceaccount.com'
+#   twilioAccountSid: '$(DEV_TWILIO_ACCOUNT_SID)'
+#   twilioAuthToken: '$(DEV_TWILIO_AUTH_TOKEN)'
+#   twilioPhoneNumber: '+1234567890'
+#   openaiApiKey: '$(DEV_OPENAI_API_KEY)'
+
+# -----------------------------------------------------------------------------
+# QA Environment
+# Variable Group: QuikApp-QA-Variables
+# Source: .env.qa.example
+# -----------------------------------------------------------------------------
+# variables:
+#   # Environment
+#   environment: 'qa'
+#   nodeEnv: 'development'
+#   aksCluster: 'aks-qa'
+#   resourceGroup: 'rg-quikapp-qa'
+#   namespace: 'quikapp-qa'
+#
+#   # Database - QA Servers
+#   mongodbUri: '$(QA_MONGODB_URI)'
+#   mysqlHost: 'quikapp-qa.xxxxx.us-east-1.rds.amazonaws.com'
+#   mysqlPort: '3306'
+#   mysqlDatabase: 'quikapp_qa'
+#   mysqlUser: 'quikapp_qa'
+#   mysqlPassword: '$(QA_MYSQL_PASSWORD)'
+#   postgresHost: 'quikapp-pg-qa.xxxxx.us-east-1.rds.amazonaws.com'
+#   postgresPort: '5432'
+#   postgresDb: 'quikapp_qa'
+#   postgresUser: 'quikapp_qa'
+#   postgresPassword: '$(QA_POSTGRES_PASSWORD)'
+#   redisHost: 'quikapp-qa.xxxxx.cache.amazonaws.com'
+#   redisPort: '6379'
+#   redisPassword: '$(QA_REDIS_PASSWORD)'
+#   elasticsearchUrl: 'https://quikapp-qa.es.us-east-1.aws.found.io:9243'
+#
+#   # Message Brokers
+#   kafkaBrokers: 'quikapp-qa-kafka.xxxxx.amazonaws.com:9092'
+#
+#   # Storage
+#   awsRegion: 'us-east-1'
+#   s3Bucket: 'quikapp-qa-bucket'
+#   storageMode: 's3'
+#
+#   # Security
+#   jwtSecret: '$(QA_JWT_SECRET)'
+#   jwtExpiresIn: '7d'
+#   jwtRefreshSecret: '$(QA_JWT_REFRESH_SECRET)'
+#   jwtRefreshExpiresIn: '30d'
+#   encryptionKey: '$(QA_ENCRYPTION_KEY)'
+#   secretKeyBase: '$(QA_SECRET_KEY_BASE)'
+#
+#   # CORS
+#   corsOrigin: 'https://qa.quikapp.io,http://localhost:3000'
+#
+#   # Logging
+#   logLevel: 'debug'
+#   logFormat: 'json'
+#
+#   # Monitoring
+#   sentryDsn: '$(QA_SENTRY_DSN)'
+#   sentryEnvironment: 'qa'
+#   tracingSampleRate: '1.0'
+
+# -----------------------------------------------------------------------------
+# UAT1 Environment (Partner/Customer Acceptance Testing)
+# Variable Group: QuikApp-UAT1-Variables
+# Source: .env.uat.example
+# -----------------------------------------------------------------------------
+# variables:
+#   # Environment
+#   environment: 'uat1'
+#   nodeEnv: 'production'
+#   aksCluster: 'aks-uat'
+#   resourceGroup: 'rg-quikapp-uat'
+#   namespace: 'quikapp-uat1'
+#
+#   # Database - UAT1 Servers
+#   mongodbUri: '$(UAT1_MONGODB_URI)'
+#   mysqlHost: 'quikapp-uat1.xxxxx.us-east-1.rds.amazonaws.com'
+#   mysqlPort: '3306'
+#   mysqlDatabase: 'quikapp_uat1'
+#   mysqlUser: 'quikapp_uat1'
+#   mysqlPassword: '$(UAT1_MYSQL_PASSWORD)'
+#   postgresHost: 'quikapp-pg-uat1.xxxxx.us-east-1.rds.amazonaws.com'
+#   postgresPort: '5432'
+#   postgresDb: 'quikapp_uat1'
+#   postgresUser: 'quikapp_uat1'
+#   postgresPassword: '$(UAT1_POSTGRES_PASSWORD)'
+#   redisHost: 'quikapp-uat1.xxxxx.cache.amazonaws.com'
+#   redisPort: '6379'
+#   redisPassword: '$(UAT1_REDIS_PASSWORD)'
+#   elasticsearchUrl: 'https://quikapp-uat1.es.us-east-1.aws.found.io:9243'
+#
+#   # Message Brokers
+#   kafkaBrokers: 'quikapp-uat1-kafka.xxxxx.amazonaws.com:9092'
+#
+#   # Storage
+#   awsRegion: 'us-east-1'
+#   s3Bucket: 'quikapp-uat1-bucket'
+#   storageMode: 's3'
+#
+#   # Security
+#   jwtSecret: '$(UAT1_JWT_SECRET)'
+#   jwtExpiresIn: '1d'
+#   jwtRefreshSecret: '$(UAT1_JWT_REFRESH_SECRET)'
+#   jwtRefreshExpiresIn: '7d'
+#   encryptionKey: '$(UAT1_ENCRYPTION_KEY)'
+#   secretKeyBase: '$(UAT1_SECRET_KEY_BASE)'
+#
+#   # CORS
+#   corsOrigin: 'https://uat1.quikapp.io'
+#
+#   # Logging (Production-like)
+#   logLevel: 'info'
+#   logFormat: 'json'
+#
+#   # Monitoring
+#   sentryDsn: '$(UAT_SENTRY_DSN)'
+#   sentryEnvironment: 'uat1'
+#   tracingSampleRate: '0.5'
+
+# -----------------------------------------------------------------------------
+# UAT2 Environment (Internal QA Testing)
+# Variable Group: QuikApp-UAT2-Variables
+# Source: .env.uat.example
+# -----------------------------------------------------------------------------
+# variables:
+#   # Environment
+#   environment: 'uat2'
+#   nodeEnv: 'production'
+#   aksCluster: 'aks-uat'
+#   resourceGroup: 'rg-quikapp-uat'
+#   namespace: 'quikapp-uat2'
+#
+#   # Database - UAT2 Servers
+#   mongodbUri: '$(UAT2_MONGODB_URI)'
+#   mysqlHost: 'quikapp-uat2.xxxxx.us-east-1.rds.amazonaws.com'
+#   mysqlPort: '3306'
+#   mysqlDatabase: 'quikapp_uat2'
+#   mysqlUser: 'quikapp_uat2'
+#   mysqlPassword: '$(UAT2_MYSQL_PASSWORD)'
+#   postgresHost: 'quikapp-pg-uat2.xxxxx.us-east-1.rds.amazonaws.com'
+#   postgresPort: '5432'
+#   postgresDb: 'quikapp_uat2'
+#   postgresUser: 'quikapp_uat2'
+#   postgresPassword: '$(UAT2_POSTGRES_PASSWORD)'
+#   redisHost: 'quikapp-uat2.xxxxx.cache.amazonaws.com'
+#   redisPort: '6379'
+#   redisPassword: '$(UAT2_REDIS_PASSWORD)'
+#   elasticsearchUrl: 'https://quikapp-uat2.es.us-east-1.aws.found.io:9243'
+#
+#   # Message Brokers
+#   kafkaBrokers: 'quikapp-uat2-kafka.xxxxx.amazonaws.com:9092'
+#
+#   # Storage
+#   awsRegion: 'us-east-1'
+#   s3Bucket: 'quikapp-uat2-bucket'
+#   storageMode: 's3'
+#
+#   # Security
+#   jwtSecret: '$(UAT2_JWT_SECRET)'
+#   jwtExpiresIn: '1d'
+#   jwtRefreshSecret: '$(UAT2_JWT_REFRESH_SECRET)'
+#   jwtRefreshExpiresIn: '7d'
+#   encryptionKey: '$(UAT2_ENCRYPTION_KEY)'
+#   secretKeyBase: '$(UAT2_SECRET_KEY_BASE)'
+#
+#   # CORS
+#   corsOrigin: 'https://uat2.quikapp.io'
+#
+#   # Logging (Debug enabled for internal testing)
+#   logLevel: 'debug'
+#   logFormat: 'json'
+#
+#   # Monitoring
+#   sentryDsn: '$(UAT_SENTRY_DSN)'
+#   sentryEnvironment: 'uat2'
+#   tracingSampleRate: '0.5'
+
+# -----------------------------------------------------------------------------
+# UAT3 Environment (Performance/Load Testing)
+# Variable Group: QuikApp-UAT3-Variables
+# Source: .env.uat.example
+# -----------------------------------------------------------------------------
+# variables:
+#   # Environment
+#   environment: 'uat3'
+#   nodeEnv: 'production'
+#   aksCluster: 'aks-uat'
+#   resourceGroup: 'rg-quikapp-uat'
+#   namespace: 'quikapp-uat3'
+#
+#   # Database - UAT3 Servers
+#   mongodbUri: '$(UAT3_MONGODB_URI)'
+#   mysqlHost: 'quikapp-uat3.xxxxx.us-east-1.rds.amazonaws.com'
+#   mysqlPort: '3306'
+#   mysqlDatabase: 'quikapp_uat3'
+#   mysqlUser: 'quikapp_uat3'
+#   mysqlPassword: '$(UAT3_MYSQL_PASSWORD)'
+#   postgresHost: 'quikapp-pg-uat3.xxxxx.us-east-1.rds.amazonaws.com'
+#   postgresPort: '5432'
+#   postgresDb: 'quikapp_uat3'
+#   postgresUser: 'quikapp_uat3'
+#   postgresPassword: '$(UAT3_POSTGRES_PASSWORD)'
+#   redisHost: 'quikapp-uat3.xxxxx.cache.amazonaws.com'
+#   redisPort: '6379'
+#   redisPassword: '$(UAT3_REDIS_PASSWORD)'
+#   elasticsearchUrl: 'https://quikapp-uat3.es.us-east-1.aws.found.io:9243'
+#
+#   # Message Brokers
+#   kafkaBrokers: 'quikapp-uat3-kafka.xxxxx.amazonaws.com:9092'
+#
+#   # Storage
+#   awsRegion: 'us-east-1'
+#   s3Bucket: 'quikapp-uat3-bucket'
+#   storageMode: 's3'
+#
+#   # Security
+#   jwtSecret: '$(UAT3_JWT_SECRET)'
+#   jwtExpiresIn: '1d'
+#   jwtRefreshSecret: '$(UAT3_JWT_REFRESH_SECRET)'
+#   jwtRefreshExpiresIn: '7d'
+#   encryptionKey: '$(UAT3_ENCRYPTION_KEY)'
+#   secretKeyBase: '$(UAT3_SECRET_KEY_BASE)'
+#
+#   # CORS
+#   corsOrigin: 'https://uat3.quikapp.io'
+#
+#   # Logging (Reduced for load testing - minimize I/O)
+#   logLevel: 'warn'
+#   logFormat: 'json'
+#
+#   # Monitoring
+#   sentryDsn: '$(UAT_SENTRY_DSN)'
+#   sentryEnvironment: 'uat3'
+#   tracingSampleRate: '0.01'
+
+# -----------------------------------------------------------------------------
+# Staging Environment
+# Variable Group: QuikApp-Staging-Variables
+# Source: .env.staging.example
+# -----------------------------------------------------------------------------
+# variables:
+#   # Environment
+#   environment: 'staging'
+#   nodeEnv: 'production'
+#   aksCluster: 'aks-staging'
+#   resourceGroup: 'rg-quikapp-staging'
+#   namespace: 'quikapp-staging'
+#
+#   # Database - Staging Servers
+#   mongodbUri: '$(STAGING_MONGODB_URI)'
+#   mysqlHost: 'quikapp-staging.xxxxx.us-east-1.rds.amazonaws.com'
+#   mysqlPort: '3306'
+#   mysqlDatabase: 'quikapp_staging'
+#   mysqlUser: 'quikapp_staging'
+#   mysqlPassword: '$(STAGING_MYSQL_PASSWORD)'
+#   postgresHost: 'quikapp-pg-staging.xxxxx.us-east-1.rds.amazonaws.com'
+#   postgresPort: '5432'
+#   postgresDb: 'quikapp_staging'
+#   postgresUser: 'quikapp_staging'
+#   postgresPassword: '$(STAGING_POSTGRES_PASSWORD)'
+#   redisHost: 'quikapp-staging.xxxxx.cache.amazonaws.com'
+#   redisPort: '6379'
+#   redisPassword: '$(STAGING_REDIS_PASSWORD)'
+#   elasticsearchUrl: 'https://quikapp-staging.es.us-east-1.aws.found.io:9243'
+#
+#   # Message Brokers
+#   kafkaBrokers: 'quikapp-staging-kafka.xxxxx.amazonaws.com:9092'
+#
+#   # Storage - S3 Staging
+#   awsAccessKeyId: '$(STAGING_AWS_ACCESS_KEY_ID)'
+#   awsSecretAccessKey: '$(STAGING_AWS_SECRET_ACCESS_KEY)'
+#   awsRegion: 'us-east-1'
+#   s3Bucket: 'quikapp-staging-bucket'
+#   storageMode: 's3'
+#   cdnUrl: 'https://staging-cdn.quikapp.io'
+#
+#   # Security
+#   jwtSecret: '$(STAGING_JWT_SECRET)'
+#   jwtExpiresIn: '1d'
+#   jwtRefreshSecret: '$(STAGING_JWT_REFRESH_SECRET)'
+#   jwtRefreshExpiresIn: '7d'
+#   encryptionKey: '$(STAGING_ENCRYPTION_KEY)'
+#   secretKeyBase: '$(STAGING_SECRET_KEY_BASE)'
+#
+#   # CORS
+#   corsOrigin: 'https://staging.quikapp.io'
+#
+#   # Logging
+#   logLevel: 'info'
+#   logPretty: 'false'
+#   logFormat: 'json'
+#
+#   # Monitoring
+#   sentryDsn: '$(STAGING_SENTRY_DSN)'
+#   sentryEnvironment: 'staging'
+#   datadogEnabled: 'true'
+#   datadogApiKey: '$(STAGING_DATADOG_API_KEY)'
+#   datadogEnv: 'staging'
+#   newrelicEnabled: 'true'
+#   newrelicLicenseKey: '$(STAGING_NEWRELIC_LICENSE_KEY)'
+#   newrelicAppName: 'quikapp-staging'
+#
+#   # Tracing
+#   otelEnabled: 'true'
+#   otelExporterOtlpEndpoint: 'https://otel-staging.quikapp.io:4317'
+#   otelServiceName: 'quikapp-staging'
+#   tracingSampleRate: '0.5'
+#
+#   # External Services
+#   firebaseProjectId: 'quikapp-staging'
+#   firebasePrivateKey: '$(STAGING_FIREBASE_PRIVATE_KEY)'
+#   firebaseClientEmail: 'firebase-adminsdk@quikapp-staging.iam.gserviceaccount.com'
+#   twilioAccountSid: '$(STAGING_TWILIO_ACCOUNT_SID)'
+#   twilioAuthToken: '$(STAGING_TWILIO_AUTH_TOKEN)'
+#   twilioPhoneNumber: '+1234567890'
+#   openaiApiKey: '$(STAGING_OPENAI_API_KEY)'
+#
+#   # OAuth Providers
+#   googleClientId: '$(STAGING_GOOGLE_CLIENT_ID)'
+#   googleClientSecret: '$(STAGING_GOOGLE_CLIENT_SECRET)'
+#   facebookAppId: '$(STAGING_FACEBOOK_APP_ID)'
+#   facebookAppSecret: '$(STAGING_FACEBOOK_APP_SECRET)'
+
+# -----------------------------------------------------------------------------
+# Production/Live Environment
+# Variable Group: QuikApp-Live-Variables
+# Source: .env.production.example
+# -----------------------------------------------------------------------------
+# variables:
+#   # Environment
+#   environment: 'live'
+#   nodeEnv: 'production'
+#   aksCluster: 'aks-prod'
+#   resourceGroup: 'rg-quikapp-prod'
+#   namespace: 'quikapp-prod'
+#
+#   # Database - Production Servers (Multi-Region)
+#   mongodbUri: '$(PROD_MONGODB_URI)'
+#   mysqlHost: 'quikapp-prod.cluster-xxxxx.us-east-1.rds.amazonaws.com'
+#   mysqlPort: '3306'
+#   mysqlDatabase: 'quikapp'
+#   mysqlUser: 'quikapp_prod'
+#   mysqlPassword: '$(PROD_MYSQL_PASSWORD)'
+#   postgresHost: 'quikapp-pg-prod.cluster-xxxxx.us-east-1.rds.amazonaws.com'
+#   postgresPort: '5432'
+#   postgresDb: 'quikapp'
+#   postgresUser: 'quikapp_prod'
+#   postgresPassword: '$(PROD_POSTGRES_PASSWORD)'
+#   redisHost: 'quikapp-prod.xxxxx.clustercfg.use1.cache.amazonaws.com'
+#   redisPort: '6379'
+#   redisPassword: '$(PROD_REDIS_PASSWORD)'
+#   redisTlsEnabled: 'true'
+#   elasticsearchUrl: 'https://quikapp-prod.es.us-east-1.aws.found.io:9243'
+#   elasticsearchUsername: '$(PROD_ES_USERNAME)'
+#   elasticsearchPassword: '$(PROD_ES_PASSWORD)'
+#
+#   # Message Brokers (Multi-Broker)
+#   kafkaBrokers: 'quikapp-prod-kafka-1.xxxxx.amazonaws.com:9092,quikapp-prod-kafka-2.xxxxx.amazonaws.com:9092,quikapp-prod-kafka-3.xxxxx.amazonaws.com:9092'
+#   kafkaSaslEnabled: 'true'
+#   kafkaSaslUsername: '$(PROD_KAFKA_SASL_USERNAME)'
+#   kafkaSaslPassword: '$(PROD_KAFKA_SASL_PASSWORD)'
+#
+#   # Storage - S3 Production
+#   awsRegion: 'us-east-1'
+#   s3Bucket: 'quikapp-prod-bucket'
+#   storageMode: 's3'
+#   cdnUrl: 'https://cdn.quikapp.io'
+#   cdnSigningKeyId: '$(PROD_CDN_SIGNING_KEY_ID)'
+#
+#   # Security
+#   jwtSecret: '$(PROD_JWT_SECRET)'
+#   jwtExpiresIn: '1h'
+#   jwtRefreshSecret: '$(PROD_JWT_REFRESH_SECRET)'
+#   jwtRefreshExpiresIn: '7d'
+#   encryptionKey: '$(PROD_ENCRYPTION_KEY)'
+#   secretKeyBase: '$(PROD_SECRET_KEY_BASE)'
+#
+#   # Rate Limiting
+#   rateLimitTtl: '60'
+#   rateLimitMax: '100'
+#
+#   # CORS
+#   corsOrigin: 'https://quikapp.io,https://www.quikapp.io,https://app.quikapp.io'
+#
+#   # Logging
+#   logLevel: 'warn'
+#   logPretty: 'false'
+#   logFormat: 'json'
+#   logRedactSensitive: 'true'
+#
+#   # Monitoring
+#   sentryDsn: '$(PROD_SENTRY_DSN)'
+#   sentryEnvironment: 'production'
+#   sentryTracesSampleRate: '0.1'
+#   datadogEnabled: 'true'
+#   datadogApiKey: '$(PROD_DATADOG_API_KEY)'
+#   datadogEnv: 'production'
+#   newrelicEnabled: 'true'
+#   newrelicLicenseKey: '$(PROD_NEWRELIC_LICENSE_KEY)'
+#   newrelicAppName: 'quikapp-production'
+#
+#   # Tracing
+#   otelEnabled: 'true'
+#   otelExporterOtlpEndpoint: 'https://otel.quikapp.io:4317'
+#   otelServiceName: 'quikapp'
+#   tracingSampleRate: '0.1'
+#
+#   # External Services
+#   firebaseProjectId: 'quikapp-prod'
+#   firebasePrivateKey: '$(PROD_FIREBASE_PRIVATE_KEY)'
+#   firebaseClientEmail: 'firebase-adminsdk@quikapp-prod.iam.gserviceaccount.com'
+#   twilioAccountSid: '$(PROD_TWILIO_ACCOUNT_SID)'
+#   twilioAuthToken: '$(PROD_TWILIO_AUTH_TOKEN)'
+#   twilioPhoneNumber: '+1234567890'
+#   openaiApiKey: '$(PROD_OPENAI_API_KEY)'
+#
+#   # OAuth Providers
+#   googleClientId: '$(PROD_GOOGLE_CLIENT_ID)'
+#   googleClientSecret: '$(PROD_GOOGLE_CLIENT_SECRET)'
+#   facebookAppId: '$(PROD_FACEBOOK_APP_ID)'
+#   facebookAppSecret: '$(PROD_FACEBOOK_APP_SECRET)'
+#   appleClientId: '$(PROD_APPLE_CLIENT_ID)'
+#   appleTeamId: '$(PROD_APPLE_TEAM_ID)'
+#   appleKeyId: '$(PROD_APPLE_KEY_ID)'
+#   applePrivateKey: '$(PROD_APPLE_PRIVATE_KEY)'
+#
+#   # Secrets Management
+#   awsSecretsManagerRegion: 'us-east-1'
+#   awsSecretsPrefix: 'quikapp/prod/'
+#   vaultAddr: 'https://vault.quikapp.io'
+#   vaultToken: '$(PROD_VAULT_TOKEN)'
+#   vaultSecretsPath: 'secret/data/quikapp/prod'
+
+# =============================================================================
+# TECH STACK VARIABLES
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Spring Boot Variables
+# Variable Group: QuikApp-SpringBoot-Variables
+# -----------------------------------------------------------------------------
+# variables:
+#   javaVersion: '21'
+#   mavenVersion: '3.9.5'
+#   springProfile: '$(environment)'
+#   jvmOpts: '-Xms256m -Xmx512m'
+
+# -----------------------------------------------------------------------------
+# NestJS Variables
+# Variable Group: QuikApp-NestJS-Variables
+# -----------------------------------------------------------------------------
+# variables:
+#   nodeVersion: '20'
+#   npmVersion: '10'
+#   nestCliVersion: '10'
+
+# -----------------------------------------------------------------------------
+# Elixir Variables
+# Variable Group: QuikApp-Elixir-Variables
+# -----------------------------------------------------------------------------
+# variables:
+#   elixirVersion: '1.15'
+#   otpVersion: '26'
+#   mixEnv: 'prod'
+#   erlVmArgs: '+P 1000000 +Q 65536'
+
+# -----------------------------------------------------------------------------
+# Go Variables
+# Variable Group: QuikApp-Go-Variables
+# -----------------------------------------------------------------------------
+# variables:
+#   goVersion: '1.21'
+#   goPrivate: 'github.com/quikapp/*'
+#   cgoEnabled: '0'
+
+# -----------------------------------------------------------------------------
+# Python Variables
+# Variable Group: QuikApp-Python-Variables
+# -----------------------------------------------------------------------------
+# variables:
+#   pythonVersion: '3.11'
+#   pipVersion: '23.3'
+#   uvicornWorkers: '4'
+
+# =============================================================================
+# TERRAFORM INFRASTRUCTURE VARIABLES
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Terraform Common Variables
+# Variable Group: quikapp-terraform-common
+# Used by: terraform-cd.yml, terraform-promote.yml
+# -----------------------------------------------------------------------------
+# variables:
+#   # Azure Service Connection
+#   azureServiceConnection: 'quikapp-azure-connection'
+#
+#   # Terraform State Backend
+#   tfStateResourceGroup: 'rg-quikapp-tfstate'
+#   tfStateStorageAccount: 'stquikapptfstate'
+#   tfStateContainer: 'tfstate'
+#
+#   # Terraform Version
+#   terraformVersion: '1.5.7'
+#
+#   # Azure Subscription (optional override)
+#   # azureSubscriptionId: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+
+# -----------------------------------------------------------------------------
+# Terraform Dev Environment
+# Variable Group: quikapp-terraform-dev
+# -----------------------------------------------------------------------------
+# variables:
+#   environment: 'dev'
+#   tfStateKey: 'quikapp-dev.tfstate'
+#   location: 'eastus'
+#   aksEnabled: 'true'
+#   acrEnabled: 'true'
+#   keyvaultEnabled: 'true'
+#   enablePrivateEndpoints: 'false'
+#   enableMonitoring: 'true'
+
+# -----------------------------------------------------------------------------
+# Terraform QA Environment
+# Variable Group: quikapp-terraform-qa
+# -----------------------------------------------------------------------------
+# variables:
+#   environment: 'qa'
+#   tfStateKey: 'quikapp-qa.tfstate'
+#   location: 'eastus'
+#   aksEnabled: 'true'
+#   acrEnabled: 'true'
+#   keyvaultEnabled: 'true'
+#   enablePrivateEndpoints: 'false'
+#   enableMonitoring: 'true'
+
+# -----------------------------------------------------------------------------
+# Terraform Staging Environment
+# Variable Group: quikapp-terraform-staging
+# -----------------------------------------------------------------------------
+# variables:
+#   environment: 'staging'
+#   tfStateKey: 'quikapp-staging.tfstate'
+#   location: 'eastus'
+#   aksEnabled: 'true'
+#   acrEnabled: 'true'
+#   keyvaultEnabled: 'true'
+#   enablePrivateEndpoints: 'true'
+#   enableMonitoring: 'true'
+#   aksSkuTier: 'Standard'
+#   acrSku: 'Standard'
+
+# -----------------------------------------------------------------------------
+# Terraform Production Environment
+# Variable Group: quikapp-terraform-prod
+# -----------------------------------------------------------------------------
+# variables:
+#   environment: 'prod'
+#   tfStateKey: 'quikapp-prod.tfstate'
+#   location: 'eastus'
+#   aksEnabled: 'true'
+#   acrEnabled: 'true'
+#   keyvaultEnabled: 'true'
+#   enablePrivateEndpoints: 'true'
+#   enableMonitoring: 'true'
+#   aksSkuTier: 'Standard'
+#   acrSku: 'Premium'
+#   keyvaultSku: 'premium'
+#   keyvaultPurgeProtection: 'true'
+
+# =============================================================================
+# KUBERNETES DEPLOYMENT VARIABLES
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Kubernetes Common Variables
+# Variable Group: quikapp-kubernetes-common
+# Used by: kubernetes-cd.yml, kubernetes-promote.yml
+# -----------------------------------------------------------------------------
+# variables:
+#   # Azure Container Registry
+#   acrName: 'quikapp'
+#   acrLoginServer: 'quikapp.azurecr.io'
+#
+#   # Default image tag strategy
+#   defaultImageTag: 'latest'
+#
+#   # Kustomize version
+#   kustomizeVersion: '5.0.0'
+#
+#   # Deployment timeout (seconds)
+#   deploymentTimeout: '600'
+#
+#   # Health check configuration
+#   healthCheckEndpoint: '/health'
+#   healthCheckTimeout: '300'
+
+# -----------------------------------------------------------------------------
+# Kubernetes Non-Production Variables
+# Variable Group: quikapp-kubernetes-nonprod
+# Used for: dev, qa environments
+# -----------------------------------------------------------------------------
+# variables:
+#   # Resource limits (reduced for non-prod)
+#   defaultCpuRequest: '50m'
+#   defaultMemoryRequest: '128Mi'
+#   defaultCpuLimit: '500m'
+#   defaultMemoryLimit: '512Mi'
+#
+#   # Replica defaults
+#   defaultMinReplicas: '1'
+#   defaultMaxReplicas: '3'
+#
+#   # Auto-scaling thresholds
+#   cpuTargetUtilization: '80'
+#   memoryTargetUtilization: '85'
+
+# -----------------------------------------------------------------------------
+# Kubernetes Pre-Production Variables
+# Variable Group: quikapp-kubernetes-preprod
+# Used for: uat1, uat2, uat3, staging environments
+# -----------------------------------------------------------------------------
+# variables:
+#   # Resource limits (moderate)
+#   defaultCpuRequest: '100m'
+#   defaultMemoryRequest: '256Mi'
+#   defaultCpuLimit: '1000m'
+#   defaultMemoryLimit: '1Gi'
+#
+#   # Replica defaults
+#   defaultMinReplicas: '2'
+#   defaultMaxReplicas: '8'
+#
+#   # Auto-scaling thresholds
+#   cpuTargetUtilization: '70'
+#   memoryTargetUtilization: '80'
+
+# -----------------------------------------------------------------------------
+# Kubernetes Production Variables
+# Variable Group: quikapp-kubernetes-prod
+# Used for: prod, live environments
+# -----------------------------------------------------------------------------
+# variables:
+#   # Resource limits (production)
+#   defaultCpuRequest: '200m'
+#   defaultMemoryRequest: '512Mi'
+#   defaultCpuLimit: '2000m'
+#   defaultMemoryLimit: '2Gi'
+#
+#   # Replica defaults
+#   defaultMinReplicas: '3'
+#   defaultMaxReplicas: '20'
+#
+#   # Auto-scaling thresholds
+#   cpuTargetUtilization: '60'
+#   memoryTargetUtilization: '70'
+#
+#   # Production-specific settings
+#   enablePodDisruptionBudget: 'true'
+#   minAvailable: '2'
+#   enableTopologySpread: 'true'
+
+# -----------------------------------------------------------------------------
+# AKS Service Connections
+# Create these service connections in Azure DevOps:
+# Project Settings > Service connections > New service connection > Kubernetes
+# -----------------------------------------------------------------------------
+# Service Connections:
+#   - quikapp-aks-dev       (AKS cluster for dev)
+#   - quikapp-aks-qa        (AKS cluster for qa)
+#   - quikapp-aks-uat       (AKS cluster for uat1, uat2, uat3)
+#   - quikapp-aks-staging   (AKS cluster for staging)
+#   - quikapp-aks-prod      (AKS cluster for prod, live)
+#
+# To create a Kubernetes service connection:
+# 1. Go to Project Settings > Service connections
+# 2. Click "New service connection"
+# 3. Select "Kubernetes"
+# 4. Choose authentication method:
+#    - Azure Subscription (recommended for AKS)
+#    - Service Account
+#    - Kubeconfig
+# 5. Select your AKS cluster
+# 6. Name the connection (e.g., quikapp-aks-dev)
+# 7. Grant access permission to all pipelines
+
+# =============================================================================
+# CI/CD BUILD VARIABLES
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# CI Common Variables
+# Variable Group: quikapp-ci-common
+# Used by: docker-ci.yml
+# -----------------------------------------------------------------------------
+# variables:
+#   # Azure Container Registry
+#   acrName: 'quikapp'
+#   acrLoginServer: 'quikapp.azurecr.io'
+#   acrServiceConnection: 'quikapp-acr-connection'
+#
+#   # Build defaults
+#   defaultImageTag: 'latest'
+#   buildTimeout: '60'
+#
+#   # Security scanning
+#   trivySeverity: 'HIGH,CRITICAL'
+#   scanTimeout: '300'
+#
+#   # Caching
+#   enableCaching: 'true'
+
+# -----------------------------------------------------------------------------
+# Spring Boot Build Variables
+# Variable Group: quikapp-ci-springboot
+# -----------------------------------------------------------------------------
+# variables:
+#   javaVersion: '21'
+#   mavenVersion: '3.9.5'
+#   mavenOpts: '-Xmx1024m'
+#   springBootVersion: '3.2.0'
+
+# -----------------------------------------------------------------------------
+# NestJS Build Variables
+# Variable Group: quikapp-ci-nestjs
+# -----------------------------------------------------------------------------
+# variables:
+#   nodeVersion: '20'
+#   npmVersion: '10'
+#   nestCliVersion: '10'
+
+# -----------------------------------------------------------------------------
+# Go Build Variables
+# Variable Group: quikapp-ci-go
+# -----------------------------------------------------------------------------
+# variables:
+#   goVersion: '1.21'
+#   golangciLintVersion: '1.55.2'
+#   cgoEnabled: '0'
+
+# -----------------------------------------------------------------------------
+# Elixir Build Variables
+# Variable Group: quikapp-ci-elixir
+# -----------------------------------------------------------------------------
+# variables:
+#   elixirVersion: '1.15'
+#   otpVersion: '26'
+#   mixEnv: 'prod'
+
+# -----------------------------------------------------------------------------
+# Python Build Variables
+# Variable Group: quikapp-ci-python
+# -----------------------------------------------------------------------------
+# variables:
+#   pythonVersion: '3.11'
+#   pipVersion: '23.3'
+#   uvicornWorkers: '4'
+
+# -----------------------------------------------------------------------------
+# ACR Service Connection
+# Create this service connection in Azure DevOps:
+# Project Settings > Service connections > Docker Registry
+# -----------------------------------------------------------------------------
+# Service Connection:
+#   - Name: quikapp-acr-connection
+#   - Type: Azure Container Registry
+#   - Registry: quikapp.azurecr.io
+#   - Authentication: Service Principal or Managed Identity
+#
+# To create:
+# 1. Go to Project Settings > Service connections
+# 2. Click "New service connection"
+# 3. Select "Docker Registry"
+# 4. Select "Azure Container Registry"
+# 5. Choose your subscription and ACR
+# 6. Name it "quikapp-acr-connection"
+# 7. Grant access to all pipelines
+
+# =============================================================================
+# AZURE KEY VAULT SECRETS MAPPING
+# =============================================================================
+# The following secrets should be stored in Azure Key Vault and linked to
+# the variable groups above. Use the naming convention: ENV-SECRET-NAME
+#
+# Example Key Vault secrets:
+#   - DEV-MONGODB-URI
+#   - DEV-JWT-SECRET
+#   - DEV-ENCRYPTION-KEY
+#   - QA-MONGODB-URI
+#   - STAGING-MONGODB-URI
+#   - PROD-MONGODB-URI
+#   - PROD-JWT-SECRET
+#   - etc.
+#
+# To link Key Vault secrets to variable groups in Azure DevOps:
+# 1. Go to Pipelines > Library > Variable groups
+# 2. Create/Edit variable group
+# 3. Enable "Link secrets from an Azure key vault as variables"
+# 4. Select your Azure subscription and Key Vault
+# 5. Add the required secrets
+
+# =============================================================================
+# SETUP INSTRUCTIONS
+# =============================================================================
+# 1. Create each variable group in Azure DevOps:
+#    - Pipelines > Library > + Variable group
+#
+# 2. For each environment, create the corresponding variable group:
+#
+#    Application Variables:
+#    - QuikApp-Global-Variables
+#    - QuikApp-Local-Variables
+#    - QuikApp-Dev-Variables
+#    - QuikApp-QA-Variables
+#    - QuikApp-UAT1-Variables
+#    - QuikApp-UAT2-Variables
+#    - QuikApp-UAT3-Variables
+#    - QuikApp-Staging-Variables
+#    - QuikApp-Live-Variables
+#
+#    Tech Stack Variables:
+#    - QuikApp-SpringBoot-Variables
+#    - QuikApp-NestJS-Variables
+#    - QuikApp-Elixir-Variables
+#    - QuikApp-Go-Variables
+#    - QuikApp-Python-Variables
+#
+#    Terraform Infrastructure Variables:
+#    - quikapp-terraform-common (required for all Terraform pipelines)
+#    - quikapp-terraform-dev
+#    - quikapp-terraform-qa
+#    - quikapp-terraform-staging
+#    - quikapp-terraform-prod
+#
+# 3. Link Azure Key Vault for sensitive values (passwords, keys, tokens)
+#
+# 4. Grant pipeline permissions to each variable group

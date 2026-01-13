@@ -1,0 +1,238 @@
+# =============================================================================
+# BACKEND GATEWAY (NestJS)
+# =============================================================================
+# Main API gateway that routes requests to microservices
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-gateway
+  namespace: quikapp
+  labels:
+    app.kubernetes.io/name: backend-gateway
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: quikapp
+    app.kubernetes.io/technology: nestjs
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: backend-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: backend-gateway
+        app.kubernetes.io/component: api
+        app.kubernetes.io/part-of: quikapp
+        app.kubernetes.io/technology: nestjs
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: quikapp-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: backend-gateway
+          image: quikapp.azurecr.io/backend-gateway:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          env:
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-common-config
+                  key: NODE_ENV
+            - name: PORT
+              value: "3000"
+            # Service URLs
+            - name: AUTH_SERVICE_URL
+              value: "http://auth-service.quikapp.svc.cluster.local"
+            - name: USER_SERVICE_URL
+              value: "http://user-service.quikapp.svc.cluster.local"
+            - name: WORKSPACE_SERVICE_URL
+              value: "http://workspace-service.quikapp.svc.cluster.local"
+            - name: CHANNEL_SERVICE_URL
+              value: "http://channel-service.quikapp.svc.cluster.local"
+            - name: MESSAGE_SERVICE_URL
+              value: "http://message-service.quikapp.svc.cluster.local"
+            - name: FILE_SERVICE_URL
+              value: "http://file-service.quikapp.svc.cluster.local"
+            - name: SEARCH_SERVICE_URL
+              value: "http://search-service.quikapp.svc.cluster.local"
+            - name: NOTIFICATION_SERVICE_URL
+              value: "http://notification-service.quikapp.svc.cluster.local"
+            # Redis for caching/rate limiting
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-database-config
+                  key: REDIS_HOST
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-database-config
+                  key: REDIS_PORT
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: quikapp-database-secrets
+                  key: REDIS_PASSWORD
+            # JWT Validation
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: quikapp-jwt-secrets
+                  key: JWT_SECRET
+            # CORS
+            - name: CORS_ORIGIN
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-common-config
+                  key: CORS_ORIGIN
+            # Rate Limiting
+            - name: RATE_LIMIT_TTL
+              value: "60"
+            - name: RATE_LIMIT_MAX
+              value: "100"
+            # Monitoring
+            - name: OTEL_SERVICE_NAME
+              value: "backend-gateway"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-monitoring-config
+                  key: OTEL_EXPORTER_OTLP_ENDPOINT
+          envFrom:
+            - configMapRef:
+                name: quikapp-common-config
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: backend-gateway
+                topologyKey: kubernetes.io/hostname
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: backend-gateway
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-gateway
+  namespace: quikapp
+  labels:
+    app.kubernetes.io/name: backend-gateway
+    app.kubernetes.io/component: api
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: backend-gateway
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend-gateway-hpa
+  namespace: quikapp
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend-gateway
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 70
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 10
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+        - type: Pods
+          value: 4
+          periodSeconds: 15
+      selectPolicy: Max
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: backend-gateway-pdb
+  namespace: quikapp
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: backend-gateway

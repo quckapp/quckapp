@@ -1,0 +1,172 @@
+{
+  "docusaurus-plugin-content-docs": {
+    "default": {
+      "path": "/docs",
+      "versions": [
+        {
+          "name": "current",
+          "label": "Next",
+          "isLast": true,
+          "path": "/docs",
+          "mainDocId": "index",
+          "docs": [
+            {
+              "id": "api-reference/openapi",
+              "path": "/docs/api-reference/openapi",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "api-reference/postman",
+              "path": "/docs/api-reference/postman",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "architecture/algorithms-patterns",
+              "path": "/docs/architecture/algorithms-patterns",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "architecture/auth-service",
+              "path": "/docs/architecture/auth-service",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "architecture/database",
+              "path": "/docs/architecture/database",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "architecture/gateway",
+              "path": "/docs/architecture/gateway",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "architecture/microservices",
+              "path": "/docs/architecture/microservices",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "architecture/overview",
+              "path": "/docs/architecture/overview",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "architecture/realtime-service",
+              "path": "/docs/architecture/realtime-service",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "architecture/security",
+              "path": "/docs/architecture/security",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "architecture/websockets",
+              "path": "/docs/architecture/websockets",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "deployment/docker",
+              "path": "/docs/deployment/docker",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "deployment/environments",
+              "path": "/docs/deployment/environments",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "deployment/railway",
+              "path": "/docs/deployment/railway",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "features/implementation-summary",
+              "path": "/docs/features/implementation-summary",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "features/index",
+              "path": "/docs/features/",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "features/new-features",
+              "path": "/docs/features/new-features",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "getting-started/configuration",
+              "path": "/docs/getting-started/configuration",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "getting-started/installation",
+              "path": "/docs/getting-started/installation",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "getting-started/integration-status",
+              "path": "/docs/getting-started/integration-status",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "getting-started/quick-start",
+              "path": "/docs/getting-started/quick-start",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "getting-started/testing-guide",
+              "path": "/docs/getting-started/testing-guide",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "index",
+              "path": "/docs/"
+            },
+            {
+              "id": "integrations/firebase",
+              "path": "/docs/integrations/firebase",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "integrations/firebase-setup",
+              "path": "/docs/integrations/firebase-setup",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "integrations/message-brokers",
+              "path": "/docs/integrations/message-brokers",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "integrations/monitoring",
+              "path": "/docs/integrations/monitoring",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "integrations/push-notifications",
+              "path": "/docs/integrations/push-notifications",
+              "sidebar": "docsSidebar"
+            },
+            {
+              "id": "integrations/service-discovery",
+              "path": "/docs/integrations/service-discovery",
+              "sidebar": "docsSidebar"
+            }
+          ],
+          "draftIds": [],
+          "sidebars": {
+            "docsSidebar": {
+              "link": {
+                "path": "/docs/getting-started/quick-start",
+                "label": "getting-started/quick-start"
+              }
+            }
+          }
+        }
+      ],
+      "breadcrumbs": true
+    }
+  }
+}

@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  permission-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: quikapp-permission-service
+    ports:
+      - "8083:8083"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_DATABASE=quikapp_permissions
+      - MYSQL_USERNAME=root
+      - MYSQL_PASSWORD=password
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - quikapp-network
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.0
+    container_name: quikapp-permission-mysql
+    ports:
+      - "3308:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=password
+      - MYSQL_DATABASE=quikapp_permissions
+    volumes:
+      - permission-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - quikapp-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: quikapp-permission-redis
+    ports:
+      - "6381:6379"
+    volumes:
+      - permission-redis-data:/data
+    networks:
+      - quikapp-network
+
+volumes:
+  permission-mysql-data:
+  permission-redis-data:
+
+networks:
+  quikapp-network:
+    driver: bridge

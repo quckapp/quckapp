@@ -1,0 +1,187 @@
+# =============================================================================
+# PRODUCTION ENVIRONMENT OVERLAY
+# =============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: quikapp-prod
+
+namespace: quikapp
+
+resources:
+  - ../../base
+
+commonLabels:
+  environment: prod
+
+commonAnnotations:
+  quikapp.io/environment: production
+
+# Production uses base replica counts and resources (no reduction patches)
+patches:
+  # Ensure production has proper affinity rules
+  - target:
+      kind: Deployment
+      name: backend-gateway
+    patch: |-
+      - op: add
+        path: /spec/template/spec/topologySpreadConstraints
+        value:
+          - maxSkew: 1
+            topologyKey: topology.kubernetes.io/zone
+            whenUnsatisfiable: DoNotSchedule
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: backend-gateway
+
+  - target:
+      kind: Deployment
+      name: realtime-service
+    patch: |-
+      - op: add
+        path: /spec/template/spec/topologySpreadConstraints
+        value:
+          - maxSkew: 1
+            topologyKey: topology.kubernetes.io/zone
+            whenUnsatisfiable: DoNotSchedule
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: realtime-service
+
+  # Production HPA with higher limits
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: backend-gateway-hpa
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+      - op: replace
+        path: /spec/maxReplicas
+        value: 25
+
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: realtime-service-hpa
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+      - op: replace
+        path: /spec/maxReplicas
+        value: 20
+
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: presence-service-hpa
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+      - op: replace
+        path: /spec/maxReplicas
+        value: 15
+
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: message-service-hpa
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+      - op: replace
+        path: /spec/maxReplicas
+        value: 20
+
+  # Production PDB - higher availability
+  - target:
+      kind: PodDisruptionBudget
+      name: backend-gateway-pdb
+    patch: |-
+      - op: replace
+        path: /spec/minAvailable
+        value: 2
+
+  - target:
+      kind: PodDisruptionBudget
+      name: realtime-service-pdb
+    patch: |-
+      - op: replace
+        path: /spec/minAvailable
+        value: 2
+
+configMapGenerator:
+  - name: quikapp-common-config
+    behavior: merge
+    literals:
+      - NODE_ENV=production
+      - ENVIRONMENT=prod
+      - LOG_LEVEL=warn
+      - CORS_ORIGIN=https://quikapp.io,https://www.quikapp.io,https://app.quikapp.io
+
+  - name: quikapp-version
+    behavior: replace
+    literals:
+      - VERSION=prod
+      - BUILD_DATE=unknown
+      - ENVIRONMENT=prod
+
+# Production images use specific version tags (set during deployment)
+images:
+  - name: quikapp.azurecr.io/backend-gateway
+    newTag: prod
+  - name: quikapp.azurecr.io/auth-service
+    newTag: prod
+  - name: quikapp.azurecr.io/user-service
+    newTag: prod
+  - name: quikapp.azurecr.io/workspace-service
+    newTag: prod
+  - name: quikapp.azurecr.io/channel-service
+    newTag: prod
+  - name: quikapp.azurecr.io/thread-service
+    newTag: prod
+  - name: quikapp.azurecr.io/search-service
+    newTag: prod
+  - name: quikapp.azurecr.io/file-service
+    newTag: prod
+  - name: quikapp.azurecr.io/media-service
+    newTag: prod
+  - name: quikapp.azurecr.io/notification-service
+    newTag: prod
+  - name: quikapp.azurecr.io/realtime-service
+    newTag: prod
+  - name: quikapp.azurecr.io/presence-service
+    newTag: prod
+  - name: quikapp.azurecr.io/message-service
+    newTag: prod
+  - name: quikapp.azurecr.io/call-service
+    newTag: prod
+  - name: quikapp.azurecr.io/huddle-service
+    newTag: prod
+  - name: quikapp.azurecr.io/analytics-service
+    newTag: prod
+  - name: quikapp.azurecr.io/ml-service
+    newTag: prod
+  - name: quikapp.azurecr.io/moderation-service
+    newTag: prod
+  - name: quikapp.azurecr.io/sentiment-service
+    newTag: prod
+  - name: quikapp.azurecr.io/permission-service
+    newTag: prod
+  - name: quikapp.azurecr.io/audit-service
+    newTag: prod
+  - name: quikapp.azurecr.io/admin-service
+    newTag: prod
+
+# Production-specific replacements
+replacements:
+  - source:
+      kind: ConfigMap
+      name: quikapp-version
+      fieldPath: data.VERSION
+    targets:
+      - select:
+          kind: Deployment
+        fieldPaths:
+          - spec.template.metadata.annotations.[quikapp.io/version]

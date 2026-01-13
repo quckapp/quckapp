@@ -1,0 +1,260 @@
+# QuikApp Prometheus Configuration
+# Scrapes metrics from all microservices and infrastructure
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'quikapp'
+    env: 'development'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+# Load alert rules
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+# Scrape configurations
+scrape_configs:
+  # ============================================
+  # Prometheus Self-Monitoring
+  # ============================================
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+
+  # ============================================
+  # Infrastructure Exporters
+  # ============================================
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          service: 'node-exporter'
+
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          service: 'cadvisor'
+
+  # ============================================
+  # Database Exporters
+  # ============================================
+  - job_name: 'redis-exporter'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+        labels:
+          service: 'redis'
+          database: 'redis'
+
+  - job_name: 'mysql-exporter'
+    static_configs:
+      - targets: ['mysql-exporter:9104']
+        labels:
+          service: 'mysql'
+          database: 'mysql'
+
+  - job_name: 'postgres-exporter'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+        labels:
+          service: 'postgres'
+          database: 'postgresql'
+
+  - job_name: 'mongodb-exporter'
+    static_configs:
+      - targets: ['mongodb-exporter:9216']
+        labels:
+          service: 'mongodb'
+          database: 'mongodb'
+
+  # ============================================
+  # Message Queue Exporters
+  # ============================================
+  - job_name: 'kafka-exporter'
+    static_configs:
+      - targets: ['kafka-exporter:9308']
+        labels:
+          service: 'kafka'
+
+  - job_name: 'elasticsearch-exporter'
+    static_configs:
+      - targets: ['elasticsearch-exporter:9114']
+        labels:
+          service: 'elasticsearch'
+
+  # ============================================
+  # Spring Boot Services (Actuator Metrics)
+  # ============================================
+  - job_name: 'spring-boot-services'
+    metrics_path: /actuator/prometheus
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['auth-service:8081']
+        labels:
+          service: 'auth-service'
+          stack: 'spring-boot'
+      - targets: ['user-service:8082']
+        labels:
+          service: 'user-service'
+          stack: 'spring-boot'
+      - targets: ['permission-service:8083']
+        labels:
+          service: 'permission-service'
+          stack: 'spring-boot'
+      - targets: ['audit-service:8084']
+        labels:
+          service: 'audit-service'
+          stack: 'spring-boot'
+      - targets: ['admin-service:8085']
+        labels:
+          service: 'admin-service'
+          stack: 'spring-boot'
+
+  # ============================================
+  # NestJS Services (Prometheus Metrics)
+  # ============================================
+  - job_name: 'nestjs-services'
+    metrics_path: /metrics
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['backend-gateway:3000']
+        labels:
+          service: 'backend-gateway'
+          stack: 'nestjs'
+      - targets: ['notification-service:3001']
+        labels:
+          service: 'notification-service'
+          stack: 'nestjs'
+      - targets: ['realtime-service:4000']
+        labels:
+          service: 'realtime-service'
+          stack: 'nestjs'
+
+  # ============================================
+  # Elixir Services (Prometheus Metrics)
+  # ============================================
+  - job_name: 'elixir-services'
+    metrics_path: /metrics
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['presence-service:4001']
+        labels:
+          service: 'presence-service'
+          stack: 'elixir'
+      - targets: ['call-service:4002']
+        labels:
+          service: 'call-service'
+          stack: 'elixir'
+      - targets: ['message-service:4003']
+        labels:
+          service: 'message-service'
+          stack: 'elixir'
+      - targets: ['notification-orchestrator:4004']
+        labels:
+          service: 'notification-orchestrator'
+          stack: 'elixir'
+      - targets: ['huddle-service:4005']
+        labels:
+          service: 'huddle-service'
+          stack: 'elixir'
+      - targets: ['event-broadcast-service:4006']
+        labels:
+          service: 'event-broadcast-service'
+          stack: 'elixir'
+
+  # ============================================
+  # Go Services (Prometheus Metrics)
+  # ============================================
+  - job_name: 'go-services'
+    metrics_path: /metrics
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['media-service:5001']
+        labels:
+          service: 'media-service'
+          stack: 'go'
+      - targets: ['file-service:5002']
+        labels:
+          service: 'file-service'
+          stack: 'go'
+      - targets: ['workspace-service:5004']
+        labels:
+          service: 'workspace-service'
+          stack: 'go'
+      - targets: ['channel-service:5005']
+        labels:
+          service: 'channel-service'
+          stack: 'go'
+      - targets: ['search-service:5006']
+        labels:
+          service: 'search-service'
+          stack: 'go'
+      - targets: ['thread-service:5009']
+        labels:
+          service: 'thread-service'
+          stack: 'go'
+      - targets: ['bookmark-service:5010']
+        labels:
+          service: 'bookmark-service'
+          stack: 'go'
+      - targets: ['reminder-service:5011']
+        labels:
+          service: 'reminder-service'
+          stack: 'go'
+      - targets: ['attachment-service:5012']
+        labels:
+          service: 'attachment-service'
+          stack: 'go'
+      - targets: ['cdn-service:5013']
+        labels:
+          service: 'cdn-service'
+          stack: 'go'
+
+  # ============================================
+  # Python Services (Prometheus Metrics)
+  # ============================================
+  - job_name: 'python-services'
+    metrics_path: /metrics
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['analytics-service:5007']
+        labels:
+          service: 'analytics-service'
+          stack: 'python'
+      - targets: ['ml-service:5008']
+        labels:
+          service: 'ml-service'
+          stack: 'python'
+      - targets: ['moderation-service:5014']
+        labels:
+          service: 'moderation-service'
+          stack: 'python'
+      - targets: ['export-service:5015']
+        labels:
+          service: 'export-service'
+          stack: 'python'
+      - targets: ['integration-service:5016']
+        labels:
+          service: 'integration-service'
+          stack: 'python'
+      - targets: ['sentiment-service:5017']
+        labels:
+          service: 'sentiment-service'
+          stack: 'python'
+      - targets: ['insights-service:5018']
+        labels:
+          service: 'insights-service'
+          stack: 'python'
+      - targets: ['smart-reply-service:5019']
+        labels:
+          service: 'smart-reply-service'
+          stack: 'python'

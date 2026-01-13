@@ -1,0 +1,29 @@
+{
+  "id": "integrations/message-brokers",
+  "title": "Message Brokers",
+  "description": "Kafka, RabbitMQ, and BullMQ configuration",
+  "source": "@site/docs/integrations/message-brokers.md",
+  "sourceDirName": "integrations",
+  "slug": "/integrations/message-brokers",
+  "permalink": "/docs/integrations/message-brokers",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/quckchat/backend/tree/main/docs/docs/integrations/message-brokers.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 5,
+  "frontMatter": {
+    "sidebar_position": 5,
+    "title": "Message Brokers",
+    "description": "Kafka, RabbitMQ, and BullMQ configuration"
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Monitoring & Observability",
+    "permalink": "/docs/integrations/monitoring"
+  },
+  "next": {
+    "title": "Service Discovery & Secrets",
+    "permalink": "/docs/integrations/service-discovery"
+  }
+}

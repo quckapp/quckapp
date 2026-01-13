@@ -1,0 +1,10 @@
+# =============================================================================
+# QA Backend Configuration
+# =============================================================================
+# Copy to backend.hcl and update with your values
+
+bucket         = "quikapp-terraform-state-ACCOUNT_ID"
+key            = "qa/terraform.tfstate"
+region         = "us-east-1"
+dynamodb_table = "quikapp-terraform-locks"
+encrypt        = true

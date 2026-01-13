@@ -1,0 +1,21 @@
+{
+  "new_message": "New message from {sender}",
+  "new_message_body": "{sender}: {message}",
+  "missed_call": "Missed call from {caller}",
+  "incoming_call": "Incoming call from {caller}",
+  "new_group_message": "New message in {group}",
+  "added_to_group": "{user} added you to {group}",
+  "removed_from_group": "You were removed from {group}",
+  "group_name_changed": "Group name changed to {name}",
+  "new_broadcast": "New broadcast from {sender}",
+  "status_update": "{user} updated their status",
+  "mention": "{user} mentioned you in {group}",
+  "reaction": "{user} reacted to your message",
+  "poll_created": "{user} created a new poll in {group}",
+  "poll_ended": "Poll ended in {group}",
+  "scheduled_message": "Scheduled message sent",
+  "export_ready": "Your data export is ready for download",
+  "password_changed": "Your password was changed successfully",
+  "login_new_device": "New login detected from {device}",
+  "account_verified": "Your account has been verified"
+}

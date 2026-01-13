@@ -1,0 +1,296 @@
+# QuikApp Promtail Configuration
+# Collects logs from all Docker containers
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    tenant_id: quikapp
+    batchwait: 1s
+    batchsize: 1048576
+    timeout: 10s
+    backoff_config:
+      min_period: 500ms
+      max_period: 5m
+      max_retries: 10
+
+scrape_configs:
+  # ============================================
+  # Docker Container Logs
+  # ============================================
+  - job_name: docker-containers
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: network
+            values: ["quikapp-network"]
+    relabel_configs:
+      # Keep only containers with quikapp prefix or in quikapp network
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(quikapp-.*)'
+        action: keep
+      # Extract container name
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: container
+      # Extract service name from container name
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/quikapp-(.*)'
+        target_label: service
+      # Add container ID
+      - source_labels: ['__meta_docker_container_id']
+        target_label: container_id
+      # Add image name
+      - source_labels: ['__meta_docker_container_image']
+        target_label: image
+      # Add compose service label if present
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: compose_service
+      # Add environment label
+      - action: replace
+        target_label: environment
+        replacement: development
+      # Add namespace label
+      - action: replace
+        target_label: namespace
+        replacement: quikapp
+
+    pipeline_stages:
+      # Parse Docker JSON logs
+      - docker: {}
+
+      # Parse JSON log messages (common format)
+      - json:
+          expressions:
+            level: level
+            msg: msg
+            message: message
+            timestamp: timestamp
+            time: time
+            service: service
+            trace_id: trace_id
+            span_id: span_id
+            request_id: request_id
+            user_id: user_id
+            error: error
+            stack: stack
+          source: log
+
+      # Extract level from various formats
+      - regex:
+          expression: '(?P<level>DEBUG|INFO|WARN|WARNING|ERROR|FATAL|CRITICAL|TRACE)'
+          source: log
+
+      # Normalize log levels
+      - template:
+          source: level
+          template: '{{ ToLower .Value }}'
+
+      # Add labels from extracted fields
+      - labels:
+          level:
+          trace_id:
+          span_id:
+          request_id:
+
+      # Add timestamp from log if present
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+          fallback_formats:
+            - RFC3339
+            - '2006-01-02T15:04:05.000Z07:00'
+            - '2006-01-02 15:04:05.000'
+            - UnixMs
+
+      # Output final log line
+      - output:
+          source: message
+
+  # ============================================
+  # Spring Boot Services (Structured Logs)
+  # ============================================
+  - job_name: spring-boot
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: name
+            values: ["quikapp-auth-service", "quikapp-user-service", "quikapp-permission-service", "quikapp-audit-service", "quikapp-admin-service"]
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/quikapp-(.*)-service'
+        target_label: service
+      - action: replace
+        target_label: stack
+        replacement: spring-boot
+    pipeline_stages:
+      - docker: {}
+      - multiline:
+          firstline: '^\d{4}-\d{2}-\d{2}'
+          max_wait_time: 3s
+      - regex:
+          expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3})\s+(?P<level>\w+)\s+\[(?P<thread>[^\]]+)\]\s+(?P<logger>[^\s]+)\s+:\s+(?P<message>.*)$'
+      - labels:
+          level:
+          thread:
+          logger:
+      - output:
+          source: message
+
+  # ============================================
+  # NestJS Services (JSON Logs)
+  # ============================================
+  - job_name: nestjs
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: name
+            values: ["quikapp-backend-gateway", "quikapp-notification-service", "quikapp-realtime-service"]
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/quikapp-(.*)'
+        target_label: service
+      - action: replace
+        target_label: stack
+        replacement: nestjs
+    pipeline_stages:
+      - docker: {}
+      - json:
+          expressions:
+            level: level
+            message: message
+            context: context
+            timestamp: timestamp
+            trace_id: traceId
+            span_id: spanId
+      - labels:
+          level:
+          context:
+          trace_id:
+          span_id:
+      - output:
+          source: message
+
+  # ============================================
+  # Elixir Services (Phoenix Logs)
+  # ============================================
+  - job_name: elixir
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: name
+            values: ["quikapp-presence-service", "quikapp-call-service", "quikapp-message-service", "quikapp-notification-orchestrator", "quikapp-huddle-service", "quikapp-event-broadcast-service"]
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/quikapp-(.*)'
+        target_label: service
+      - action: replace
+        target_label: stack
+        replacement: elixir
+    pipeline_stages:
+      - docker: {}
+      - regex:
+          expression: '^\[(?P<level>\w+)\]\s+(?P<message>.*)$'
+      - labels:
+          level:
+      - output:
+          source: message
+
+  # ============================================
+  # Go Services (Structured Logs)
+  # ============================================
+  - job_name: go
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: name
+            values: ["quikapp-media-service", "quikapp-file-service", "quikapp-workspace-service", "quikapp-channel-service", "quikapp-search-service", "quikapp-thread-service", "quikapp-bookmark-service", "quikapp-reminder-service", "quikapp-attachment-service", "quikapp-cdn-service"]
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/quikapp-(.*)'
+        target_label: service
+      - action: replace
+        target_label: stack
+        replacement: go
+    pipeline_stages:
+      - docker: {}
+      - json:
+          expressions:
+            level: level
+            msg: msg
+            time: time
+            caller: caller
+            trace_id: trace_id
+            span_id: span_id
+      - labels:
+          level:
+          caller:
+          trace_id:
+          span_id:
+      - output:
+          source: msg
+
+  # ============================================
+  # Python Services (Structured Logs)
+  # ============================================
+  - job_name: python
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: name
+            values: ["quikapp-analytics-service", "quikapp-ml-service", "quikapp-moderation-service", "quikapp-export-service", "quikapp-integration-service", "quikapp-sentiment-service", "quikapp-insights-service", "quikapp-smart-reply-service"]
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/quikapp-(.*)'
+        target_label: service
+      - action: replace
+        target_label: stack
+        replacement: python
+    pipeline_stages:
+      - docker: {}
+      - json:
+          expressions:
+            level: levelname
+            message: message
+            timestamp: timestamp
+            logger: name
+            trace_id: otelTraceID
+            span_id: otelSpanID
+      - labels:
+          level:
+          logger:
+          trace_id:
+          span_id:
+      - output:
+          source: message
+
+  # ============================================
+  # Infrastructure Services
+  # ============================================
+  - job_name: infrastructure
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: name
+            values: ["quikapp-mongodb", "quikapp-mysql", "quikapp-postgres", "quikapp-redis", "quikapp-elasticsearch", "quikapp-kafka", "quikapp-zookeeper", "quikapp-minio", "quikapp-nginx"]
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/quikapp-(.*)'
+        target_label: service
+      - action: replace
+        target_label: stack
+        replacement: infrastructure
+    pipeline_stages:
+      - docker: {}

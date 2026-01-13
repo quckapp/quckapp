@@ -1,0 +1,138 @@
+# =============================================================================
+# STAGING ENVIRONMENT OVERLAY
+# =============================================================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: quikapp-staging
+
+namespace: quikapp-staging
+
+resources:
+  - ../../base
+
+commonLabels:
+  environment: staging
+
+commonAnnotations:
+  quikapp.io/environment: staging
+
+patches:
+  # Staging replicas (near production)
+  - target:
+      kind: Deployment
+      name: backend-gateway
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+
+  - target:
+      kind: Deployment
+      name: realtime-service
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+
+  - target:
+      kind: Deployment
+      name: presence-service
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+
+  - target:
+      kind: Deployment
+      name: message-service
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+
+  # Staging HPA (moderate scaling)
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: backend-gateway-hpa
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 2
+      - op: replace
+        path: /spec/maxReplicas
+        value: 10
+
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: realtime-service-hpa
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 2
+      - op: replace
+        path: /spec/maxReplicas
+        value: 8
+
+configMapGenerator:
+  - name: quikapp-common-config
+    behavior: merge
+    literals:
+      - NODE_ENV=staging
+      - ENVIRONMENT=staging
+      - LOG_LEVEL=info
+      - CORS_ORIGIN=https://staging.quikapp.io
+
+  - name: quikapp-version
+    behavior: replace
+    literals:
+      - VERSION=staging
+      - BUILD_DATE=unknown
+      - ENVIRONMENT=staging
+
+images:
+  - name: quikapp.azurecr.io/backend-gateway
+    newTag: staging
+  - name: quikapp.azurecr.io/auth-service
+    newTag: staging
+  - name: quikapp.azurecr.io/user-service
+    newTag: staging
+  - name: quikapp.azurecr.io/workspace-service
+    newTag: staging
+  - name: quikapp.azurecr.io/channel-service
+    newTag: staging
+  - name: quikapp.azurecr.io/thread-service
+    newTag: staging
+  - name: quikapp.azurecr.io/search-service
+    newTag: staging
+  - name: quikapp.azurecr.io/file-service
+    newTag: staging
+  - name: quikapp.azurecr.io/media-service
+    newTag: staging
+  - name: quikapp.azurecr.io/notification-service
+    newTag: staging
+  - name: quikapp.azurecr.io/realtime-service
+    newTag: staging
+  - name: quikapp.azurecr.io/presence-service
+    newTag: staging
+  - name: quikapp.azurecr.io/message-service
+    newTag: staging
+  - name: quikapp.azurecr.io/call-service
+    newTag: staging
+  - name: quikapp.azurecr.io/huddle-service
+    newTag: staging
+  - name: quikapp.azurecr.io/analytics-service
+    newTag: staging
+  - name: quikapp.azurecr.io/ml-service
+    newTag: staging
+  - name: quikapp.azurecr.io/moderation-service
+    newTag: staging
+  - name: quikapp.azurecr.io/sentiment-service
+    newTag: staging
+  - name: quikapp.azurecr.io/permission-service
+    newTag: staging
+  - name: quikapp.azurecr.io/audit-service
+    newTag: staging
+  - name: quikapp.azurecr.io/admin-service
+    newTag: staging

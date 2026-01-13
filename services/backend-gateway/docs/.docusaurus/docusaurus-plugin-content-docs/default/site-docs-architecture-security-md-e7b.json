@@ -1,0 +1,29 @@
+{
+  "id": "architecture/security",
+  "title": "Security Architecture",
+  "description": "Security measures and authentication flow",
+  "source": "@site/docs/architecture/security.md",
+  "sourceDirName": "architecture",
+  "slug": "/architecture/security",
+  "permalink": "/docs/architecture/security",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/quckchat/backend/tree/main/docs/docs/architecture/security.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 6,
+  "frontMatter": {
+    "sidebar_position": 6,
+    "title": "Security Architecture",
+    "description": "Security measures and authentication flow"
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "WebSocket Architecture",
+    "permalink": "/docs/architecture/websockets"
+  },
+  "next": {
+    "title": "Algorithms & Patterns",
+    "permalink": "/docs/architecture/algorithms-patterns"
+  }
+}

@@ -1,0 +1,60 @@
+# QA Tests Template
+# Comprehensive QA test suite
+
+parameters:
+  - name: environment
+    type: string
+  - name: serviceName
+    type: string
+
+steps:
+  - checkout: self
+    displayName: 'Checkout Repository'
+
+  - task: NodeTool@0
+    displayName: 'Setup Node.js'
+    inputs:
+      versionSpec: '20.x'
+
+  - task: AzureCLI@2
+    displayName: 'Run QA Test Suite'
+    inputs:
+      azureSubscription: 'QuikApp-${{ parameters.environment }}'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        BASE_URL="https://${{ parameters.serviceName }}.qa.quikapp.io"
+        export BASE_URL
+        export TEST_ENV="qa"
+
+        echo "Running QA tests against: $BASE_URL"
+
+        # Install test dependencies
+        npm ci --prefix tests/qa
+
+        # Run functional tests
+        echo "Running functional tests..."
+        npm run test:functional --prefix tests/qa
+
+        # Run regression tests
+        echo "Running regression tests..."
+        npm run test:regression --prefix tests/qa
+
+        # Run API contract tests
+        echo "Running API contract tests..."
+        npm run test:contract --prefix tests/qa
+
+  - task: PublishTestResults@2
+    displayName: 'Publish QA Test Results'
+    inputs:
+      testResultsFormat: 'JUnit'
+      testResultsFiles: '**/qa-results.xml'
+      testRunTitle: 'QA Tests - ${{ parameters.serviceName }}'
+    condition: always()
+
+  - task: PublishCodeCoverageResults@1
+    displayName: 'Publish Code Coverage'
+    inputs:
+      codeCoverageTool: 'Cobertura'
+      summaryFileLocation: '**/coverage/cobertura-coverage.xml'
+    condition: always()

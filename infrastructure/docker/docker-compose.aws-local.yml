@@ -1,0 +1,246 @@
+# =============================================================================
+# QuikApp Local Development Environment
+# =============================================================================
+# This Docker Compose setup provides local alternatives to AWS services:
+#
+#   AWS Service      -> Local Alternative
+#   ----------------------------------------
+#   S3               -> LocalStack / MinIO
+#   DynamoDB         -> LocalStack / DynamoDB Local
+#   SQS              -> LocalStack
+#   SNS              -> LocalStack
+#   RDS (PostgreSQL) -> PostgreSQL
+#   ElastiCache      -> Redis
+#   Cognito          -> Keycloak (optional)
+#   API Gateway      -> Direct access
+#
+# Usage:
+#   docker-compose up -d              # Start all services
+#   docker-compose up -d postgres redis  # Start specific services
+#   docker-compose logs -f            # View logs
+#   docker-compose down               # Stop all services
+#   docker-compose down -v            # Stop and remove volumes
+#
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # ===========================================================================
+  # PostgreSQL Database (RDS/Aurora alternative)
+  # ===========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: quikapp-postgres
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-quikapp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-quikapp_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-quikapp}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts/postgres:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-quikapp}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - quikapp-network
+
+  # ===========================================================================
+  # Redis (ElastiCache alternative)
+  # ===========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: quikapp-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - quikapp-network
+
+  # ===========================================================================
+  # LocalStack (S3, DynamoDB, SQS, SNS, etc.)
+  # ===========================================================================
+  localstack:
+    image: localstack/localstack:latest
+    container_name: quikapp-localstack
+    restart: unless-stopped
+    ports:
+      - "4566:4566"            # LocalStack Gateway
+      - "4510-4559:4510-4559"  # External services
+    environment:
+      - SERVICES=s3,dynamodb,sqs,sns,secretsmanager,kms,lambda
+      - DEBUG=${LOCALSTACK_DEBUG:-0}
+      - DATA_DIR=/var/lib/localstack/data
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - AWS_DEFAULT_REGION=${AWS_REGION:-us-east-1}
+      - EDGE_PORT=4566
+    volumes:
+      - localstack_data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./init-scripts/localstack:/etc/localstack/init/ready.d:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - quikapp-network
+
+  # ===========================================================================
+  # MinIO (S3 alternative - optional, use if you prefer over LocalStack S3)
+  # ===========================================================================
+  minio:
+    image: minio/minio:latest
+    container_name: quikapp-minio
+    restart: unless-stopped
+    profiles:
+      - minio  # Only starts with: docker-compose --profile minio up
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - quikapp-network
+
+  # ===========================================================================
+  # DynamoDB Local (alternative to LocalStack DynamoDB)
+  # ===========================================================================
+  dynamodb-local:
+    image: amazon/dynamodb-local:latest
+    container_name: quikapp-dynamodb
+    restart: unless-stopped
+    profiles:
+      - dynamodb  # Only starts with: docker-compose --profile dynamodb up
+    ports:
+      - "${DYNAMODB_PORT:-8000}:8000"
+    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath /data"
+    volumes:
+      - dynamodb_data:/data
+    networks:
+      - quikapp-network
+
+  # ===========================================================================
+  # Keycloak (Cognito alternative - optional)
+  # ===========================================================================
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: quikapp-keycloak
+    restart: unless-stopped
+    profiles:
+      - auth  # Only starts with: docker-compose --profile auth up
+    ports:
+      - "${KEYCLOAK_PORT:-8080}:8080"
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-quikapp}
+      KC_DB_USERNAME: ${POSTGRES_USER:-quikapp}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-quikapp_dev}
+    command: start-dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - quikapp-network
+
+  # ===========================================================================
+  # MailHog (Email testing)
+  # ===========================================================================
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: quikapp-mailhog
+    restart: unless-stopped
+    profiles:
+      - mail  # Only starts with: docker-compose --profile mail up
+    ports:
+      - "${MAILHOG_SMTP_PORT:-1025}:1025"    # SMTP
+      - "${MAILHOG_UI_PORT:-8025}:8025"       # Web UI
+    networks:
+      - quikapp-network
+
+  # ===========================================================================
+  # Adminer (Database UI)
+  # ===========================================================================
+  adminer:
+    image: adminer:latest
+    container_name: quikapp-adminer
+    restart: unless-stopped
+    profiles:
+      - tools  # Only starts with: docker-compose --profile tools up
+    ports:
+      - "${ADMINER_PORT:-8081}:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    depends_on:
+      - postgres
+    networks:
+      - quikapp-network
+
+  # ===========================================================================
+  # Redis Commander (Redis UI)
+  # ===========================================================================
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: quikapp-redis-commander
+    restart: unless-stopped
+    profiles:
+      - tools  # Only starts with: docker-compose --profile tools up
+    ports:
+      - "${REDIS_COMMANDER_PORT:-8082}:8081"
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    depends_on:
+      - redis
+    networks:
+      - quikapp-network
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  quikapp-network:
+    driver: bridge
+    name: quikapp-network
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  postgres_data:
+    name: quikapp-postgres-data
+  redis_data:
+    name: quikapp-redis-data
+  localstack_data:
+    name: quikapp-localstack-data
+  minio_data:
+    name: quikapp-minio-data
+  dynamodb_data:
+    name: quikapp-dynamodb-data

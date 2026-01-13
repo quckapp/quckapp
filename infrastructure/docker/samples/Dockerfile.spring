@@ -1,0 +1,95 @@
+# =============================================================================
+# QuikApp Spring Boot Service Dockerfile
+# Multi-stage build with layered JARs for optimized caching
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Stage 1: Builder
+# -----------------------------------------------------------------------------
+FROM eclipse-temurin:17-jdk-alpine AS builder
+
+WORKDIR /app
+
+# Install Maven
+RUN apk add --no-cache maven
+
+# Copy pom.xml first to cache dependencies
+COPY pom.xml .
+COPY .mvn .mvn
+COPY mvnw .
+
+# Download dependencies (cached if pom.xml unchanged)
+RUN mvn dependency:go-offline -B
+
+# Copy source code
+COPY src ./src
+
+# Build arguments
+ARG VERSION=dev
+ARG BUILD_DATE
+ARG GIT_COMMIT
+
+# Build the application
+RUN mvn package -DskipTests -B \
+    -Drevision=${VERSION} \
+    -Dbuild.timestamp=${BUILD_DATE} \
+    -Dgit.commit=${GIT_COMMIT}
+
+# Extract layered JAR for better caching
+RUN mkdir -p target/extracted && \
+    java -Djarmode=layertools -jar target/*.jar extract --destination target/extracted
+
+# -----------------------------------------------------------------------------
+# Stage 2: Production Runner
+# -----------------------------------------------------------------------------
+FROM eclipse-temurin:17-jre-alpine AS runner
+
+# Install security updates and required packages
+RUN apk update && \
+    apk upgrade && \
+    apk add --no-cache curl tzdata && \
+    rm -rf /var/cache/apk/*
+
+# Create non-root user
+RUN addgroup --system --gid 1001 spring && \
+    adduser --system --uid 1001 spring
+
+WORKDIR /app
+
+# Set environment variables
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0 -Djava.security.egd=file:/dev/./urandom"
+ENV SPRING_PROFILES_ACTIVE=production
+ENV SERVER_PORT=8080
+ENV TZ=UTC
+
+# Copy layered JAR components (better caching)
+COPY --from=builder --chown=spring:spring /app/target/extracted/dependencies/ ./
+COPY --from=builder --chown=spring:spring /app/target/extracted/spring-boot-loader/ ./
+COPY --from=builder --chown=spring:spring /app/target/extracted/snapshot-dependencies/ ./
+COPY --from=builder --chown=spring:spring /app/target/extracted/application/ ./
+
+# Build metadata labels
+ARG VERSION=dev
+ARG BUILD_DATE
+ARG GIT_COMMIT
+
+LABEL org.opencontainers.image.title="QuikApp Spring Boot Service" \
+      org.opencontainers.image.description="QuikApp microservice built with Spring Boot" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.revision="${GIT_COMMIT}" \
+      org.opencontainers.image.vendor="QuikApp" \
+      org.opencontainers.image.source="https://github.com/quikapp/quikapp"
+
+# Switch to non-root user
+USER spring
+
+# Expose port
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8080/actuator/health || exit 1
+
+# Start the application using the layered launcher
+ENTRYPOINT ["sh", "-c", "java ${JAVA_OPTS} org.springframework.boot.loader.launch.JarLauncher"]

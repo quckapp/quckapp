@@ -1,0 +1,29 @@
+{
+  "id": "architecture/algorithms-patterns",
+  "title": "Algorithms & Patterns",
+  "description": "Algorithms, data structures, and design patterns used in QuckChat",
+  "source": "@site/docs/architecture/algorithms-patterns.md",
+  "sourceDirName": "architecture",
+  "slug": "/architecture/algorithms-patterns",
+  "permalink": "/docs/architecture/algorithms-patterns",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/quckchat/backend/tree/main/docs/docs/architecture/algorithms-patterns.md",
+  "tags": [],
+  "version": "current",
+  "sidebarPosition": 7,
+  "frontMatter": {
+    "sidebar_position": 7,
+    "title": "Algorithms & Patterns",
+    "description": "Algorithms, data structures, and design patterns used in QuckChat"
+  },
+  "sidebar": "docsSidebar",
+  "previous": {
+    "title": "Security Architecture",
+    "permalink": "/docs/architecture/security"
+  },
+  "next": {
+    "title": "Auth Service (Spring Boot)",
+    "permalink": "/docs/architecture/auth-service"
+  }
+}

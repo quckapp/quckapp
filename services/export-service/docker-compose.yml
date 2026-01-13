@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  export-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: quikapp-export-service
+    ports:
+      - "5015:5015"
+    environment:
+      - PORT=5015
+      - DATABASE_URL=mysql+asyncmy://quikapp:quikapp@mysql:3306/quikapp_exports
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - LOCAL_STORAGE_PATH=/tmp/exports
+    depends_on:
+      - mysql
+      - redis
+    volumes:
+      - export-data:/tmp/exports
+    networks:
+      - quikapp-network
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.0
+    container_name: quikapp-export-mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=quikapp_exports
+      - MYSQL_USER=quikapp
+      - MYSQL_PASSWORD=quikapp
+    ports:
+      - "3317:3306"
+    volumes:
+      - export-mysql-data:/var/lib/mysql
+    networks:
+      - quikapp-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: quikapp-export-redis
+    ports:
+      - "6389:6379"
+    networks:
+      - quikapp-network
+
+networks:
+  quikapp-network:
+    driver: bridge
+
+volumes:
+  export-mysql-data:
+  export-data:

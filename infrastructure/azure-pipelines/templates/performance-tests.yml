@@ -1,0 +1,81 @@
+# Performance Tests Template
+# Performance benchmarking and profiling
+
+parameters:
+  - name: environment
+    type: string
+  - name: serviceName
+    type: string
+
+steps:
+  - checkout: self
+    displayName: 'Checkout Repository'
+
+  - task: AzureCLI@2
+    displayName: 'Run Performance Tests'
+    inputs:
+      azureSubscription: 'QuikApp-${{ parameters.environment }}'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        BASE_URL="https://${{ parameters.serviceName }}.${{ parameters.environment }}.quikapp.io"
+
+        echo "Running performance tests against: $BASE_URL"
+
+        # Install k6
+        curl -sSL https://github.com/grafana/k6/releases/download/v0.47.0/k6-v0.47.0-linux-amd64.tar.gz | tar xz
+        mv k6-v0.47.0-linux-amd64/k6 /usr/local/bin/
+
+        # Run performance test
+        k6 run \
+          --env BASE_URL=$BASE_URL \
+          --out json=performance-results.json \
+          tests/performance/benchmark.js
+
+  - task: AzureCLI@2
+    displayName: 'Run Latency Tests'
+    inputs:
+      azureSubscription: 'QuikApp-${{ parameters.environment }}'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        BASE_URL="https://${{ parameters.serviceName }}.${{ parameters.environment }}.quikapp.io"
+
+        echo "Running latency tests..."
+
+        # Run multiple requests and capture latency
+        for endpoint in "/health" "/api/v1/status" "/api/v1/ping"; do
+          echo "Testing endpoint: $BASE_URL$endpoint"
+          for i in {1..10}; do
+            curl -s -o /dev/null -w "Request $i: %{time_total}s\n" "$BASE_URL$endpoint"
+          done
+        done | tee latency-results.txt
+
+  - task: PowerShell@2
+    displayName: 'Analyze Performance Results'
+    inputs:
+      targetType: 'inline'
+      script: |
+        $results = Get-Content "performance-results.json" -Raw | ConvertFrom-Json -ErrorAction SilentlyContinue
+
+        if ($results) {
+          Write-Host "Performance Test Results:"
+          Write-Host "  VUs: $($results.metrics.vus.value)"
+          Write-Host "  Requests: $($results.metrics.http_reqs.count)"
+          Write-Host "  Avg Response Time: $($results.metrics.http_req_duration.avg)ms"
+          Write-Host "  P95 Response Time: $($results.metrics.http_req_duration.'p(95)')ms"
+          Write-Host "  P99 Response Time: $($results.metrics.http_req_duration.'p(99)')ms"
+
+          # Check thresholds
+          if ($results.metrics.http_req_duration.'p(95)' -gt 500) {
+            Write-Host "##vso[task.logissue type=warning]P95 latency exceeds 500ms threshold"
+          }
+        }
+
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Performance Reports'
+    inputs:
+      PathtoPublish: '.'
+      ArtifactName: 'performance-reports-${{ parameters.serviceName }}'
+      includePattern: '**/*-results.*'
+    condition: always()

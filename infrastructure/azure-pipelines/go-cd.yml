@@ -1,0 +1,56 @@
+# Go CD Pipeline
+# Deploys Go/Gin services through all environments
+
+trigger: none
+
+resources:
+  pipelines:
+    - pipeline: GoCI
+      source: 'Go CI'
+      trigger:
+        branches:
+          include:
+            - main
+            - develop
+
+parameters:
+  - name: serviceName
+    type: string
+    displayName: 'Service Name'
+    values:
+      - workspace-service
+      - channel-service
+      - thread-service
+      - search-service
+      - file-service
+      - media-service
+      - bookmark-service
+      - reminder-service
+      - attachment-service
+      - cdn-service
+  - name: deployToEnvironments
+    type: object
+    displayName: 'Environments to Deploy'
+    default:
+      - local
+      - dev
+      - qa
+      - uat1
+      - uat2
+      - uat3
+      - staging
+      - live
+
+variables:
+  - group: QuikApp-Global-Variables
+  - group: QuikApp-Go-Variables
+  - name: techStack
+    value: 'go'
+
+extends:
+  template: cd-main.yml
+  parameters:
+    techStack: 'go'
+    serviceName: ${{ parameters.serviceName }}
+    imageTag: $(resources.pipeline.GoCI.runID)
+    deployToEnvironments: ${{ parameters.deployToEnvironments }}

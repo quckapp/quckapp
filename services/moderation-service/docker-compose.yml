@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  moderation-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: quikapp-moderation-service
+    ports:
+      - "5014:5014"
+    environment:
+      - PORT=5014
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=password
+      - DB_NAME=quikapp_moderation
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - quikapp-network
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.0
+    container_name: quikapp-moderation-mysql
+    ports:
+      - "3312:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=password
+      - MYSQL_DATABASE=quikapp_moderation
+    volumes:
+      - moderation-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - quikapp-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: quikapp-moderation-redis
+    ports:
+      - "6385:6379"
+    networks:
+      - quikapp-network
+
+volumes:
+  moderation-mysql-data:
+
+networks:
+  quikapp-network:
+    driver: bridge

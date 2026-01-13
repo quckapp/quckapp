@@ -1,0 +1,94 @@
+:root {
+  --ifm-color-primary: #2e8555;
+  --ifm-color-primary-dark: #29784c;
+  --ifm-color-primary-darker: #277148;
+  --ifm-color-primary-darkest: #205d3b;
+  --ifm-color-primary-light: #33925d;
+  --ifm-color-primary-lighter: #359962;
+  --ifm-color-primary-lightest: #3cad6e;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #25c2a0;
+  --ifm-color-primary-dark: #21af90;
+  --ifm-color-primary-darker: #1fa588;
+  --ifm-color-primary-darkest: #1a8870;
+  --ifm-color-primary-light: #29d5b0;
+  --ifm-color-primary-lighter: #32d8b4;
+  --ifm-color-primary-lightest: #4fddbf;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+}
+
+.hero {
+  background: linear-gradient(135deg, var(--ifm-color-primary) 0%, #1a5f3c 100%);
+}
+
+.hero__title {
+  font-size: 3rem;
+}
+
+.architecture-diagram {
+  background: var(--ifm-background-surface-color);
+  padding: 2rem;
+  border-radius: 8px;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  margin: 1rem 0;
+  overflow-x: auto;
+}
+
+.architecture-diagram pre {
+  margin: 0;
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.service-card {
+  background: var(--ifm-card-background-color);
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin: 1rem 0;
+}
+
+.service-card h3 {
+  margin-top: 0;
+  color: var(--ifm-color-primary);
+}
+
+.endpoint-badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  margin-right: 0.5rem;
+}
+
+.endpoint-badge.get { background: #61affe; color: white; }
+.endpoint-badge.post { background: #49cc90; color: white; }
+.endpoint-badge.put { background: #fca130; color: white; }
+.endpoint-badge.delete { background: #f93e3e; color: white; }
+.endpoint-badge.patch { background: #50e3c2; color: white; }
+
+.env-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.env-table th,
+.env-table td {
+  border: 1px solid var(--ifm-color-emphasis-200);
+  padding: 0.75rem;
+  text-align: left;
+}
+
+.env-table th {
+  background: var(--ifm-color-emphasis-100);
+}
+
+.env-table code {
+  font-size: 0.85rem;
+}

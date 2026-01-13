@@ -1,0 +1,49 @@
+# NestJS CD Pipeline
+# Deploys NestJS services through all environments
+
+trigger: none
+
+resources:
+  pipelines:
+    - pipeline: NestJSCI
+      source: 'NestJS CI'
+      trigger:
+        branches:
+          include:
+            - main
+            - develop
+
+parameters:
+  - name: serviceName
+    type: string
+    displayName: 'Service Name'
+    values:
+      - backend-gateway
+      - notification-service
+      - realtime-service
+  - name: deployToEnvironments
+    type: object
+    displayName: 'Environments to Deploy'
+    default:
+      - local
+      - dev
+      - qa
+      - uat1
+      - uat2
+      - uat3
+      - staging
+      - live
+
+variables:
+  - group: QuikApp-Global-Variables
+  - group: QuikApp-NestJS-Variables
+  - name: techStack
+    value: 'nestjs'
+
+extends:
+  template: cd-main.yml
+  parameters:
+    techStack: 'nestjs'
+    serviceName: ${{ parameters.serviceName }}
+    imageTag: $(resources.pipeline.NestJSCI.runID)
+    deployToEnvironments: ${{ parameters.deployToEnvironments }}

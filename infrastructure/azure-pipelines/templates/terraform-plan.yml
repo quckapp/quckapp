@@ -1,0 +1,121 @@
+# =============================================================================
+# TERRAFORM PLAN TEMPLATE
+# =============================================================================
+# Creates Terraform execution plan for an environment
+# =============================================================================
+
+parameters:
+  - name: workingDirectory
+    type: string
+    default: '$(System.DefaultWorkingDirectory)/infrastructure/terraform'
+
+  - name: azureServiceConnection
+    type: string
+
+  - name: environment
+    type: string
+    default: 'dev'
+
+  - name: publishPlan
+    type: boolean
+    default: true
+
+  - name: additionalArgs
+    type: string
+    default: ''
+
+steps:
+  - task: AzureCLI@2
+    displayName: 'Terraform Plan - ${{ parameters.environment }}'
+    inputs:
+      azureSubscription: '${{ parameters.azureServiceConnection }}'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      workingDirectory: '${{ parameters.workingDirectory }}'
+      addSpnToEnvironment: true
+      inlineScript: |
+        set -e
+
+        echo "=========================================="
+        echo "TERRAFORM PLAN - ${{ parameters.environment }}"
+        echo "=========================================="
+
+        # Export ARM credentials for Terraform
+        export ARM_CLIENT_ID=$servicePrincipalId
+        export ARM_CLIENT_SECRET=$servicePrincipalKey
+        export ARM_TENANT_ID=$tenantId
+        export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+
+        # Check if environment-specific tfvars exists
+        TFVARS_FILE="environments/${{ parameters.environment }}.tfvars"
+        if [ -f "$TFVARS_FILE" ]; then
+          echo "Using tfvars file: $TFVARS_FILE"
+          VAR_FILE_ARG="-var-file=$TFVARS_FILE"
+        else
+          echo "No tfvars file found at $TFVARS_FILE, using defaults"
+          VAR_FILE_ARG="-var=environment=${{ parameters.environment }}"
+        fi
+
+        # Run Terraform plan
+        terraform plan \
+          $VAR_FILE_ARG \
+          -out=tfplan-${{ parameters.environment }}.out \
+          -input=false \
+          -detailed-exitcode \
+          ${{ parameters.additionalArgs }} \
+          || PLAN_EXIT_CODE=$?
+
+        # Handle exit codes
+        # 0 = No changes
+        # 1 = Error
+        # 2 = Changes present
+        if [ "${PLAN_EXIT_CODE:-0}" -eq 1 ]; then
+          echo "##[error]Terraform plan failed!"
+          exit 1
+        elif [ "${PLAN_EXIT_CODE:-0}" -eq 2 ]; then
+          echo "##[warning]Changes detected in plan"
+          echo "##vso[task.setvariable variable=TF_PLAN_HAS_CHANGES;isOutput=true]true"
+        else
+          echo "No changes detected"
+          echo "##vso[task.setvariable variable=TF_PLAN_HAS_CHANGES;isOutput=true]false"
+        fi
+
+        # Generate plan output for review
+        echo ""
+        echo "=========================================="
+        echo "PLAN SUMMARY"
+        echo "=========================================="
+        terraform show -no-color tfplan-${{ parameters.environment }}.out
+
+        # Generate JSON output for parsing
+        terraform show -json tfplan-${{ parameters.environment }}.out > tfplan-${{ parameters.environment }}.json
+
+    name: plan
+
+  - ${{ if eq(parameters.publishPlan, true) }}:
+    - task: PublishPipelineArtifact@1
+      displayName: 'Publish Plan Artifact'
+      inputs:
+        targetPath: '${{ parameters.workingDirectory }}/tfplan-${{ parameters.environment }}.out'
+        artifactName: 'terraform-plan-${{ parameters.environment }}'
+        publishLocation: 'pipeline'
+
+    - task: PublishPipelineArtifact@1
+      displayName: 'Publish Plan JSON'
+      inputs:
+        targetPath: '${{ parameters.workingDirectory }}/tfplan-${{ parameters.environment }}.json'
+        artifactName: 'terraform-plan-json-${{ parameters.environment }}'
+        publishLocation: 'pipeline'
+      continueOnError: true
+
+  # Create plan summary comment for PR
+  - script: |
+      echo "## Terraform Plan Summary - ${{ parameters.environment }}" > plan-summary.md
+      echo "" >> plan-summary.md
+      echo "### Resources" >> plan-summary.md
+      echo "\`\`\`" >> plan-summary.md
+      terraform show -no-color tfplan-${{ parameters.environment }}.out | grep -E "^(Plan:|  #|  \+|  -|  ~)" | head -50 >> plan-summary.md
+      echo "\`\`\`" >> plan-summary.md
+    displayName: 'Generate Plan Summary'
+    workingDirectory: '${{ parameters.workingDirectory }}'
+    continueOnError: true

@@ -1,0 +1,59 @@
+# =============================================================================
+# QUIKAPP NAMESPACE
+# =============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: quikapp
+  labels:
+    app.kubernetes.io/name: quikapp
+    app.kubernetes.io/managed-by: kubectl
+  annotations:
+    description: "QuikApp microservices namespace"
+---
+# =============================================================================
+# RESOURCE QUOTAS
+# =============================================================================
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: quikapp-quota
+  namespace: quikapp
+spec:
+  hard:
+    requests.cpu: "50"
+    requests.memory: "100Gi"
+    limits.cpu: "100"
+    limits.memory: "200Gi"
+    pods: "200"
+    services: "50"
+    secrets: "100"
+    configmaps: "100"
+    persistentvolumeclaims: "50"
+---
+# =============================================================================
+# LIMIT RANGES
+# =============================================================================
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: quikapp-limits
+  namespace: quikapp
+spec:
+  limits:
+    # Default limits for containers
+    - default:
+        cpu: "500m"
+        memory: "512Mi"
+      defaultRequest:
+        cpu: "100m"
+        memory: "128Mi"
+      type: Container
+    # Pod limits
+    - max:
+        cpu: "8"
+        memory: "16Gi"
+      min:
+        cpu: "50m"
+        memory: "64Mi"
+      type: Pod

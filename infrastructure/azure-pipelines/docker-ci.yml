@@ -1,0 +1,589 @@
+# =============================================================================
+# DOCKER CI PIPELINE
+# =============================================================================
+# Build and push Docker images to Azure Container Registry
+# =============================================================================
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+      - feature/*
+      - release/*
+      - hotfix/*
+  paths:
+    include:
+      - services/**
+      - infrastructure/docker/**
+      - Dockerfile*
+
+pr:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    include:
+      - services/**
+      - infrastructure/docker/**
+
+parameters:
+  - name: services
+    displayName: 'Services to Build (comma-separated, or "all", or "changed")'
+    type: string
+    default: 'changed'
+
+  - name: pushImages
+    displayName: 'Push Images to ACR'
+    type: boolean
+    default: true
+
+  - name: tagStrategy
+    displayName: 'Image Tag Strategy'
+    type: string
+    default: 'auto'
+    values:
+      - auto       # branch-based tagging
+      - semver     # semantic versioning from git tag
+      - commit     # commit SHA
+      - custom     # use customTag parameter
+
+  - name: customTag
+    displayName: 'Custom Tag (when tagStrategy=custom)'
+    type: string
+    default: ''
+
+  - name: platforms
+    displayName: 'Target Platforms'
+    type: string
+    default: 'linux/amd64'
+    values:
+      - linux/amd64
+      - linux/amd64,linux/arm64
+
+  - name: scanImages
+    displayName: 'Run Security Scan'
+    type: boolean
+    default: true
+
+variables:
+  - group: quikapp-common
+  - group: quikapp-ci-common
+
+  - name: acrName
+    value: 'quikapp'
+  - name: acrLoginServer
+    value: 'quikapp.azurecr.io'
+
+  # Determine image tag based on strategy
+  - name: imageTag
+    ${{ if eq(parameters.tagStrategy, 'custom') }}:
+      value: ${{ parameters.customTag }}
+    ${{ elseif eq(parameters.tagStrategy, 'commit') }}:
+      value: $(Build.SourceVersion)
+    ${{ elseif eq(parameters.tagStrategy, 'semver') }}:
+      value: $(Build.SourceBranchName)
+    ${{ else }}:
+      value: 'auto'
+
+  # All services list
+  - name: allServices
+    value: 'backend-gateway,auth-service,user-service,workspace-service,channel-service,thread-service,search-service,file-service,media-service,notification-service,realtime-service,presence-service,message-service,call-service,huddle-service,analytics-service,ml-service,moderation-service,sentiment-service,permission-service,audit-service,admin-service'
+
+stages:
+  # =============================================================================
+  # DETECT CHANGES
+  # =============================================================================
+  - stage: Detect
+    displayName: 'Detect Changes'
+    jobs:
+      - job: DetectChanges
+        displayName: 'Detect Changed Services'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - checkout: self
+            fetchDepth: 0
+
+          - bash: |
+              echo "=== Build Configuration ==="
+              echo "Services parameter: ${{ parameters.services }}"
+              echo "Tag strategy: ${{ parameters.tagStrategy }}"
+              echo "Push images: ${{ parameters.pushImages }}"
+              echo "Branch: $(Build.SourceBranchName)"
+              echo "Commit: $(Build.SourceVersion)"
+              echo "==========================="
+            displayName: 'Display Configuration'
+
+          - bash: |
+              # Determine image tag
+              if [ "$(imageTag)" = "auto" ]; then
+                BRANCH=$(Build.SourceBranchName)
+                if [ "$BRANCH" = "main" ]; then
+                  TAG="latest"
+                elif [ "$BRANCH" = "develop" ]; then
+                  TAG="dev"
+                elif [[ "$BRANCH" == feature/* ]]; then
+                  TAG="feature-$(echo $BRANCH | sed 's/feature\///' | tr '/' '-')"
+                elif [[ "$BRANCH" == release/* ]]; then
+                  TAG=$(echo $BRANCH | sed 's/release\///')
+                elif [[ "$BRANCH" == hotfix/* ]]; then
+                  TAG="hotfix-$(echo $BRANCH | sed 's/hotfix\///')"
+                else
+                  TAG="$(Build.BuildId)"
+                fi
+              else
+                TAG="$(imageTag)"
+              fi
+
+              echo "##vso[task.setvariable variable=computedTag;isOutput=true]$TAG"
+              echo "Computed image tag: $TAG"
+            name: ComputeTag
+            displayName: 'Compute Image Tag'
+
+          - bash: |
+              SERVICES_PARAM="${{ parameters.services }}"
+
+              if [ "$SERVICES_PARAM" = "all" ]; then
+                SERVICES="${{ variables.allServices }}"
+              elif [ "$SERVICES_PARAM" = "changed" ]; then
+                # Detect changed services based on git diff
+                if [ "$(Build.Reason)" = "PullRequest" ]; then
+                  BASE_BRANCH="origin/$(System.PullRequest.TargetBranch)"
+                else
+                  BASE_BRANCH="HEAD~1"
+                fi
+
+                CHANGED_FILES=$(git diff --name-only $BASE_BRANCH 2>/dev/null || git diff --name-only HEAD~1)
+                echo "Changed files:"
+                echo "$CHANGED_FILES"
+
+                SERVICES=""
+
+                # Map directories to services
+                declare -A SERVICE_MAP=(
+                  ["services/backend-gateway"]="backend-gateway"
+                  ["services/auth-service"]="auth-service"
+                  ["services/user-service"]="user-service"
+                  ["services/workspace-service"]="workspace-service"
+                  ["services/channel-service"]="channel-service"
+                  ["services/thread-service"]="thread-service"
+                  ["services/search-service"]="search-service"
+                  ["services/file-service"]="file-service"
+                  ["services/media-service"]="media-service"
+                  ["services/notification-service"]="notification-service"
+                  ["services/realtime-service"]="realtime-service"
+                  ["services/presence-service"]="presence-service"
+                  ["services/message-service"]="message-service"
+                  ["services/call-service"]="call-service"
+                  ["services/huddle-service"]="huddle-service"
+                  ["services/analytics-service"]="analytics-service"
+                  ["services/ml-service"]="ml-service"
+                  ["services/moderation-service"]="moderation-service"
+                  ["services/sentiment-service"]="sentiment-service"
+                  ["services/permission-service"]="permission-service"
+                  ["services/audit-service"]="audit-service"
+                  ["services/admin-service"]="admin-service"
+                )
+
+                for dir in "${!SERVICE_MAP[@]}"; do
+                  if echo "$CHANGED_FILES" | grep -q "^$dir"; then
+                    SERVICE="${SERVICE_MAP[$dir]}"
+                    if [ -z "$SERVICES" ]; then
+                      SERVICES="$SERVICE"
+                    else
+                      SERVICES="$SERVICES,$SERVICE"
+                    fi
+                  fi
+                done
+
+                # If shared libraries changed, build all
+                if echo "$CHANGED_FILES" | grep -q "^packages/\|^libs/\|^infrastructure/docker/"; then
+                  SERVICES="${{ variables.allServices }}"
+                fi
+
+                if [ -z "$SERVICES" ]; then
+                  echo "No service changes detected"
+                  SERVICES="none"
+                fi
+              else
+                SERVICES="$SERVICES_PARAM"
+              fi
+
+              echo "##vso[task.setvariable variable=servicesToBuild;isOutput=true]$SERVICES"
+              echo "Services to build: $SERVICES"
+            name: DetectServices
+            displayName: 'Detect Services to Build'
+
+  # =============================================================================
+  # BUILD SPRING BOOT SERVICES
+  # =============================================================================
+  - stage: BuildSpringBoot
+    displayName: 'Build Spring Boot Services'
+    dependsOn: Detect
+    condition: |
+      and(
+        succeeded(),
+        ne(dependencies.Detect.outputs['DetectChanges.DetectServices.servicesToBuild'], 'none'),
+        or(
+          contains(dependencies.Detect.outputs['DetectChanges.DetectServices.servicesToBuild'], 'auth-service'),
+          contains(dependencies.Detect.outputs['DetectChanges.DetectServices.servicesToBuild'], 'user-service'),
+          contains(dependencies.Detect.outputs['DetectChanges.DetectServices.servicesToBuild'], 'permission-service'),
+          contains(dependencies.Detect.outputs['DetectChanges.DetectServices.servicesToBuild'], 'audit-service'),
+          contains(dependencies.Detect.outputs['DetectChanges.DetectServices.servicesToBuild'], 'admin-service')
+        )
+      )
+    variables:
+      imageTag: $[ stageDependencies.Detect.DetectChanges.outputs['ComputeTag.computedTag'] ]
+      servicesToBuild: $[ stageDependencies.Detect.DetectChanges.outputs['DetectServices.servicesToBuild'] ]
+    jobs:
+      - job: BuildSpringBootServices
+        displayName: 'Build Spring Boot Images'
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          matrix:
+            auth-service:
+              serviceName: 'auth-service'
+              serviceDir: 'services/auth-service'
+            user-service:
+              serviceName: 'user-service'
+              serviceDir: 'services/user-service'
+            permission-service:
+              serviceName: 'permission-service'
+              serviceDir: 'services/permission-service'
+            audit-service:
+              serviceName: 'audit-service'
+              serviceDir: 'services/audit-service'
+            admin-service:
+              serviceName: 'admin-service'
+              serviceDir: 'services/admin-service'
+        steps:
+          - checkout: self
+
+          - bash: |
+              if [[ "$(servicesToBuild)" != *"$(serviceName)"* ]] && [[ "$(servicesToBuild)" != *"all"* ]]; then
+                echo "Skipping $(serviceName) - not in build list"
+                echo "##vso[task.setvariable variable=skipBuild]true"
+              else
+                echo "Building $(serviceName)"
+                echo "##vso[task.setvariable variable=skipBuild]false"
+              fi
+            displayName: 'Check if service should build'
+
+          - template: templates/docker-build-springboot.yml
+            parameters:
+              serviceName: $(serviceName)
+              serviceDir: $(serviceDir)
+              imageTag: $(imageTag)
+              acrLoginServer: $(acrLoginServer)
+              pushImage: ${{ parameters.pushImages }}
+              scanImage: ${{ parameters.scanImages }}
+              condition: eq(variables.skipBuild, 'false')
+
+  # =============================================================================
+  # BUILD NESTJS SERVICES
+  # =============================================================================
+  - stage: BuildNestJS
+    displayName: 'Build NestJS Services'
+    dependsOn: Detect
+    condition: |
+      and(
+        succeeded(),
+        ne(dependencies.Detect.outputs['DetectChanges.DetectServices.servicesToBuild'], 'none'),
+        or(
+          contains(dependencies.Detect.outputs['DetectChanges.DetectServices.servicesToBuild'], 'backend-gateway'),
+          contains(dependencies.Detect.outputs['DetectChanges.DetectServices.servicesToBuild'], 'notification-service'),
+          contains(dependencies.Detect.outputs['DetectChanges.DetectServices.servicesToBuild'], 'realtime-service')
+        )
+      )
+    variables:
+      imageTag: $[ stageDependencies.Detect.DetectChanges.outputs['ComputeTag.computedTag'] ]
+      servicesToBuild: $[ stageDependencies.Detect.DetectChanges.outputs['DetectServices.servicesToBuild'] ]
+    jobs:
+      - job: BuildNestJSServices
+        displayName: 'Build NestJS Images'
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          matrix:
+            backend-gateway:
+              serviceName: 'backend-gateway'
+              serviceDir: 'services/backend-gateway'
+            notification-service:
+              serviceName: 'notification-service'
+              serviceDir: 'services/notification-service'
+            realtime-service:
+              serviceName: 'realtime-service'
+              serviceDir: 'services/realtime-service'
+        steps:
+          - checkout: self
+
+          - bash: |
+              if [[ "$(servicesToBuild)" != *"$(serviceName)"* ]] && [[ "$(servicesToBuild)" != *"all"* ]]; then
+                echo "Skipping $(serviceName) - not in build list"
+                echo "##vso[task.setvariable variable=skipBuild]true"
+              else
+                echo "Building $(serviceName)"
+                echo "##vso[task.setvariable variable=skipBuild]false"
+              fi
+            displayName: 'Check if service should build'
+
+          - template: templates/docker-build-nestjs.yml
+            parameters:
+              serviceName: $(serviceName)
+              serviceDir: $(serviceDir)
+              imageTag: $(imageTag)
+              acrLoginServer: $(acrLoginServer)
+              pushImage: ${{ parameters.pushImages }}
+              scanImage: ${{ parameters.scanImages }}
+              condition: eq(variables.skipBuild, 'false')
+
+  # =============================================================================
+  # BUILD GO SERVICES
+  # =============================================================================
+  - stage: BuildGo
+    displayName: 'Build Go Services'
+    dependsOn: Detect
+    condition: |
+      and(
+        succeeded(),
+        ne(dependencies.Detect.outputs['DetectChanges.DetectServices.servicesToBuild'], 'none'),
+        or(
+          contains(dependencies.Detect.outputs['DetectChanges.DetectServices.servicesToBuild'], 'workspace-service'),
+          contains(dependencies.Detect.outputs['DetectChanges.DetectServices.servicesToBuild'], 'channel-service'),
+          contains(dependencies.Detect.outputs['DetectChanges.DetectServices.servicesToBuild'], 'thread-service'),
+          contains(dependencies.Detect.outputs['DetectChanges.DetectServices.servicesToBuild'], 'search-service'),
+          contains(dependencies.Detect.outputs['DetectChanges.DetectServices.servicesToBuild'], 'file-service'),
+          contains(dependencies.Detect.outputs['DetectChanges.DetectServices.servicesToBuild'], 'media-service')
+        )
+      )
+    variables:
+      imageTag: $[ stageDependencies.Detect.DetectChanges.outputs['ComputeTag.computedTag'] ]
+      servicesToBuild: $[ stageDependencies.Detect.DetectChanges.outputs['DetectServices.servicesToBuild'] ]
+    jobs:
+      - job: BuildGoServices
+        displayName: 'Build Go Images'
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          matrix:
+            workspace-service:
+              serviceName: 'workspace-service'
+              serviceDir: 'services/workspace-service'
+            channel-service:
+              serviceName: 'channel-service'
+              serviceDir: 'services/channel-service'
+            thread-service:
+              serviceName: 'thread-service'
+              serviceDir: 'services/thread-service'
+            search-service:
+              serviceName: 'search-service'
+              serviceDir: 'services/search-service'
+            file-service:
+              serviceName: 'file-service'
+              serviceDir: 'services/file-service'
+            media-service:
+              serviceName: 'media-service'
+              serviceDir: 'services/media-service'
+        steps:
+          - checkout: self
+
+          - bash: |
+              if [[ "$(servicesToBuild)" != *"$(serviceName)"* ]] && [[ "$(servicesToBuild)" != *"all"* ]]; then
+                echo "Skipping $(serviceName) - not in build list"
+                echo "##vso[task.setvariable variable=skipBuild]true"
+              else
+                echo "Building $(serviceName)"
+                echo "##vso[task.setvariable variable=skipBuild]false"
+              fi
+            displayName: 'Check if service should build'
+
+          - template: templates/docker-build-go.yml
+            parameters:
+              serviceName: $(serviceName)
+              serviceDir: $(serviceDir)
+              imageTag: $(imageTag)
+              acrLoginServer: $(acrLoginServer)
+              pushImage: ${{ parameters.pushImages }}
+              scanImage: ${{ parameters.scanImages }}
+              condition: eq(variables.skipBuild, 'false')
+
+  # =============================================================================
+  # BUILD ELIXIR SERVICES
+  # =============================================================================
+  - stage: BuildElixir
+    displayName: 'Build Elixir Services'
+    dependsOn: Detect
+    condition: |
+      and(
+        succeeded(),
+        ne(dependencies.Detect.outputs['DetectChanges.DetectServices.servicesToBuild'], 'none'),
+        or(
+          contains(dependencies.Detect.outputs['DetectChanges.DetectServices.servicesToBuild'], 'presence-service'),
+          contains(dependencies.Detect.outputs['DetectChanges.DetectServices.servicesToBuild'], 'message-service'),
+          contains(dependencies.Detect.outputs['DetectChanges.DetectServices.servicesToBuild'], 'call-service'),
+          contains(dependencies.Detect.outputs['DetectChanges.DetectServices.servicesToBuild'], 'huddle-service')
+        )
+      )
+    variables:
+      imageTag: $[ stageDependencies.Detect.DetectChanges.outputs['ComputeTag.computedTag'] ]
+      servicesToBuild: $[ stageDependencies.Detect.DetectChanges.outputs['DetectServices.servicesToBuild'] ]
+    jobs:
+      - job: BuildElixirServices
+        displayName: 'Build Elixir Images'
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          matrix:
+            presence-service:
+              serviceName: 'presence-service'
+              serviceDir: 'services/presence-service'
+            message-service:
+              serviceName: 'message-service'
+              serviceDir: 'services/message-service'
+            call-service:
+              serviceName: 'call-service'
+              serviceDir: 'services/call-service'
+            huddle-service:
+              serviceName: 'huddle-service'
+              serviceDir: 'services/huddle-service'
+        steps:
+          - checkout: self
+
+          - bash: |
+              if [[ "$(servicesToBuild)" != *"$(serviceName)"* ]] && [[ "$(servicesToBuild)" != *"all"* ]]; then
+                echo "Skipping $(serviceName) - not in build list"
+                echo "##vso[task.setvariable variable=skipBuild]true"
+              else
+                echo "Building $(serviceName)"
+                echo "##vso[task.setvariable variable=skipBuild]false"
+              fi
+            displayName: 'Check if service should build'
+
+          - template: templates/docker-build-elixir.yml
+            parameters:
+              serviceName: $(serviceName)
+              serviceDir: $(serviceDir)
+              imageTag: $(imageTag)
+              acrLoginServer: $(acrLoginServer)
+              pushImage: ${{ parameters.pushImages }}
+              scanImage: ${{ parameters.scanImages }}
+              condition: eq(variables.skipBuild, 'false')
+
+  # =============================================================================
+  # BUILD PYTHON SERVICES
+  # =============================================================================
+  - stage: BuildPython
+    displayName: 'Build Python Services'
+    dependsOn: Detect
+    condition: |
+      and(
+        succeeded(),
+        ne(dependencies.Detect.outputs['DetectChanges.DetectServices.servicesToBuild'], 'none'),
+        or(
+          contains(dependencies.Detect.outputs['DetectChanges.DetectServices.servicesToBuild'], 'analytics-service'),
+          contains(dependencies.Detect.outputs['DetectChanges.DetectServices.servicesToBuild'], 'ml-service'),
+          contains(dependencies.Detect.outputs['DetectChanges.DetectServices.servicesToBuild'], 'moderation-service'),
+          contains(dependencies.Detect.outputs['DetectChanges.DetectServices.servicesToBuild'], 'sentiment-service')
+        )
+      )
+    variables:
+      imageTag: $[ stageDependencies.Detect.DetectChanges.outputs['ComputeTag.computedTag'] ]
+      servicesToBuild: $[ stageDependencies.Detect.DetectChanges.outputs['DetectServices.servicesToBuild'] ]
+    jobs:
+      - job: BuildPythonServices
+        displayName: 'Build Python Images'
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          matrix:
+            analytics-service:
+              serviceName: 'analytics-service'
+              serviceDir: 'services/analytics-service'
+            ml-service:
+              serviceName: 'ml-service'
+              serviceDir: 'services/ml-service'
+            moderation-service:
+              serviceName: 'moderation-service'
+              serviceDir: 'services/moderation-service'
+            sentiment-service:
+              serviceName: 'sentiment-service'
+              serviceDir: 'services/sentiment-service'
+        steps:
+          - checkout: self
+
+          - bash: |
+              if [[ "$(servicesToBuild)" != *"$(serviceName)"* ]] && [[ "$(servicesToBuild)" != *"all"* ]]; then
+                echo "Skipping $(serviceName) - not in build list"
+                echo "##vso[task.setvariable variable=skipBuild]true"
+              else
+                echo "Building $(serviceName)"
+                echo "##vso[task.setvariable variable=skipBuild]false"
+              fi
+            displayName: 'Check if service should build'
+
+          - template: templates/docker-build-python.yml
+            parameters:
+              serviceName: $(serviceName)
+              serviceDir: $(serviceDir)
+              imageTag: $(imageTag)
+              acrLoginServer: $(acrLoginServer)
+              pushImage: ${{ parameters.pushImages }}
+              scanImage: ${{ parameters.scanImages }}
+              condition: eq(variables.skipBuild, 'false')
+
+  # =============================================================================
+  # SUMMARY
+  # =============================================================================
+  - stage: Summary
+    displayName: 'Build Summary'
+    dependsOn:
+      - Detect
+      - BuildSpringBoot
+      - BuildNestJS
+      - BuildGo
+      - BuildElixir
+      - BuildPython
+    condition: always()
+    variables:
+      imageTag: $[ stageDependencies.Detect.DetectChanges.outputs['ComputeTag.computedTag'] ]
+      servicesToBuild: $[ stageDependencies.Detect.DetectChanges.outputs['DetectServices.servicesToBuild'] ]
+    jobs:
+      - job: BuildSummary
+        displayName: 'Generate Summary'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - bash: |
+              echo "========================================"
+              echo "         BUILD SUMMARY"
+              echo "========================================"
+              echo "Branch: $(Build.SourceBranchName)"
+              echo "Commit: $(Build.SourceVersion)"
+              echo "Image Tag: $(imageTag)"
+              echo "Services Built: $(servicesToBuild)"
+              echo "Push to ACR: ${{ parameters.pushImages }}"
+              echo "Security Scan: ${{ parameters.scanImages }}"
+              echo "Build ID: $(Build.BuildId)"
+              echo "========================================"
+
+              # Generate build manifest
+              cat > $(Build.ArtifactStagingDirectory)/build-manifest.json << EOF
+              {
+                "buildId": "$(Build.BuildId)",
+                "buildNumber": "$(Build.BuildNumber)",
+                "branch": "$(Build.SourceBranchName)",
+                "commit": "$(Build.SourceVersion)",
+                "imageTag": "$(imageTag)",
+                "services": "$(servicesToBuild)",
+                "registry": "$(acrLoginServer)",
+                "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+              }
+              EOF
+            displayName: 'Generate Build Summary'
+
+          - publish: $(Build.ArtifactStagingDirectory)/build-manifest.json
+            artifact: 'build-manifest'
+            displayName: 'Publish Build Manifest'

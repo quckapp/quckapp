@@ -1,0 +1,588 @@
+# =============================================================================
+# ELIXIR REALTIME SERVICES
+# =============================================================================
+# presence-service, message-service, call-service, huddle-service
+# =============================================================================
+
+# =============================================================================
+# PRESENCE SERVICE (Elixir/Phoenix)
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: presence-service
+  namespace: quikapp
+  labels:
+    app.kubernetes.io/name: presence-service
+    app.kubernetes.io/component: realtime
+    app.kubernetes.io/part-of: quikapp
+    app.kubernetes.io/technology: elixir
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: presence-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: presence-service
+        app.kubernetes.io/component: realtime
+        app.kubernetes.io/part-of: quikapp
+        app.kubernetes.io/technology: elixir
+        app.kubernetes.io/uses-broker: "true"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "4000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: quikapp-backend-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: presence-service
+          image: quikapp.azurecr.io/presence-service:latest
+          ports:
+            - name: http
+              containerPort: 4000
+            - name: epmd
+              containerPort: 4369
+            - name: distribution
+              containerPort: 9100
+          env:
+            - name: MIX_ENV
+              value: "prod"
+            - name: PORT
+              value: "4000"
+            - name: PHX_HOST
+              value: "presence-service.quikapp.svc.cluster.local"
+            # Erlang Distribution
+            - name: RELEASE_DISTRIBUTION
+              value: "name"
+            - name: RELEASE_NODE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: RELEASE_COOKIE
+              valueFrom:
+                secretKeyRef:
+                  name: quikapp-encryption-secrets
+                  key: SECRET_KEY_BASE
+            # Database
+            - name: DATABASE_URL
+              value: "ecto://$(POSTGRES_USERNAME):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/quikapp_presence"
+            # Redis
+            - name: REDIS_URL
+              value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)/1"
+            # Kafka
+            - name: KAFKA_BROKERS
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-broker-config
+                  key: KAFKA_BROKERS
+            # Security
+            - name: SECRET_KEY_BASE
+              valueFrom:
+                secretKeyRef:
+                  name: quikapp-encryption-secrets
+                  key: SECRET_KEY_BASE
+            # Monitoring
+            - name: OTEL_SERVICE_NAME
+              value: "presence-service"
+          envFrom:
+            - configMapRef:
+                name: quikapp-database-config
+            - secretRef:
+                name: quikapp-database-secrets
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: presence-service
+                topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: presence-service
+  namespace: quikapp
+spec:
+  type: ClusterIP
+  # Headless for Erlang clustering
+  clusterIP: None
+  ports:
+    - name: http
+      port: 4000
+      targetPort: http
+    - name: epmd
+      port: 4369
+      targetPort: epmd
+    - name: distribution
+      port: 9100
+      targetPort: distribution
+  selector:
+    app.kubernetes.io/name: presence-service
+---
+# =============================================================================
+# MESSAGE SERVICE (Elixir/Phoenix)
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: message-service
+  namespace: quikapp
+  labels:
+    app.kubernetes.io/name: message-service
+    app.kubernetes.io/component: realtime
+    app.kubernetes.io/part-of: quikapp
+    app.kubernetes.io/technology: elixir
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: message-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: message-service
+        app.kubernetes.io/component: realtime
+        app.kubernetes.io/part-of: quikapp
+        app.kubernetes.io/technology: elixir
+        app.kubernetes.io/uses-broker: "true"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "4000"
+    spec:
+      serviceAccountName: quikapp-backend-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: message-service
+          image: quikapp.azurecr.io/message-service:latest
+          ports:
+            - name: http
+              containerPort: 4000
+            - name: epmd
+              containerPort: 4369
+            - name: distribution
+              containerPort: 9100
+          env:
+            - name: MIX_ENV
+              value: "prod"
+            - name: PORT
+              value: "4000"
+            - name: PHX_HOST
+              value: "message-service.quikapp.svc.cluster.local"
+            - name: RELEASE_DISTRIBUTION
+              value: "name"
+            - name: RELEASE_NODE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: DATABASE_URL
+              value: "ecto://$(POSTGRES_USERNAME):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/quikapp_messages"
+            - name: REDIS_URL
+              value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)/2"
+            - name: KAFKA_BROKERS
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-broker-config
+                  key: KAFKA_BROKERS
+            - name: SECRET_KEY_BASE
+              valueFrom:
+                secretKeyRef:
+                  name: quikapp-encryption-secrets
+                  key: SECRET_KEY_BASE
+            - name: OTEL_SERVICE_NAME
+              value: "message-service"
+          envFrom:
+            - configMapRef:
+                name: quikapp-database-config
+            - secretRef:
+                name: quikapp-database-secrets
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: message-service
+  namespace: quikapp
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: http
+      port: 4000
+      targetPort: http
+    - name: epmd
+      port: 4369
+      targetPort: epmd
+  selector:
+    app.kubernetes.io/name: message-service
+---
+# =============================================================================
+# CALL SERVICE (Elixir/Phoenix + WebRTC)
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: call-service
+  namespace: quikapp
+  labels:
+    app.kubernetes.io/name: call-service
+    app.kubernetes.io/component: realtime
+    app.kubernetes.io/part-of: quikapp
+    app.kubernetes.io/technology: elixir
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: call-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: call-service
+        app.kubernetes.io/component: realtime
+        app.kubernetes.io/part-of: quikapp
+        app.kubernetes.io/technology: elixir
+        app.kubernetes.io/uses-broker: "true"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "4000"
+    spec:
+      serviceAccountName: quikapp-backend-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: call-service
+          image: quikapp.azurecr.io/call-service:latest
+          ports:
+            - name: http
+              containerPort: 4000
+            - name: epmd
+              containerPort: 4369
+          env:
+            - name: MIX_ENV
+              value: "prod"
+            - name: PORT
+              value: "4000"
+            - name: PHX_HOST
+              value: "call-service.quikapp.svc.cluster.local"
+            - name: DATABASE_URL
+              value: "ecto://$(POSTGRES_USERNAME):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/quikapp_calls"
+            - name: REDIS_URL
+              value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)/3"
+            - name: KAFKA_BROKERS
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-broker-config
+                  key: KAFKA_BROKERS
+            - name: SECRET_KEY_BASE
+              valueFrom:
+                secretKeyRef:
+                  name: quikapp-encryption-secrets
+                  key: SECRET_KEY_BASE
+            - name: OTEL_SERVICE_NAME
+              value: "call-service"
+          envFrom:
+            - configMapRef:
+                name: quikapp-database-config
+            - secretRef:
+                name: quikapp-database-secrets
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: call-service
+  namespace: quikapp
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: http
+      port: 4000
+      targetPort: http
+    - name: epmd
+      port: 4369
+      targetPort: epmd
+  selector:
+    app.kubernetes.io/name: call-service
+---
+# =============================================================================
+# HUDDLE SERVICE (Elixir/Phoenix)
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: huddle-service
+  namespace: quikapp
+  labels:
+    app.kubernetes.io/name: huddle-service
+    app.kubernetes.io/component: realtime
+    app.kubernetes.io/part-of: quikapp
+    app.kubernetes.io/technology: elixir
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: huddle-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: huddle-service
+        app.kubernetes.io/component: realtime
+        app.kubernetes.io/part-of: quikapp
+        app.kubernetes.io/technology: elixir
+        app.kubernetes.io/uses-broker: "true"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "4000"
+    spec:
+      serviceAccountName: quikapp-backend-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: huddle-service
+          image: quikapp.azurecr.io/huddle-service:latest
+          ports:
+            - name: http
+              containerPort: 4000
+            - name: epmd
+              containerPort: 4369
+          env:
+            - name: MIX_ENV
+              value: "prod"
+            - name: PORT
+              value: "4000"
+            - name: DATABASE_URL
+              value: "ecto://$(POSTGRES_USERNAME):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/quikapp_huddles"
+            - name: REDIS_URL
+              value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)/4"
+            - name: KAFKA_BROKERS
+              valueFrom:
+                configMapKeyRef:
+                  name: quikapp-broker-config
+                  key: KAFKA_BROKERS
+            - name: SECRET_KEY_BASE
+              valueFrom:
+                secretKeyRef:
+                  name: quikapp-encryption-secrets
+                  key: SECRET_KEY_BASE
+            - name: OTEL_SERVICE_NAME
+              value: "huddle-service"
+          envFrom:
+            - configMapRef:
+                name: quikapp-database-config
+            - secretRef:
+                name: quikapp-database-secrets
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: huddle-service
+  namespace: quikapp
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: http
+      port: 4000
+      targetPort: http
+    - name: epmd
+      port: 4369
+      targetPort: epmd
+  selector:
+    app.kubernetes.io/name: huddle-service
+---
+# =============================================================================
+# HPA FOR ELIXIR SERVICES
+# =============================================================================
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: presence-service-hpa
+  namespace: quikapp
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: presence-service
+  minReplicas: 3
+  maxReplicas: 12
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: message-service-hpa
+  namespace: quikapp
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: message-service
+  minReplicas: 3
+  maxReplicas: 15
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+---
+# =============================================================================
+# PDB FOR ELIXIR SERVICES
+# =============================================================================
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: presence-service-pdb
+  namespace: quikapp
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: presence-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: message-service-pdb
+  namespace: quikapp
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: message-service

@@ -1,0 +1,569 @@
+# Azure DevOps Multi-Stage CD Pipeline
+# Deploys to: Local/Mock -> Dev -> QA -> UAT1 -> UAT2 -> UAT3 -> Staging -> Live
+# All 8 environments with approval gates and governance controls
+
+trigger: none
+
+resources:
+  webhooks:
+    - webhook: GitHubActionsWebhook
+      connection: GitHubServiceConnection
+      filters:
+        - path: action
+          value: completed
+
+parameters:
+  - name: serviceName
+    type: string
+    displayName: 'Service Name'
+  - name: imageTag
+    type: string
+    displayName: 'Image Tag (Git SHA)'
+  - name: techStack
+    type: string
+    displayName: 'Technology Stack'
+    values:
+      - spring-boot
+      - nestjs
+      - elixir
+      - go
+      - python
+  - name: deployToEnvironments
+    type: object
+    default:
+      - local
+      - dev
+      - qa
+      - uat1
+      - uat2
+      - uat3
+      - staging
+      - live
+
+variables:
+  - group: QuikApp-Global-Variables
+  - name: acrRegistry
+    value: 'quikapp.azurecr.io'
+  - name: imageRepository
+    value: '${{ parameters.serviceName }}'
+  - name: imageTag
+    value: '${{ parameters.imageTag }}'
+
+stages:
+  # ============================================================================
+  # LOCAL/MOCK ENVIRONMENT
+  # ============================================================================
+  - stage: Deploy_Local_Mock
+    displayName: 'Deploy to Local/Mock'
+    condition: contains('${{ parameters.deployToEnvironments }}', 'local')
+    jobs:
+      - deployment: DeployLocalMock
+        displayName: 'Deploy to Local/Mock Environment'
+        environment: 'quikapp-local-mock'
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - template: templates/deploy-steps.yml
+                  parameters:
+                    environment: 'local'
+                    namespace: 'quikapp-mock'
+                    serviceName: '${{ parameters.serviceName }}'
+                    imageTag: '${{ parameters.imageTag }}'
+                    replicas: 1
+                    memoryLimit: '256Mi'
+                    cpuLimit: '250m'
+
+  # ============================================================================
+  # DEV ENVIRONMENT
+  # ============================================================================
+  - stage: Deploy_Dev
+    displayName: 'Deploy to Dev'
+    dependsOn: Deploy_Local_Mock
+    condition: |
+      and(
+        or(succeeded(), eq(stageDependencies.Deploy_Local_Mock.result, 'Skipped')),
+        contains('${{ parameters.deployToEnvironments }}', 'dev')
+      )
+    jobs:
+      - deployment: DeployDev
+        displayName: 'Deploy to Dev Environment'
+        environment: 'quikapp-dev'
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - template: templates/deploy-steps.yml
+                  parameters:
+                    environment: 'dev'
+                    namespace: 'quikapp-dev'
+                    serviceName: '${{ parameters.serviceName }}'
+                    imageTag: '${{ parameters.imageTag }}'
+                    replicas: 2
+                    memoryLimit: '512Mi'
+                    cpuLimit: '500m'
+                    aksCluster: 'aks-dev'
+                    resourceGroup: 'rg-quikapp-dev'
+
+      - job: IntegrationTests
+        displayName: 'Run Integration Tests'
+        dependsOn: DeployDev
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - template: templates/integration-tests.yml
+            parameters:
+              environment: 'dev'
+              serviceName: '${{ parameters.serviceName }}'
+
+  # ============================================================================
+  # QA ENVIRONMENT
+  # ============================================================================
+  - stage: Deploy_QA
+    displayName: 'Deploy to QA'
+    dependsOn: Deploy_Dev
+    condition: |
+      and(
+        succeeded(),
+        contains('${{ parameters.deployToEnvironments }}', 'qa')
+      )
+    jobs:
+      - deployment: DeployQA
+        displayName: 'Deploy to QA Environment'
+        environment: 'quikapp-qa'
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          runOnce:
+            preDeploy:
+              steps:
+                - task: ManualValidation@0
+                  displayName: 'QA Lead Approval'
+                  inputs:
+                    notifyUsers: |
+                      qa-lead@quikapp.com
+                    instructions: 'Please review and approve deployment to QA environment'
+                    timeoutInMinutes: 1440  # 24 hours
+            deploy:
+              steps:
+                - template: templates/deploy-steps.yml
+                  parameters:
+                    environment: 'qa'
+                    namespace: 'quikapp-qa'
+                    serviceName: '${{ parameters.serviceName }}'
+                    imageTag: '${{ parameters.imageTag }}'
+                    replicas: 2
+                    memoryLimit: '512Mi'
+                    cpuLimit: '500m'
+                    aksCluster: 'aks-qa'
+                    resourceGroup: 'rg-quikapp-qa'
+
+      - job: QATests
+        displayName: 'Run QA Test Suite'
+        dependsOn: DeployQA
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - template: templates/qa-tests.yml
+            parameters:
+              environment: 'qa'
+              serviceName: '${{ parameters.serviceName }}'
+
+  # ============================================================================
+  # UAT1 ENVIRONMENT (Partner/Customer Acceptance Testing)
+  # ============================================================================
+  - stage: Deploy_UAT1
+    displayName: 'Deploy to UAT1 (Partner Testing)'
+    dependsOn: Deploy_QA
+    condition: |
+      and(
+        succeeded(),
+        contains('${{ parameters.deployToEnvironments }}', 'uat1')
+      )
+    jobs:
+      - deployment: DeployUAT1
+        displayName: 'Deploy to UAT1 Environment'
+        environment: 'quikapp-uat1'
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          runOnce:
+            preDeploy:
+              steps:
+                - task: ManualValidation@0
+                  displayName: 'Product Owner Approval (UAT1)'
+                  inputs:
+                    notifyUsers: |
+                      product-owner@quikapp.com
+                      partner-team@quikapp.com
+                    instructions: |
+                      UAT1 Deployment - Partner/Customer Acceptance Testing
+
+                      This environment is used for external partner testing.
+                      Please verify QA testing is complete before approving.
+                    timeoutInMinutes: 2880  # 48 hours
+            deploy:
+              steps:
+                - template: templates/deploy-steps.yml
+                  parameters:
+                    environment: 'uat1'
+                    namespace: 'quikapp-uat1'
+                    serviceName: '${{ parameters.serviceName }}'
+                    imageTag: '${{ parameters.imageTag }}'
+                    replicas: 2
+                    memoryLimit: '1Gi'
+                    cpuLimit: '1000m'
+                    aksCluster: 'aks-uat'
+                    resourceGroup: 'rg-quikapp-uat'
+
+  # ============================================================================
+  # UAT2 ENVIRONMENT (Internal QA Testing)
+  # ============================================================================
+  - stage: Deploy_UAT2
+    displayName: 'Deploy to UAT2 (Internal QA)'
+    dependsOn: Deploy_UAT1
+    condition: |
+      and(
+        succeeded(),
+        contains('${{ parameters.deployToEnvironments }}', 'uat2')
+      )
+    jobs:
+      - deployment: DeployUAT2
+        displayName: 'Deploy to UAT2 Environment'
+        environment: 'quikapp-uat2'
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          runOnce:
+            preDeploy:
+              steps:
+                - task: ManualValidation@0
+                  displayName: 'Product Owner Approval (UAT2)'
+                  inputs:
+                    notifyUsers: |
+                      product-owner@quikapp.com
+                      internal-qa@quikapp.com
+                    instructions: |
+                      UAT2 Deployment - Internal QA Testing
+
+                      This environment has debug logging enabled.
+                      Please verify UAT1 testing is complete before approving.
+                    timeoutInMinutes: 2880  # 48 hours
+            deploy:
+              steps:
+                - template: templates/deploy-steps.yml
+                  parameters:
+                    environment: 'uat2'
+                    namespace: 'quikapp-uat2'
+                    serviceName: '${{ parameters.serviceName }}'
+                    imageTag: '${{ parameters.imageTag }}'
+                    replicas: 2
+                    memoryLimit: '1Gi'
+                    cpuLimit: '1000m'
+                    aksCluster: 'aks-uat'
+                    resourceGroup: 'rg-quikapp-uat'
+
+  # ============================================================================
+  # UAT3 ENVIRONMENT (Performance/Load Testing)
+  # ============================================================================
+  - stage: Deploy_UAT3
+    displayName: 'Deploy to UAT3 (Performance Testing)'
+    dependsOn: Deploy_UAT2
+    condition: |
+      and(
+        succeeded(),
+        contains('${{ parameters.deployToEnvironments }}', 'uat3')
+      )
+    jobs:
+      - deployment: DeployUAT3
+        displayName: 'Deploy to UAT3 Environment'
+        environment: 'quikapp-uat3'
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          runOnce:
+            preDeploy:
+              steps:
+                - task: ManualValidation@0
+                  displayName: 'Product Owner + Security Approval (UAT3)'
+                  inputs:
+                    notifyUsers: |
+                      product-owner@quikapp.com
+                      security-team@quikapp.com
+                      performance-team@quikapp.com
+                    instructions: |
+                      UAT3 Deployment - Performance/Load Testing
+
+                      Dual approval required:
+                      1. Product Owner sign-off
+                      2. Security team sign-off
+
+                      Please review security scan results and approve deployment.
+                    timeoutInMinutes: 4320  # 72 hours
+            deploy:
+              steps:
+                - template: templates/deploy-steps.yml
+                  parameters:
+                    environment: 'uat3'
+                    namespace: 'quikapp-uat3'
+                    serviceName: '${{ parameters.serviceName }}'
+                    imageTag: '${{ parameters.imageTag }}'
+                    replicas: 3
+                    memoryLimit: '1Gi'
+                    cpuLimit: '1000m'
+                    aksCluster: 'aks-uat'
+                    resourceGroup: 'rg-quikapp-uat'
+
+      - job: SecurityTests
+        displayName: 'Run Security Tests'
+        dependsOn: DeployUAT3
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - template: templates/security-tests.yml
+            parameters:
+              environment: 'uat3'
+              serviceName: '${{ parameters.serviceName }}'
+
+      - job: PerformanceTests
+        displayName: 'Run Performance Tests'
+        dependsOn: DeployUAT3
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - template: templates/performance-tests.yml
+            parameters:
+              environment: 'uat3'
+              serviceName: '${{ parameters.serviceName }}'
+
+      - job: LoadTests
+        displayName: 'Run Load Tests'
+        dependsOn: DeployUAT3
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - template: templates/load-tests.yml
+            parameters:
+              environment: 'uat3'
+              serviceName: '${{ parameters.serviceName }}'
+              targetRPS: 500
+              duration: '5m'
+
+  # ============================================================================
+  # STAGING ENVIRONMENT
+  # ============================================================================
+  - stage: Deploy_Staging
+    displayName: 'Deploy to Staging'
+    dependsOn: Deploy_UAT3
+    condition: |
+      and(
+        succeeded(),
+        contains('${{ parameters.deployToEnvironments }}', 'staging')
+      )
+    jobs:
+      - deployment: DeployStaging
+        displayName: 'Deploy to Staging Environment'
+        environment: 'quikapp-staging'
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          runOnce:
+            preDeploy:
+              steps:
+                - task: ManualValidation@0
+                  displayName: 'Release Manager Approval'
+                  inputs:
+                    notifyUsers: |
+                      release-manager@quikapp.com
+                      devops-team@quikapp.com
+                    instructions: |
+                      Pre-Production Deployment
+
+                      Please verify:
+                      - All UAT sign-offs completed
+                      - Security scans passed
+                      - Performance benchmarks met
+                      - Rollback plan documented
+                    timeoutInMinutes: 4320  # 72 hours
+            deploy:
+              steps:
+                - template: templates/deploy-steps.yml
+                  parameters:
+                    environment: 'staging'
+                    namespace: 'quikapp-staging'
+                    serviceName: '${{ parameters.serviceName }}'
+                    imageTag: '${{ parameters.imageTag }}'
+                    replicas: 3
+                    memoryLimit: '2Gi'
+                    cpuLimit: '2000m'
+                    aksCluster: 'aks-staging'
+                    resourceGroup: 'rg-quikapp-staging'
+                    enableAutoScale: true
+                    minReplicas: 3
+                    maxReplicas: 10
+
+      - job: StagingLoadTests
+        displayName: 'Run Production-like Load Tests'
+        dependsOn: DeployStaging
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - template: templates/load-tests.yml
+            parameters:
+              environment: 'staging'
+              serviceName: '${{ parameters.serviceName }}'
+              targetRPS: 1000
+              duration: '10m'
+
+  # ============================================================================
+  # LIVE/PRODUCTION ENVIRONMENT
+  # ============================================================================
+  - stage: Deploy_Live
+    displayName: 'Deploy to Live (Production)'
+    dependsOn: Deploy_Staging
+    condition: |
+      and(
+        succeeded(),
+        contains('${{ parameters.deployToEnvironments }}', 'live')
+      )
+    jobs:
+      - deployment: DeployLive
+        displayName: 'Deploy to Production'
+        environment: 'quikapp-production'
+        pool:
+          vmImage: 'ubuntu-latest'
+        strategy:
+          runOnce:
+            preDeploy:
+              steps:
+                - task: ManualValidation@0
+                  displayName: 'CAB + Release Manager Approval'
+                  inputs:
+                    notifyUsers: |
+                      cab@quikapp.com
+                      release-manager@quikapp.com
+                      cto@quikapp.com
+                      ops-team@quikapp.com
+                    instructions: |
+                      PRODUCTION DEPLOYMENT APPROVAL
+
+                      Change Advisory Board (CAB) Review Required
+
+                      Checklist:
+                      - All environment sign-offs completed
+                      - Security assessment passed
+                      - Performance benchmarks verified
+                      - Rollback plan approved
+                      - Communication plan ready
+                      - On-call team notified
+                      - Maintenance window confirmed
+
+                      Risk Assessment: [LOW/MEDIUM/HIGH]
+                      Rollback Time: < 5 minutes
+                    timeoutInMinutes: 10080  # 1 week
+            deploy:
+              steps:
+                - template: templates/deploy-canary.yml
+                  parameters:
+                    environment: 'live'
+                    namespace: 'quikapp-prod'
+                    serviceName: '${{ parameters.serviceName }}'
+                    imageTag: '${{ parameters.imageTag }}'
+                    replicas: 5
+                    memoryLimit: '4Gi'
+                    cpuLimit: '4000m'
+                    aksCluster: 'aks-prod'
+                    resourceGroup: 'rg-quikapp-prod'
+                    enableAutoScale: true
+                    minReplicas: 5
+                    maxReplicas: 50
+                    canaryPercentage: 10
+            postRouteTraffic:
+              steps:
+                - task: AzureCLI@2
+                  displayName: 'Monitor Canary Metrics'
+                  inputs:
+                    azureSubscription: 'QuikApp-Production'
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      # Monitor error rate, latency, and success rate
+                      ./scripts/monitor-canary.sh \
+                        --service ${{ parameters.serviceName }} \
+                        --duration 15m \
+                        --error-threshold 1% \
+                        --latency-threshold 200ms
+            on:
+              failure:
+                steps:
+                  - template: templates/rollback.yml
+                    parameters:
+                      environment: 'live'
+                      serviceName: '${{ parameters.serviceName }}'
+              success:
+                steps:
+                  - task: ManualValidation@0
+                    displayName: 'Ops Team Post-Deployment Verification'
+                    inputs:
+                      notifyUsers: |
+                        ops-team@quikapp.com
+                      instructions: |
+                        Post-Deployment Verification
+
+                        Please verify:
+                        - Service health checks passing
+                        - No increase in error rates
+                        - Latency within acceptable range
+                        - User feedback monitored
+                      timeoutInMinutes: 60
+
+      - job: SmokeTests
+        displayName: 'Production Smoke Tests'
+        dependsOn: DeployLive
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - template: templates/smoke-tests.yml
+            parameters:
+              environment: 'live'
+              serviceName: '${{ parameters.serviceName }}'
+
+      - job: NotifyStakeholders
+        displayName: 'Notify Stakeholders'
+        dependsOn: SmokeTests
+        condition: succeeded()
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: PowerShell@2
+            displayName: 'Send Deployment Notification'
+            inputs:
+              targetType: 'inline'
+              script: |
+                $body = @{
+                  "text" = "QuikApp Deployment Complete - ${{ parameters.serviceName }}"
+                  "blocks" = @(
+                    @{
+                      "type" = "header"
+                      "text" = @{
+                        "type" = "plain_text"
+                        "text" = "Production Deployment Successful"
+                      }
+                    }
+                    @{
+                      "type" = "section"
+                      "fields" = @(
+                        @{ "type" = "mrkdwn"; "text" = "*Service:*`n${{ parameters.serviceName }}" }
+                        @{ "type" = "mrkdwn"; "text" = "*Version:*`n${{ parameters.imageTag }}" }
+                        @{ "type" = "mrkdwn"; "text" = "*Environment:*`nProduction" }
+                        @{ "type" = "mrkdwn"; "text" = "*Status:*`nSuccess" }
+                      )
+                    }
+                  )
+                } | ConvertTo-Json -Depth 10
+
+                Invoke-RestMethod -Uri "$(SLACK_WEBHOOK_URL)" -Method Post -Body $body -ContentType "application/json"

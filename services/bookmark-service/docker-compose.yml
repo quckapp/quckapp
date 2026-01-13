@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  bookmark-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: quikapp-bookmark-service
+    ports:
+      - "5010:5010"
+    environment:
+      - PORT=5010
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=password
+      - DB_NAME=quikapp_bookmarks
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - quikapp-network
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.0
+    container_name: quikapp-bookmark-mysql
+    ports:
+      - "3311:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=password
+      - MYSQL_DATABASE=quikapp_bookmarks
+    volumes:
+      - bookmark-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - quikapp-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: quikapp-bookmark-redis
+    ports:
+      - "6384:6379"
+    networks:
+      - quikapp-network
+
+volumes:
+  bookmark-mysql-data:
+
+networks:
+  quikapp-network:
+    driver: bridge

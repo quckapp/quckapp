@@ -1,0 +1,153 @@
+# =============================================================================
+# QUIKAPP COMMON CONFIGURATION
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: quikapp-common-config
+  namespace: quikapp
+  labels:
+    app.kubernetes.io/name: quikapp
+    app.kubernetes.io/component: config
+data:
+  # Environment
+  ENVIRONMENT: "dev"
+  NODE_ENV: "development"
+
+  # Logging
+  LOG_LEVEL: "info"
+  LOG_FORMAT: "json"
+  LOG_PRETTY: "false"
+
+  # CORS (override per environment)
+  CORS_ORIGIN: "http://localhost:3000"
+
+  # Service Discovery
+  SERVICE_MESH_ENABLED: "false"
+
+  # Health Check
+  HEALTH_CHECK_PATH: "/health"
+  READINESS_PATH: "/ready"
+  LIVENESS_PATH: "/live"
+---
+# =============================================================================
+# DATABASE CONFIGURATION
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: quikapp-database-config
+  namespace: quikapp
+  labels:
+    app.kubernetes.io/name: quikapp
+    app.kubernetes.io/component: database-config
+data:
+  # MongoDB
+  MONGODB_HOST: "mongodb.quikapp.svc.cluster.local"
+  MONGODB_PORT: "27017"
+  MONGODB_DATABASE: "quikapp"
+
+  # MySQL
+  MYSQL_HOST: "mysql.quikapp.svc.cluster.local"
+  MYSQL_PORT: "3306"
+  MYSQL_DATABASE: "quikapp"
+
+  # PostgreSQL
+  POSTGRES_HOST: "postgres.quikapp.svc.cluster.local"
+  POSTGRES_PORT: "5432"
+  POSTGRES_DATABASE: "quikapp"
+
+  # Redis
+  REDIS_HOST: "redis.quikapp.svc.cluster.local"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+
+  # Elasticsearch
+  ELASTICSEARCH_HOST: "elasticsearch.quikapp.svc.cluster.local"
+  ELASTICSEARCH_PORT: "9200"
+---
+# =============================================================================
+# MESSAGE BROKER CONFIGURATION
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: quikapp-broker-config
+  namespace: quikapp
+  labels:
+    app.kubernetes.io/name: quikapp
+    app.kubernetes.io/component: broker-config
+data:
+  # Kafka
+  KAFKA_BROKERS: "kafka.quikapp.svc.cluster.local:9092"
+  KAFKA_CLIENT_ID: "quikapp"
+  KAFKA_GROUP_ID: "quikapp-consumers"
+
+  # RabbitMQ
+  RABBITMQ_HOST: "rabbitmq.quikapp.svc.cluster.local"
+  RABBITMQ_PORT: "5672"
+  RABBITMQ_VHOST: "quikapp"
+---
+# =============================================================================
+# MONITORING CONFIGURATION
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: quikapp-monitoring-config
+  namespace: quikapp
+  labels:
+    app.kubernetes.io/name: quikapp
+    app.kubernetes.io/component: monitoring-config
+data:
+  # OpenTelemetry
+  OTEL_ENABLED: "true"
+  OTEL_SERVICE_NAME: "quikapp"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.monitoring.svc.cluster.local:4317"
+  OTEL_TRACES_SAMPLER: "parentbased_traceidratio"
+  OTEL_TRACES_SAMPLER_ARG: "0.1"
+
+  # Prometheus
+  PROMETHEUS_ENABLED: "true"
+  PROMETHEUS_PORT: "9090"
+  PROMETHEUS_PATH: "/metrics"
+
+  # Sentry
+  SENTRY_ENVIRONMENT: "dev"
+  SENTRY_TRACES_SAMPLE_RATE: "0.1"
+---
+# =============================================================================
+# JWT CONFIGURATION
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: quikapp-jwt-config
+  namespace: quikapp
+  labels:
+    app.kubernetes.io/name: quikapp
+    app.kubernetes.io/component: jwt-config
+data:
+  JWT_ALGORITHM: "HS256"
+  JWT_EXPIRES_IN: "1h"
+  JWT_REFRESH_EXPIRES_IN: "7d"
+  JWT_ISSUER: "quikapp"
+  JWT_AUDIENCE: "quikapp-api"
+---
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: quikapp-storage-config
+  namespace: quikapp
+  labels:
+    app.kubernetes.io/name: quikapp
+    app.kubernetes.io/component: storage-config
+data:
+  STORAGE_MODE: "azure"
+  AZURE_STORAGE_CONTAINER: "quikapp-media"
+  MAX_FILE_SIZE: "104857600"  # 100MB
+  ALLOWED_FILE_TYPES: "image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,application/pdf"
+  THUMBNAIL_SIZES: "64,128,256,512"
