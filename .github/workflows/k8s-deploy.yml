@@ -30,10 +30,10 @@ permissions:
 
 env:
   AWS_REGION: us-east-1
-  ECR_REPOSITORY_API: quikapp/api
-  ECR_REPOSITORY_WORKER: quikapp/worker
-  EKS_CLUSTER_DEV: quikapp-dev
-  EKS_CLUSTER_PROD: quikapp-prod
+  ECR_REPOSITORY_API: quckapp/api
+  ECR_REPOSITORY_WORKER: quckapp/worker
+  EKS_CLUSTER_DEV: quckapp-dev
+  EKS_CLUSTER_PROD: quckapp-prod
 
 jobs:
   # Build and push Docker images
@@ -125,8 +125,8 @@ jobs:
         run: |
           cd infrastructure/k8s/overlays/dev
           kustomize edit set image \
-            quikapp/api=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_API }}:${{ needs.build.outputs.image_tag }} \
-            quikapp/worker=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_WORKER }}:${{ needs.build.outputs.image_tag }}
+            quckapp/api=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_API }}:${{ needs.build.outputs.image_tag }} \
+            quckapp/worker=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_WORKER }}:${{ needs.build.outputs.image_tag }}
 
       - name: Deploy to dev
         run: |
@@ -134,13 +134,13 @@ jobs:
 
       - name: Wait for rollout
         run: |
-          kubectl rollout status deployment/dev-quikapp-api -n quikapp-dev --timeout=300s
-          kubectl rollout status deployment/dev-quikapp-worker -n quikapp-dev --timeout=300s
+          kubectl rollout status deployment/dev-quckapp-api -n quckapp-dev --timeout=300s
+          kubectl rollout status deployment/dev-quckapp-worker -n quckapp-dev --timeout=300s
 
       - name: Verify deployment
         run: |
-          kubectl get pods -n quikapp-dev -l app.kubernetes.io/name=quikapp
-          kubectl get svc -n quikapp-dev
+          kubectl get pods -n quckapp-dev -l app.kubernetes.io/name=quckapp
+          kubectl get svc -n quckapp-dev
 
   # Deploy to prod
   deploy-prod:
@@ -174,8 +174,8 @@ jobs:
         run: |
           cd infrastructure/k8s/overlays/prod
           kustomize edit set image \
-            quikapp/api=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_API }}:${{ needs.build.outputs.image_tag }} \
-            quikapp/worker=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_WORKER }}:${{ needs.build.outputs.image_tag }}
+            quckapp/api=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_API }}:${{ needs.build.outputs.image_tag }} \
+            quckapp/worker=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_WORKER }}:${{ needs.build.outputs.image_tag }}
 
       - name: Deploy to prod
         run: |
@@ -183,16 +183,16 @@ jobs:
 
       - name: Wait for rollout
         run: |
-          kubectl rollout status deployment/prod-quikapp-api -n quikapp-prod --timeout=600s
-          kubectl rollout status deployment/prod-quikapp-worker -n quikapp-prod --timeout=600s
+          kubectl rollout status deployment/prod-quckapp-api -n quckapp-prod --timeout=600s
+          kubectl rollout status deployment/prod-quckapp-worker -n quckapp-prod --timeout=600s
 
       - name: Verify deployment
         run: |
-          kubectl get pods -n quikapp-prod -l app.kubernetes.io/name=quikapp
-          kubectl get ingress -n quikapp-prod
+          kubectl get pods -n quckapp-prod -l app.kubernetes.io/name=quckapp
+          kubectl get ingress -n quckapp-prod
 
       - name: Run smoke tests
         run: |
-          API_URL=$(kubectl get ingress prod-quikapp-alb-ingress -n quikapp-prod -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          API_URL=$(kubectl get ingress prod-quckapp-alb-ingress -n quckapp-prod -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
           curl -sf "https://${API_URL}/health/live" || exit 1
           echo "Smoke tests passed!"

@@ -86,7 +86,7 @@ jobs:
           else
             # Get latest tag from source environment
             TAG=$(aws ecr describe-images \
-              --repository-name quikapp/api \
+              --repository-name quckapp/api \
               --query 'sort_by(imageDetails,& imagePushedAt)[-1].imageTags[0]' \
               --output text \
               --filter tagStatus=TAGGED)
@@ -117,9 +117,9 @@ jobs:
 
       - name: Update kubeconfig
         run: |
-          CLUSTER_NAME="quikapp-${{ inputs.target_environment }}"
+          CLUSTER_NAME="quckapp-${{ inputs.target_environment }}"
           if [[ "${{ inputs.target_environment }}" == "live" ]]; then
-            CLUSTER_NAME="quikapp-prod"
+            CLUSTER_NAME="quckapp-prod"
           fi
           aws eks update-kubeconfig --name $CLUSTER_NAME --region ${{ env.AWS_REGION }}
 
@@ -132,10 +132,10 @@ jobs:
           TARGET_TAG="${{ inputs.target_environment }}-${{ github.run_number }}"
 
           for repo in api worker; do
-            docker pull ${{ env.ECR_REGISTRY }}/quikapp/${repo}:${SOURCE_TAG}
-            docker tag ${{ env.ECR_REGISTRY }}/quikapp/${repo}:${SOURCE_TAG} \
-                       ${{ env.ECR_REGISTRY }}/quikapp/${repo}:${TARGET_TAG}
-            docker push ${{ env.ECR_REGISTRY }}/quikapp/${repo}:${TARGET_TAG}
+            docker pull ${{ env.ECR_REGISTRY }}/quckapp/${repo}:${SOURCE_TAG}
+            docker tag ${{ env.ECR_REGISTRY }}/quckapp/${repo}:${SOURCE_TAG} \
+                       ${{ env.ECR_REGISTRY }}/quckapp/${repo}:${TARGET_TAG}
+            docker push ${{ env.ECR_REGISTRY }}/quckapp/${repo}:${TARGET_TAG}
           done
 
           echo "IMAGE_TAG=${TARGET_TAG}" >> $GITHUB_ENV
@@ -144,8 +144,8 @@ jobs:
         run: |
           cd infrastructure/k8s/overlays/${{ inputs.target_environment }}
           kustomize edit set image \
-            quikapp/api=${{ env.ECR_REGISTRY }}/quikapp/api:${{ env.IMAGE_TAG }} \
-            quikapp/worker=${{ env.ECR_REGISTRY }}/quikapp/worker:${{ env.IMAGE_TAG }}
+            quckapp/api=${{ env.ECR_REGISTRY }}/quckapp/api:${{ env.IMAGE_TAG }} \
+            quckapp/worker=${{ env.ECR_REGISTRY }}/quckapp/worker:${{ env.IMAGE_TAG }}
 
       - name: Deploy to target
         run: |
@@ -154,10 +154,10 @@ jobs:
       - name: Wait for rollout
         run: |
           PREFIX="${{ inputs.target_environment }}"
-          NAMESPACE="quikapp-${{ inputs.target_environment }}"
+          NAMESPACE="quckapp-${{ inputs.target_environment }}"
 
-          kubectl rollout status deployment/${PREFIX}-quikapp-api -n ${NAMESPACE} --timeout=600s
-          kubectl rollout status deployment/${PREFIX}-quikapp-worker -n ${NAMESPACE} --timeout=600s
+          kubectl rollout status deployment/${PREFIX}-quckapp-api -n ${NAMESPACE} --timeout=600s
+          kubectl rollout status deployment/${PREFIX}-quckapp-worker -n ${NAMESPACE} --timeout=600s
 
       - name: Summary
         run: |

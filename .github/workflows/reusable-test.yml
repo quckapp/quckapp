@@ -1,4 +1,4 @@
-# QuikApp Reusable Test Workflow
+# QuckApp Reusable Test Workflow
 # Can be called from other workflows to run tests for specific stacks
 
 name: Reusable Tests

@@ -1,4 +1,4 @@
-# QuikApp Microservices Architecture
+# QuckApp Microservices Architecture
 
 All **32 microservices** consolidated in `/services/` directory (matching documentation).
 
@@ -78,7 +78,7 @@ All **32 microservices** consolidated in `/services/` directory (matching docume
 ## Directory Structure
 
 ```
-QuikApp/
+QuckApp/
 ├── services/
 │   ├── admin-service/              # Spring Boot - Admin operations
 │   ├── analytics-service/          # Python FastAPI - Usage analytics

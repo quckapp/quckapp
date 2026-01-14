@@ -198,7 +198,7 @@ jobs:
       github.event.inputs.skip_approval != 'true'
     environment:
       name: production
-      url: https://quikapp.com
+      url: https://quckapp.com
 
     steps:
       - name: Approval Checkpoint
@@ -302,18 +302,18 @@ jobs:
       - name: Verify S3 Buckets
         run: |
           echo "Verifying S3 buckets..."
-          aws s3 ls | grep quikapp || echo "::warning::No QuikApp buckets found"
+          aws s3 ls | grep quckapp || echo "::warning::No QuckApp buckets found"
 
       - name: Verify CloudFront
         run: |
           echo "Verifying CloudFront distributions..."
-          aws cloudfront list-distributions --query 'DistributionList.Items[?contains(Aliases.Items, `quikapp`)].{Id:Id,Status:Status}' || true
+          aws cloudfront list-distributions --query 'DistributionList.Items[?contains(Aliases.Items, `quckapp`)].{Id:Id,Status:Status}' || true
 
       - name: Health Check
         run: |
           echo "Running health checks..."
           # Add your health check commands here
-          # curl -f https://api.quikapp.com/health || exit 1
+          # curl -f https://api.quckapp.com/health || exit 1
 
   # ===========================================================================
   # Notifications

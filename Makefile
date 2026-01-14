@@ -1,6 +1,6 @@
 # =============================================================================
-# QuikApp Makefile
-# Common development commands for the QuikApp microservices platform
+# QuckApp Makefile
+# Common development commands for the QuckApp microservices platform
 # =============================================================================
 
 .PHONY: help install build test lint clean docker-build docker-push docker-up docker-down \
@@ -15,24 +15,24 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
 # Project
-PROJECT_NAME := quikapp
+PROJECT_NAME := quckapp
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # Docker
 DOCKER_REGISTRY ?= ghcr.io
-DOCKER_REPO ?= $(DOCKER_REGISTRY)/quikapp
+DOCKER_REPO ?= $(DOCKER_REGISTRY)/quckapp
 DOCKER_TAG ?= $(VERSION)
 DOCKER_COMPOSE := docker compose
 DOCKER_COMPOSE_FILE := docker-compose.yml
 DOCKER_COMPOSE_SERVICES := docker-compose.services.yml
 
 # Kubernetes
-KUBE_NAMESPACE ?= quikapp
+KUBE_NAMESPACE ?= quckapp
 KUBE_CONTEXT ?= $(shell kubectl config current-context 2>/dev/null)
-HELM_RELEASE := quikapp
-HELM_CHART := ./infrastructure/helm/quikapp
+HELM_RELEASE := quckapp
+HELM_CHART := ./infrastructure/helm/quckapp
 HELM_VALUES ?= values.yaml
 
 # Services by stack
@@ -55,7 +55,7 @@ RESET := \033[0m
 # -----------------------------------------------------------------------------
 help: ## Show this help message
 	@echo ""
-	@echo "$(CYAN)QuikApp Development Commands$(RESET)"
+	@echo "$(CYAN)QuckApp Development Commands$(RESET)"
 	@echo "=============================="
 	@echo ""
 	@echo "$(GREEN)Usage:$(RESET) make [target] [VARIABLE=value]"
@@ -66,7 +66,7 @@ help: ## Show this help message
 	@echo "$(YELLOW)Variables:$(RESET)"
 	@echo "  $(CYAN)VERSION$(RESET)          Docker image tag (default: git tag or 'dev')"
 	@echo "  $(CYAN)DOCKER_REGISTRY$(RESET)  Docker registry (default: ghcr.io)"
-	@echo "  $(CYAN)KUBE_NAMESPACE$(RESET)   Kubernetes namespace (default: quikapp)"
+	@echo "  $(CYAN)KUBE_NAMESPACE$(RESET)   Kubernetes namespace (default: quckapp)"
 	@echo "  $(CYAN)HELM_VALUES$(RESET)      Helm values file (default: values.yaml)"
 	@echo "  $(CYAN)SERVICE$(RESET)          Specific service name for targeted commands"
 	@echo ""
@@ -307,10 +307,10 @@ ifndef SERVICE
 endif
 	@$(DOCKER_COMPOSE) -f $(DOCKER_COMPOSE_FILE) exec $(SERVICE) sh
 
-docker-clean: ## Remove all QuikApp containers, images, and volumes
+docker-clean: ## Remove all QuckApp containers, images, and volumes
 	@echo "$(RED)Cleaning Docker resources...$(RESET)"
 	@$(DOCKER_COMPOSE) -f $(DOCKER_COMPOSE_FILE) down -v --rmi local
-	@docker image prune -f --filter "label=org.opencontainers.image.vendor=QuikApp"
+	@docker image prune -f --filter "label=org.opencontainers.image.vendor=QuckApp"
 	@echo "$(GREEN)Docker resources cleaned!$(RESET)"
 
 # -----------------------------------------------------------------------------
@@ -427,8 +427,8 @@ db-migrate: ## Run database migrations
 
 db-seed: ## Seed databases with sample data
 	@echo "$(CYAN)Seeding databases...$(RESET)"
-	@$(DOCKER_COMPOSE) -f $(DOCKER_COMPOSE_FILE) exec mysql mysql -uroot -proot quikapp < database/init-scripts/mysql-init.sql || true
-	@$(DOCKER_COMPOSE) -f $(DOCKER_COMPOSE_FILE) exec postgres psql -U quikapp -d quikapp -f /docker-entrypoint-initdb.d/postgres-init.sql || true
+	@$(DOCKER_COMPOSE) -f $(DOCKER_COMPOSE_FILE) exec mysql mysql -uroot -proot quckapp < database/init-scripts/mysql-init.sql || true
+	@$(DOCKER_COMPOSE) -f $(DOCKER_COMPOSE_FILE) exec postgres psql -U quckapp -d quckapp -f /docker-entrypoint-initdb.d/postgres-init.sql || true
 	@$(DOCKER_COMPOSE) -f $(DOCKER_COMPOSE_FILE) exec mongodb mongosh --eval 'load("/docker-entrypoint-initdb.d/mongo-init.js")' || true
 	@echo "$(GREEN)Database seeding completed!$(RESET)"
 
@@ -442,13 +442,13 @@ db-reset: ## Reset all databases (WARNING: destroys data)
 	@echo "$(GREEN)Databases reset!$(RESET)"
 
 db-shell-mysql: ## Open MySQL shell
-	@$(DOCKER_COMPOSE) -f $(DOCKER_COMPOSE_FILE) exec mysql mysql -uroot -proot quikapp
+	@$(DOCKER_COMPOSE) -f $(DOCKER_COMPOSE_FILE) exec mysql mysql -uroot -proot quckapp
 
 db-shell-postgres: ## Open PostgreSQL shell
-	@$(DOCKER_COMPOSE) -f $(DOCKER_COMPOSE_FILE) exec postgres psql -U quikapp -d quikapp
+	@$(DOCKER_COMPOSE) -f $(DOCKER_COMPOSE_FILE) exec postgres psql -U quckapp -d quckapp
 
 db-shell-mongo: ## Open MongoDB shell
-	@$(DOCKER_COMPOSE) -f $(DOCKER_COMPOSE_FILE) exec mongodb mongosh quikapp
+	@$(DOCKER_COMPOSE) -f $(DOCKER_COMPOSE_FILE) exec mongodb mongosh quckapp
 
 db-shell-redis: ## Open Redis CLI
 	@$(DOCKER_COMPOSE) -f $(DOCKER_COMPOSE_FILE) exec redis redis-cli
@@ -514,13 +514,13 @@ clean: ## Clean all build artifacts
 	@echo "$(GREEN)Clean completed!$(RESET)"
 
 version: ## Show version information
-	@echo "$(CYAN)QuikApp Version Information$(RESET)"
+	@echo "$(CYAN)QuckApp Version Information$(RESET)"
 	@echo "Version:    $(VERSION)"
 	@echo "Git Commit: $(GIT_COMMIT)"
 	@echo "Build Date: $(BUILD_DATE)"
 
 info: ## Show project information
-	@echo "$(CYAN)QuikApp Project Information$(RESET)"
+	@echo "$(CYAN)QuckApp Project Information$(RESET)"
 	@echo "=============================="
 	@echo ""
 	@echo "$(YELLOW)Services:$(RESET)"
@@ -576,15 +576,15 @@ ci: lint test ## Run CI checks (lint + test)
 release: docker-build docker-push ## Build and push all Docker images
 
 deploy-dev: ## Deploy to development environment
-	@$(MAKE) helm-install HELM_VALUES=values-development.yaml KUBE_NAMESPACE=quikapp-dev
+	@$(MAKE) helm-install HELM_VALUES=values-development.yaml KUBE_NAMESPACE=quckapp-dev
 
 deploy-staging: ## Deploy to staging environment
-	@$(MAKE) helm-upgrade HELM_VALUES=values-staging.yaml KUBE_NAMESPACE=quikapp-staging
+	@$(MAKE) helm-upgrade HELM_VALUES=values-staging.yaml KUBE_NAMESPACE=quckapp-staging
 
 deploy-prod: ## Deploy to production environment
 	@echo "$(RED)Deploying to PRODUCTION...$(RESET)"
 	@read -p "Are you sure? [y/N] " confirm && [ "$$confirm" = "y" ] || exit 1
-	@$(MAKE) helm-upgrade HELM_VALUES=values-production.yaml KUBE_NAMESPACE=quikapp
+	@$(MAKE) helm-upgrade HELM_VALUES=values-production.yaml KUBE_NAMESPACE=quckapp
 
 # -----------------------------------------------------------------------------
 # API Documentation

@@ -1,41 +1,41 @@
-# QuikApp Code Owners
+# QuckApp Code Owners
 # These owners will be requested for review when someone opens a PR
 
 # Default owners for everything
-* @quikapp/core-team
+* @quckapp/core-team
 
 # NestJS services
-/services/nestjs/ @quikapp/backend-team @quikapp/nodejs-team
+/services/nestjs/ @quckapp/backend-team @quckapp/nodejs-team
 
 # Spring Boot services
-/services/spring/ @quikapp/backend-team @quikapp/java-team
+/services/spring/ @quckapp/backend-team @quckapp/java-team
 
 # Elixir services
-/services/elixir/ @quikapp/backend-team @quikapp/elixir-team
+/services/elixir/ @quckapp/backend-team @quckapp/elixir-team
 
 # Go services
-/services/go/ @quikapp/backend-team @quikapp/go-team
+/services/go/ @quckapp/backend-team @quckapp/go-team
 
 # Python services
-/services/python/ @quikapp/backend-team @quikapp/python-team @quikapp/ml-team
+/services/python/ @quckapp/backend-team @quckapp/python-team @quckapp/ml-team
 
 # Infrastructure
-/docker-compose*.yml @quikapp/devops-team
-/infrastructure/ @quikapp/devops-team @quikapp/sre-team
+/docker-compose*.yml @quckapp/devops-team
+/infrastructure/ @quckapp/devops-team @quckapp/sre-team
 
 # CI/CD
-/.github/ @quikapp/devops-team
+/.github/ @quckapp/devops-team
 
 # Database schemas and migrations
-**/migrations/ @quikapp/backend-team @quikapp/dba-team
-**/schema* @quikapp/backend-team @quikapp/dba-team
+**/migrations/ @quckapp/backend-team @quckapp/dba-team
+**/schema* @quckapp/backend-team @quckapp/dba-team
 
 # Security-sensitive files
-**/auth*/ @quikapp/security-team
-**/permission*/ @quikapp/security-team
-**/*secret* @quikapp/security-team
-**/.env* @quikapp/security-team
+**/auth*/ @quckapp/security-team
+**/permission*/ @quckapp/security-team
+**/*secret* @quckapp/security-team
+**/.env* @quckapp/security-team
 
 # Documentation
-/docs/ @quikapp/docs-team
-*.md @quikapp/docs-team
+/docs/ @quckapp/docs-team
+*.md @quckapp/docs-team

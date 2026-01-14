@@ -1,6 +1,6 @@
 ---
 name: Feature Request
-about: Suggest a new feature or enhancement for QuikApp
+about: Suggest a new feature or enhancement for QuckApp
 title: '[FEATURE] '
 labels: enhancement, triage
 assignees: ''

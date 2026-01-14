@@ -1,11 +1,11 @@
-# QuikApp
+# QuckApp
 
 A modern, scalable real-time communication platform built with a microservices architecture.
 
 ## Project Structure
 
 ```
-QuikApp/
+QuckApp/
 ├── admin/                  # Admin dashboard
 ├── docs/                   # Documentation (OpenAPI, guides)
 ├── infrastructure/         # All infrastructure configs
@@ -98,7 +98,7 @@ This repository uses **Git submodules** to organize 40 independent components (a
 
 ```bash
 # Clone with all submodules
-git clone --recurse-submodules https://github.com/quikapp-dev/quikapp.git
+git clone --recurse-submodules https://github.com/quckapp-dev/quckapp.git
 
 # Or if already cloned, initialize submodules
 git submodule update --init --recursive
@@ -138,13 +138,13 @@ Submodules currently use local paths. To add remote repositories:
 # Edit .gitmodules to update URLs
 [submodule "admin"]
     path = admin
-    url = https://github.com/quikapp-dev/admin.git
+    url = https://github.com/quckapp-dev/admin.git
 
 # Sync the changes
 git submodule sync
 
 # Or use command line
-git submodule set-url admin https://github.com/quikapp-dev/admin.git
+git submodule set-url admin https://github.com/quckapp-dev/admin.git
 ```
 
 ## Quick Start
@@ -161,8 +161,8 @@ git submodule set-url admin https://github.com/quikapp-dev/admin.git
 
 ```bash
 # Clone the repository
-git clone https://github.com/quikapp-dev/quikapp.git
-cd quikapp
+git clone https://github.com/quckapp-dev/quckapp.git
+cd quckapp
 
 # Copy environment file
 cp .env.example .env
@@ -242,10 +242,10 @@ make init ENV=dev
 make apply ENV=dev
 
 # Deploy with Helm
-helm install quikapp infrastructure/helm/quikapp \
-  --namespace quikapp \
+helm install quckapp infrastructure/helm/quckapp \
+  --namespace quckapp \
   --create-namespace \
-  -f infrastructure/helm/quikapp/values-development.yaml
+  -f infrastructure/helm/quckapp/values-development.yaml
 ```
 
 ### Kubernetes (Kustomize)
@@ -346,8 +346,8 @@ Copy `.env.example` to `.env` and configure:
 MONGO_ROOT_USER=admin
 MONGO_ROOT_PASSWORD=admin123
 MYSQL_ROOT_PASSWORD=root123
-POSTGRES_USER=quikapp
-POSTGRES_PASSWORD=quikapp123
+POSTGRES_USER=quckapp
+POSTGRES_PASSWORD=quckapp123
 
 # Redis
 REDIS_URL=redis://localhost:6379

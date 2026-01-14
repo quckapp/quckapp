@@ -1,4 +1,4 @@
-# QuikApp Security Scanning Workflow
+# QuckApp Security Scanning Workflow
 # Runs security scans on code, dependencies, and containers
 
 name: Security

@@ -1,4 +1,4 @@
-# QuikApp Docker Build Workflow
+# QuckApp Docker Build Workflow
 # Builds individual service Docker images
 
 name: Docker Build

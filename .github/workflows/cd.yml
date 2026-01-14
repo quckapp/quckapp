@@ -1,4 +1,4 @@
-# QuikApp CD Pipeline
+# QuckApp CD Pipeline
 # Deploys to different environments based on branch/tag
 
 name: CD
@@ -69,31 +69,31 @@ jobs:
 
           case $ENV in
             production)
-              NAMESPACE="quikapp"
+              NAMESPACE="quckapp"
               VALUES_FILE="values-production.yaml"
               ;;
             staging)
-              NAMESPACE="quikapp-staging"
+              NAMESPACE="quckapp-staging"
               VALUES_FILE="values-staging.yaml"
               ;;
             uat1)
-              NAMESPACE="quikapp-uat1"
+              NAMESPACE="quckapp-uat1"
               VALUES_FILE="values-uat1.yaml"
               ;;
             uat2)
-              NAMESPACE="quikapp-uat2"
+              NAMESPACE="quckapp-uat2"
               VALUES_FILE="values-uat2.yaml"
               ;;
             uat3)
-              NAMESPACE="quikapp-uat3"
+              NAMESPACE="quckapp-uat3"
               VALUES_FILE="values-uat3.yaml"
               ;;
             qa)
-              NAMESPACE="quikapp-qa"
+              NAMESPACE="quckapp-qa"
               VALUES_FILE="values-qa.yaml"
               ;;
             *)
-              NAMESPACE="quikapp-dev"
+              NAMESPACE="quckapp-dev"
               VALUES_FILE="values-development.yaml"
               ;;
           esac
@@ -297,7 +297,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: ${{ needs.setup.outputs.environment }}
-      url: ${{ needs.setup.outputs.environment == 'production' && 'https://api.quikapp.io' || needs.setup.outputs.environment == 'staging' && 'https://api.staging.quikapp.io' || needs.setup.outputs.environment == 'uat1' && 'https://api.uat1.quikapp.io' || needs.setup.outputs.environment == 'uat2' && 'https://api.uat2.quikapp.io' || needs.setup.outputs.environment == 'uat3' && 'https://api.uat3.quikapp.io' || needs.setup.outputs.environment == 'qa' && 'https://api.qa.quikapp.io' || 'https://api.dev.quikapp.io' }}
+      url: ${{ needs.setup.outputs.environment == 'production' && 'https://api.quckapp.io' || needs.setup.outputs.environment == 'staging' && 'https://api.staging.quckapp.io' || needs.setup.outputs.environment == 'uat1' && 'https://api.uat1.quckapp.io' || needs.setup.outputs.environment == 'uat2' && 'https://api.uat2.quckapp.io' || needs.setup.outputs.environment == 'uat3' && 'https://api.uat3.quckapp.io' || needs.setup.outputs.environment == 'qa' && 'https://api.qa.quckapp.io' || 'https://api.dev.quckapp.io' }}
 
     steps:
       - name: Checkout
@@ -332,7 +332,7 @@ jobs:
 
       - name: Build Helm dependencies
         run: |
-          helm dependency build infrastructure/helm/quikapp
+          helm dependency build infrastructure/helm/quckapp
 
       - name: Create namespace
         run: |
@@ -340,9 +340,9 @@ jobs:
 
       - name: Deploy with Helm
         run: |
-          helm upgrade --install quikapp infrastructure/helm/quikapp \
+          helm upgrade --install quckapp infrastructure/helm/quckapp \
             --namespace ${{ needs.setup.outputs.namespace }} \
-            --values infrastructure/helm/quikapp/${{ needs.setup.outputs.values-file }} \
+            --values infrastructure/helm/quckapp/${{ needs.setup.outputs.values-file }} \
             --set global.imageRegistry=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }} \
             --set global.imagePullPolicy=Always \
             --timeout 15m \
@@ -405,7 +405,7 @@ jobs:
                   "type": "header",
                   "text": {
                     "type": "plain_text",
-                    "text": "QuikApp Deployment ${{ needs.deploy.result == 'success' && 'Succeeded' || 'Failed' }}"
+                    "text": "QuckApp Deployment ${{ needs.deploy.result == 'success' && 'Succeeded' || 'Failed' }}"
                   }
                 },
                 {

@@ -1,4 +1,4 @@
-# QuikApp PR Labeler Workflow
+# QuckApp PR Labeler Workflow
 # Automatically labels PRs based on changed files
 
 name: PR Labeler

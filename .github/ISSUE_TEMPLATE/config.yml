@@ -1,8 +1,8 @@
 blank_issues_enabled: true
 contact_links:
   - name: Documentation
-    url: https://github.com/quikapp-dev/docs
+    url: https://github.com/quckapp-dev/docs
     about: Check our documentation for guides and API references
   - name: Discussions
-    url: https://github.com/quikapp-dev/quikapp/discussions
+    url: https://github.com/quckapp-dev/quckapp/discussions
     about: Ask questions and share ideas with the community

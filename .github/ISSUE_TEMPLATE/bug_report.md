@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-about: Report a bug to help us improve QuikApp
+about: Report a bug to help us improve QuckApp
 title: '[BUG] '
 labels: bug, triage
 assignees: ''

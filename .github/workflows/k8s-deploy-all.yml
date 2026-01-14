@@ -54,9 +54,9 @@ jobs:
 
       - name: Update kubeconfig
         run: |
-          CLUSTER_NAME="quikapp-${{ inputs.environment }}"
+          CLUSTER_NAME="quckapp-${{ inputs.environment }}"
           if [[ "${{ inputs.environment }}" == "live" ]]; then
-            CLUSTER_NAME="quikapp-prod"
+            CLUSTER_NAME="quckapp-prod"
           fi
           aws eks update-kubeconfig --name $CLUSTER_NAME --region ${{ env.AWS_REGION }}
 
@@ -64,8 +64,8 @@ jobs:
         run: |
           cd infrastructure/k8s/overlays/${{ inputs.environment }}
           kustomize edit set image \
-            quikapp/api=${{ env.ECR_REGISTRY }}/quikapp/api:${{ inputs.image_tag }} \
-            quikapp/worker=${{ env.ECR_REGISTRY }}/quikapp/worker:${{ inputs.image_tag }}
+            quckapp/api=${{ env.ECR_REGISTRY }}/quckapp/api:${{ inputs.image_tag }} \
+            quckapp/worker=${{ env.ECR_REGISTRY }}/quckapp/worker:${{ inputs.image_tag }}
 
       - name: Deploy
         run: |
@@ -74,16 +74,16 @@ jobs:
       - name: Wait for rollout
         run: |
           PREFIX="${{ inputs.environment }}"
-          NAMESPACE="quikapp-${{ inputs.environment }}"
+          NAMESPACE="quckapp-${{ inputs.environment }}"
 
-          kubectl rollout status deployment/${PREFIX}-quikapp-api -n ${NAMESPACE} --timeout=600s
-          kubectl rollout status deployment/${PREFIX}-quikapp-worker -n ${NAMESPACE} --timeout=600s
+          kubectl rollout status deployment/${PREFIX}-quckapp-api -n ${NAMESPACE} --timeout=600s
+          kubectl rollout status deployment/${PREFIX}-quckapp-worker -n ${NAMESPACE} --timeout=600s
 
       - name: Verify deployment
         run: |
-          NAMESPACE="quikapp-${{ inputs.environment }}"
+          NAMESPACE="quckapp-${{ inputs.environment }}"
           echo "=== Pods ==="
-          kubectl get pods -n ${NAMESPACE} -l app.kubernetes.io/name=quikapp
+          kubectl get pods -n ${NAMESPACE} -l app.kubernetes.io/name=quckapp
           echo ""
           echo "=== Services ==="
           kubectl get svc -n ${NAMESPACE}
@@ -94,11 +94,11 @@ jobs:
       - name: Run smoke tests
         if: inputs.environment == 'staging' || inputs.environment == 'live'
         run: |
-          NAMESPACE="quikapp-${{ inputs.environment }}"
+          NAMESPACE="quckapp-${{ inputs.environment }}"
           PREFIX="${{ inputs.environment }}"
 
           # Get API service endpoint
-          API_SVC=$(kubectl get svc ${PREFIX}-quikapp-api -n ${NAMESPACE} -o jsonpath='{.spec.clusterIP}')
+          API_SVC=$(kubectl get svc ${PREFIX}-quckapp-api -n ${NAMESPACE} -o jsonpath='{.spec.clusterIP}')
 
           # Run health check via kubectl exec
           kubectl run smoke-test --rm -it --restart=Never \

@@ -1,4 +1,4 @@
-# QuikApp Release Workflow
+# QuckApp Release Workflow
 # Creates releases with changelog generation
 
 name: Release
@@ -81,9 +81,9 @@ jobs:
 
             ### Kubernetes (Helm)
             ```bash
-            helm repo add quikapp https://quikapp.github.io/quikapp
+            helm repo add quckapp https://quckapp.github.io/quckapp
             helm repo update
-            helm install quikapp quikapp/quikapp --version ${{ steps.version.outputs.version }}
+            helm install quckapp quckapp/quckapp --version ${{ steps.version.outputs.version }}
             ```
 
             ### Docker Images
@@ -139,8 +139,8 @@ jobs:
           VERSION="${{ needs.release.outputs.version }}"
           VERSION="${VERSION#v}"  # Remove 'v' prefix
 
-          sed -i "s/^version:.*/version: $VERSION/" infrastructure/helm/quikapp/Chart.yaml
-          sed -i "s/^appVersion:.*/appVersion: \"$VERSION\"/" infrastructure/helm/quikapp/Chart.yaml
+          sed -i "s/^version:.*/version: $VERSION/" infrastructure/helm/quckapp/Chart.yaml
+          sed -i "s/^appVersion:.*/appVersion: \"$VERSION\"/" infrastructure/helm/quckapp/Chart.yaml
 
       - name: Add Helm repos
         run: |
@@ -155,14 +155,14 @@ jobs:
 
       - name: Package chart
         run: |
-          helm dependency build infrastructure/helm/quikapp
-          helm package infrastructure/helm/quikapp
+          helm dependency build infrastructure/helm/quckapp
+          helm package infrastructure/helm/quckapp
 
       - name: Upload chart to release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ needs.release.outputs.version }}
-          files: quikapp-*.tgz
+          files: quckapp-*.tgz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -175,7 +175,7 @@ jobs:
 
       - name: Push chart to OCI registry
         run: |
-          helm push quikapp-*.tgz oci://ghcr.io/${{ github.repository }}/charts
+          helm push quckapp-*.tgz oci://ghcr.io/${{ github.repository }}/charts
 
   # ==========================================================================
   # Notify
@@ -192,20 +192,20 @@ jobs:
         with:
           payload: |
             {
-              "text": "🚀 QuikApp ${{ needs.release.outputs.version }} Released!",
+              "text": "🚀 QuckApp ${{ needs.release.outputs.version }} Released!",
               "blocks": [
                 {
                   "type": "header",
                   "text": {
                     "type": "plain_text",
-                    "text": "🚀 QuikApp ${{ needs.release.outputs.version }} Released!"
+                    "text": "🚀 QuckApp ${{ needs.release.outputs.version }} Released!"
                   }
                 },
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "A new version of QuikApp has been released. Check out the release notes for details."
+                    "text": "A new version of QuckApp has been released. Check out the release notes for details."
                   }
                 },
                 {

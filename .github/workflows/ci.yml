@@ -1,4 +1,4 @@
-# QuikApp CI Pipeline
+# QuckApp CI Pipeline
 # Runs on all PRs and pushes to main/develop branches
 
 name: CI
@@ -374,21 +374,21 @@ jobs:
 
       - name: Lint charts
         run: |
-          helm lint infrastructure/helm/quikapp
-          helm lint infrastructure/helm/quikapp -f infrastructure/helm/quikapp/values-development.yaml
-          helm lint infrastructure/helm/quikapp -f infrastructure/helm/quikapp/values-staging.yaml
-          helm lint infrastructure/helm/quikapp -f infrastructure/helm/quikapp/values-production.yaml
+          helm lint infrastructure/helm/quckapp
+          helm lint infrastructure/helm/quckapp -f infrastructure/helm/quckapp/values-development.yaml
+          helm lint infrastructure/helm/quckapp -f infrastructure/helm/quckapp/values-staging.yaml
+          helm lint infrastructure/helm/quckapp -f infrastructure/helm/quckapp/values-production.yaml
 
       - name: Template validation
         run: |
-          helm template quikapp infrastructure/helm/quikapp -f infrastructure/helm/quikapp/values-development.yaml > /dev/null
-          helm template quikapp infrastructure/helm/quikapp -f infrastructure/helm/quikapp/values-production.yaml > /dev/null
+          helm template quckapp infrastructure/helm/quckapp -f infrastructure/helm/quckapp/values-development.yaml > /dev/null
+          helm template quckapp infrastructure/helm/quckapp -f infrastructure/helm/quckapp/values-production.yaml > /dev/null
 
       - name: Install chart-testing
         uses: helm/chart-testing-action@v2
 
       - name: Run chart-testing (lint)
-        run: ct lint --config .github/ct.yaml --charts infrastructure/helm/quikapp
+        run: ct lint --config .github/ct.yaml --charts infrastructure/helm/quckapp
 
   # ==========================================================================
   # Docker Compose Validation
