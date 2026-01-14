@@ -1,117 +1,117 @@
 [submodule "admin"]
 	path = admin
-	url = https://github.com/quikapp-dev/admin.git
+	url = https://github.com/quckapp/admin.git
 [submodule "docs"]
 	path = docs
-	url = https://github.com/quikapp-dev/docs.git
+	url = https://github.com/quckapp/docs.git
 [submodule "infrastructure"]
 	path = infrastructure
-	url = https://github.com/quikapp-dev/infrastructure.git
+	url = https://github.com/quckapp/infrastructure.git
 [submodule "mobile"]
 	path = mobile
-	url = https://github.com/quikapp-dev/mobile.git
+	url = https://github.com/quckapp/mobile.git
 [submodule "web"]
 	path = web
-	url = https://github.com/quikapp-dev/web.git
+	url = https://github.com/quckapp/web.git
 [submodule "packages/api-client"]
 	path = packages/api-client
-	url = https://github.com/quikapp-dev/packages.git
+	url = https://github.com/quckapp/api-client.git
 [submodule "services/admin-service"]
 	path = services/admin-service
-	url = https://github.com/quikapp-dev/admin-service.git
+	url = https://github.com/quckapp/admin-service.git
 [submodule "services/analytics-service"]
 	path = services/analytics-service
-	url = https://github.com/quikapp-dev/analytics-service.git
+	url = https://github.com/quckapp/analytics-service.git
 [submodule "services/attachment-service"]
 	path = services/attachment-service
-	url = https://github.com/quikapp-dev/attachment-service.git
+	url = https://github.com/quckapp/attachment-service.git
 [submodule "services/audit-service"]
 	path = services/audit-service
-	url = https://github.com/quikapp-dev/audit-service.git
+	url = https://github.com/quckapp/audit-service.git
 [submodule "services/auth-service"]
 	path = services/auth-service
-	url = https://github.com/quikapp-dev/auth-service.git
+	url = https://github.com/quckapp/auth-service.git
 [submodule "services/backend-gateway"]
 	path = services/backend-gateway
-	url = https://github.com/quikapp-dev/backend-gateway.git
+	url = https://github.com/quckapp/backend-gateway.git
 [submodule "services/bookmark-service"]
 	path = services/bookmark-service
-	url = https://github.com/quikapp-dev/bookmark-service.git
+	url = https://github.com/quckapp/bookmark-service.git
 [submodule "services/call-service"]
 	path = services/call-service
-	url = https://github.com/quikapp-dev/call-service.git
+	url = https://github.com/quckapp/call-service.git
 [submodule "services/cdn-service"]
 	path = services/cdn-service
-	url = https://github.com/quikapp-dev/cdn-service.git
+	url = https://github.com/quckapp/cdn-service.git
 [submodule "services/channel-service"]
 	path = services/channel-service
-	url = https://github.com/quikapp-dev/channel-service.git
+	url = https://github.com/quckapp/channel-service.git
 [submodule "services/event-broadcast-service"]
 	path = services/event-broadcast-service
-	url = https://github.com/quikapp-dev/event-broadcast-service.git
+	url = https://github.com/quckapp/event-broadcast-service.git
 [submodule "services/export-service"]
 	path = services/export-service
-	url = https://github.com/quikapp-dev/export-service.git
+	url = https://github.com/quckapp/export-service.git
 [submodule "services/file-service"]
 	path = services/file-service
-	url = https://github.com/quikapp-dev/file-service.git
+	url = https://github.com/quckapp/file-service.git
 [submodule "services/huddle-service"]
 	path = services/huddle-service
-	url = https://github.com/quikapp-dev/huddle-service.git
+	url = https://github.com/quckapp/huddle-service.git
 [submodule "services/insights-service"]
 	path = services/insights-service
-	url = https://github.com/quikapp-dev/insights-service.git
+	url = https://github.com/quckapp/insights-service.git
 [submodule "services/integration-service"]
 	path = services/integration-service
-	url = https://github.com/quikapp-dev/integration-service.git
+	url = https://github.com/quckapp/integration-service.git
 [submodule "services/media-service"]
 	path = services/media-service
-	url = https://github.com/quikapp-dev/media-service.git
+	url = https://github.com/quckapp/media-service.git
 [submodule "services/message-service"]
 	path = services/message-service
-	url = https://github.com/quikapp-dev/message-service.git
+	url = https://github.com/quckapp/message-service.git
 [submodule "services/ml-service"]
 	path = services/ml-service
-	url = https://github.com/quikapp-dev/ml-service.git
+	url = https://github.com/quckapp/ml-service.git
 [submodule "services/moderation-service"]
 	path = services/moderation-service
-	url = https://github.com/quikapp-dev/moderation-service.git
+	url = https://github.com/quckapp/moderation-service.git
 [submodule "services/notification-orchestrator"]
 	path = services/notification-orchestrator
-	url = https://github.com/quikapp-dev/notification-orchestrator.git
+	url = https://github.com/quckapp/notification-orchestrator.git
 [submodule "services/notification-service"]
 	path = services/notification-service
-	url = https://github.com/quikapp-dev/notification-service.git
+	url = https://github.com/quckapp/notification-service.git
 [submodule "services/permission-service"]
 	path = services/permission-service
-	url = https://github.com/quikapp-dev/permission-service.git
+	url = https://github.com/quckapp/permission-service.git
 [submodule "services/presence-service"]
 	path = services/presence-service
-	url = https://github.com/quikapp-dev/presence-service.git
+	url = https://github.com/quckapp/presence-service.git
 [submodule "services/realtime-service"]
 	path = services/realtime-service
-	url = https://github.com/quikapp-dev/realtime-service.git
+	url = https://github.com/quckapp/realtime-service.git
 [submodule "services/reminder-service"]
 	path = services/reminder-service
-	url = https://github.com/quikapp-dev/reminder-service.git
+	url = https://github.com/quckapp/reminder-service.git
 [submodule "services/search-service"]
 	path = services/search-service
-	url = https://github.com/quikapp-dev/search-service.git
+	url = https://github.com/quckapp/search-service.git
 [submodule "services/sentiment-service"]
 	path = services/sentiment-service
-	url = https://github.com/quikapp-dev/sentiment-service.git
+	url = https://github.com/quckapp/sentiment-service.git
 [submodule "services/smart-reply-service"]
 	path = services/smart-reply-service
-	url = https://github.com/quikapp-dev/smart-reply-service.git
+	url = https://github.com/quckapp/smart-reply-service.git
 [submodule "services/spark-etl"]
 	path = services/spark-etl
-	url = https://github.com/quikapp-dev/spark-etl.git
+	url = https://github.com/quckapp/spark-etl.git
 [submodule "services/thread-service"]
 	path = services/thread-service
-	url = https://github.com/quikapp-dev/thread-service.git
+	url = https://github.com/quckapp/thread-service.git
 [submodule "services/user-service"]
 	path = services/user-service
-	url = https://github.com/quikapp-dev/user-service.git
+	url = https://github.com/quckapp/user-service.git
 [submodule "services/workspace-service"]
 	path = services/workspace-service
-	url = https://github.com/quikapp-dev/workspace-service.git
+	url = https://github.com/quckapp/workspace-service.git
