@@ -21,7 +21,7 @@ By participating in this project, you agree to maintain a respectful and inclusi
 
 ```bash
 # Clone with submodules
-git clone --recurse-submodules https://github.com/quckapp-dev/quckapp.git
+git clone --recurse-submodules https://github.com/quckapp/quckapp.git
 cd quckapp
 
 # Start infrastructure

@@ -93,7 +93,7 @@ jobs:
               VALUES_FILE="values-qa.yaml"
               ;;
             *)
-              NAMESPACE="quckapp-dev"
+              NAMESPACE="quckapp"
               VALUES_FILE="values-development.yaml"
               ;;
           esac

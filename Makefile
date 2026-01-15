@@ -576,7 +576,7 @@ ci: lint test ## Run CI checks (lint + test)
 release: docker-build docker-push ## Build and push all Docker images
 
 deploy-dev: ## Deploy to development environment
-	@$(MAKE) helm-install HELM_VALUES=values-development.yaml KUBE_NAMESPACE=quckapp-dev
+	@$(MAKE) helm-install HELM_VALUES=values-development.yaml KUBE_NAMESPACE=quckapp
 
 deploy-staging: ## Deploy to staging environment
 	@$(MAKE) helm-upgrade HELM_VALUES=values-staging.yaml KUBE_NAMESPACE=quckapp-staging

@@ -1,6 +1,6 @@
-# QuckChat Deployment Guide
+# QuckApp Deployment Guide
 
-Complete guide for building and deploying QuckChat locally and on AWS production.
+Complete guide for building and deploying QuckApp locally and on AWS production.
 
 ## Table of Contents
 
@@ -58,8 +58,8 @@ Complete guide for building and deploying QuckChat locally and on AWS production
 
 ```bash
 # Clone repository
-git clone https://github.com/your-org/quckchat.git
-cd quckchat
+git clone https://github.com/your-org/quckapp.git
+cd quckapp
 
 # Install dependencies for each service
 cd backend && npm install && cd ..
@@ -91,7 +91,7 @@ Edit the `.env` files with your configuration:
 # backend/.env
 NODE_ENV=development
 PORT=3000
-MONGODB_URI=mongodb://localhost:27017/quckchat
+MONGODB_URI=mongodb://localhost:27017/quckapp
 JWT_SECRET=your-dev-secret-key
 USE_SPRING_AUTH=true
 SPRING_AUTH_SERVICE_URL=http://localhost:8081/api/auth
@@ -189,7 +189,7 @@ aws configure
 5. Get connection string:
 
 ```
-mongodb+srv://username:password@cluster.mongodb.net/quckchat?retryWrites=true&w=majority
+mongodb+srv://username:password@cluster.mongodb.net/quckapp?retryWrites=true&w=majority
 ```
 
 ### Step 2: Create AWS Secrets
@@ -197,15 +197,15 @@ mongodb+srv://username:password@cluster.mongodb.net/quckchat?retryWrites=true&w=
 ```bash
 # Store secrets in AWS Secrets Manager
 aws secretsmanager create-secret \
-  --name quckchat/production/mongodb-uri \
+  --name quckapp/production/mongodb-uri \
   --secret-string "mongodb+srv://..."
 
 aws secretsmanager create-secret \
-  --name quckchat/production/jwt-secret \
+  --name quckapp/production/jwt-secret \
   --secret-string "your-production-jwt-secret-256-bits"
 
 aws secretsmanager create-secret \
-  --name quckchat/production/db-password \
+  --name quckapp/production/db-password \
   --secret-string "your-strong-password"
 
 # List all secrets
@@ -224,8 +224,8 @@ terraform init
 cat > terraform.tfvars << EOF
 aws_region          = "us-east-1"
 environment         = "production"
-app_name            = "quckchat"
-domain_name         = "quckchat.yourdomain.com"
+app_name            = "quckapp"
+domain_name         = "quckapp.yourdomain.com"
 db_password         = "your-db-password"
 acm_certificate_arn = "arn:aws:acm:us-east-1:123456789:certificate/xxx"
 EOF
@@ -250,24 +250,24 @@ aws ecr get-login-password --region us-east-1 | \
 
 # Build and push Backend
 cd backend
-docker build -t quckchat/backend:latest .
-docker tag quckchat/backend:latest \
-  123456789.dkr.ecr.us-east-1.amazonaws.com/quckchat/backend:latest
-docker push 123456789.dkr.ecr.us-east-1.amazonaws.com/quckchat/backend:latest
+docker build -t quckapp/backend:latest .
+docker tag quckapp/backend:latest \
+  123456789.dkr.ecr.us-east-1.amazonaws.com/quckapp/backend:latest
+docker push 123456789.dkr.ecr.us-east-1.amazonaws.com/quckapp/backend:latest
 
 # Build and push Auth Service
 cd ../auth-service
-docker build -t quckchat/auth-service:latest .
-docker tag quckchat/auth-service:latest \
-  123456789.dkr.ecr.us-east-1.amazonaws.com/quckchat/auth-service:latest
-docker push 123456789.dkr.ecr.us-east-1.amazonaws.com/quckchat/auth-service:latest
+docker build -t quckapp/auth-service:latest .
+docker tag quckapp/auth-service:latest \
+  123456789.dkr.ecr.us-east-1.amazonaws.com/quckapp/auth-service:latest
+docker push 123456789.dkr.ecr.us-east-1.amazonaws.com/quckapp/auth-service:latest
 
 # Build and push Realtime
 cd ../realtime
-docker build -t quckchat/realtime:latest .
-docker tag quckchat/realtime:latest \
-  123456789.dkr.ecr.us-east-1.amazonaws.com/quckchat/realtime:latest
-docker push 123456789.dkr.ecr.us-east-1.amazonaws.com/quckchat/realtime:latest
+docker build -t quckapp/realtime:latest .
+docker tag quckapp/realtime:latest \
+  123456789.dkr.ecr.us-east-1.amazonaws.com/quckapp/realtime:latest
+docker push 123456789.dkr.ecr.us-east-1.amazonaws.com/quckapp/realtime:latest
 ```
 
 ### Step 5: Create ECS Services
@@ -275,9 +275,9 @@ docker push 123456789.dkr.ecr.us-east-1.amazonaws.com/quckchat/realtime:latest
 ```bash
 # Create ECS services using AWS CLI
 aws ecs create-service \
-  --cluster quckchat-cluster \
-  --service-name quckchat-backend \
-  --task-definition quckchat-backend:1 \
+  --cluster quckapp-cluster \
+  --service-name quckapp-backend \
+  --task-definition quckapp-backend:1 \
   --desired-count 2 \
   --launch-type FARGATE \
   --network-configuration "awsvpcConfiguration={subnets=[subnet-xxx],securityGroups=[sg-xxx],assignPublicIp=DISABLED}" \
@@ -293,7 +293,7 @@ aws ecs create-service \
 ALB_DNS=$(terraform output -raw alb_dns_name)
 
 # Add CNAME record in your DNS provider
-# api.quckchat.com -> $ALB_DNS
+# api.quckapp.com -> $ALB_DNS
 ```
 
 ---
@@ -338,13 +338,13 @@ ALB_DNS=$(terraform output -raw alb_dns_name)
 
 ```bash
 # Create log groups
-aws logs create-log-group --log-group-name /ecs/quckchat-backend
-aws logs create-log-group --log-group-name /ecs/quckchat-auth-service
-aws logs create-log-group --log-group-name /ecs/quckchat-realtime
+aws logs create-log-group --log-group-name /ecs/quckapp-backend
+aws logs create-log-group --log-group-name /ecs/quckapp-auth-service
+aws logs create-log-group --log-group-name /ecs/quckapp-realtime
 
 # Set retention
 aws logs put-retention-policy \
-  --log-group-name /ecs/quckchat-backend \
+  --log-group-name /ecs/quckapp-backend \
   --retention-in-days 30
 ```
 
@@ -387,17 +387,17 @@ fields @timestamp, @message
 aws ec2 describe-security-groups --group-ids sg-xxx
 
 # Check ECS task networking
-aws ecs describe-tasks --cluster quckchat-cluster --tasks task-id
+aws ecs describe-tasks --cluster quckapp-cluster --tasks task-id
 ```
 
 **2. Database connection issues**
 ```bash
 # Test RDS connectivity
-psql -h quckchat-postgres.xxx.us-east-1.rds.amazonaws.com \
-  -U postgres -d quckchat_auth
+psql -h quckapp-postgres.xxx.us-east-1.rds.amazonaws.com \
+  -U postgres -d quckapp_auth
 
 # Check security group rules
-aws rds describe-db-instances --db-instance-identifier quckchat-postgres
+aws rds describe-db-instances --db-instance-identifier quckapp-postgres
 ```
 
 **3. Kafka connection issues**
@@ -413,11 +413,11 @@ kafka-console-consumer --bootstrap-server b-1.xxx:9092 \
 **4. Container crashes**
 ```bash
 # View ECS logs
-aws logs tail /ecs/quckchat-backend --follow
+aws logs tail /ecs/quckapp-backend --follow
 
 # Describe stopped tasks
-aws ecs describe-tasks --cluster quckchat-cluster \
-  --tasks $(aws ecs list-tasks --cluster quckchat-cluster \
+aws ecs describe-tasks --cluster quckapp-cluster \
+  --tasks $(aws ecs list-tasks --cluster quckapp-cluster \
     --desired-status STOPPED --query 'taskArns[0]' --output text)
 ```
 
@@ -426,15 +426,15 @@ aws ecs describe-tasks --cluster quckchat-cluster \
 ```bash
 # Scale ECS service
 aws ecs update-service \
-  --cluster quckchat-cluster \
-  --service quckchat-backend \
+  --cluster quckapp-cluster \
+  --service quckapp-backend \
   --desired-count 4
 
 # Auto-scaling setup
 aws application-autoscaling register-scalable-target \
   --service-namespace ecs \
   --scalable-dimension ecs:service:DesiredCount \
-  --resource-id service/quckchat-cluster/quckchat-backend \
+  --resource-id service/quckapp-cluster/quckapp-backend \
   --min-capacity 2 \
   --max-capacity 10
 ```
@@ -456,7 +456,7 @@ aws ecs update-service --force-new-deployment  # Redeploy
 
 # ============ DEBUG ============
 docker-compose exec backend sh          # Shell into container
-aws logs tail /ecs/quckchat-backend     # View AWS logs
+aws logs tail /ecs/quckapp-backend     # View AWS logs
 curl localhost:3000/health              # Health check
 ```
 

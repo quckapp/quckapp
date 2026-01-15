@@ -1,4 +1,4 @@
-# QuckChat CI/CD Pipeline
+# QuckApp CI/CD Pipeline
 # Builds and deploys all services to AWS ECS
 
 name: Deploy to AWS
@@ -124,10 +124,10 @@ jobs:
         working-directory: backend
         run: |
           IMAGE_TAG=${{ github.sha }}
-          docker build -t $ECR_REGISTRY/quckchat/backend:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/quckchat/backend:$IMAGE_TAG
-          docker tag $ECR_REGISTRY/quckchat/backend:$IMAGE_TAG $ECR_REGISTRY/quckchat/backend:latest
-          docker push $ECR_REGISTRY/quckchat/backend:latest
+          docker build -t $ECR_REGISTRY/quckapp/backend:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/quckapp/backend:$IMAGE_TAG
+          docker tag $ECR_REGISTRY/quckapp/backend:$IMAGE_TAG $ECR_REGISTRY/quckapp/backend:latest
+          docker push $ECR_REGISTRY/quckapp/backend:latest
           echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
 
   build-auth-service:
@@ -155,10 +155,10 @@ jobs:
         working-directory: auth-service
         run: |
           IMAGE_TAG=${{ github.sha }}
-          docker build -t $ECR_REGISTRY/quckchat/auth-service:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/quckchat/auth-service:$IMAGE_TAG
-          docker tag $ECR_REGISTRY/quckchat/auth-service:$IMAGE_TAG $ECR_REGISTRY/quckchat/auth-service:latest
-          docker push $ECR_REGISTRY/quckchat/auth-service:latest
+          docker build -t $ECR_REGISTRY/quckapp/auth-service:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/quckapp/auth-service:$IMAGE_TAG
+          docker tag $ECR_REGISTRY/quckapp/auth-service:$IMAGE_TAG $ECR_REGISTRY/quckapp/auth-service:latest
+          docker push $ECR_REGISTRY/quckapp/auth-service:latest
           echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
 
   build-realtime:
@@ -186,10 +186,10 @@ jobs:
         working-directory: realtime
         run: |
           IMAGE_TAG=${{ github.sha }}
-          docker build -t $ECR_REGISTRY/quckchat/realtime:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/quckchat/realtime:$IMAGE_TAG
-          docker tag $ECR_REGISTRY/quckchat/realtime:$IMAGE_TAG $ECR_REGISTRY/quckchat/realtime:latest
-          docker push $ECR_REGISTRY/quckchat/realtime:latest
+          docker build -t $ECR_REGISTRY/quckapp/realtime:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/quckapp/realtime:$IMAGE_TAG
+          docker tag $ECR_REGISTRY/quckapp/realtime:$IMAGE_TAG $ECR_REGISTRY/quckapp/realtime:latest
+          docker push $ECR_REGISTRY/quckapp/realtime:latest
           echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
 
   # ============================================
@@ -214,29 +214,29 @@ jobs:
       - name: Deploy Backend to ECS
         run: |
           aws ecs update-service \
-            --cluster quckchat-staging \
-            --service quckchat-backend \
+            --cluster quckapp-staging \
+            --service quckapp-backend \
             --force-new-deployment
 
       - name: Deploy Auth Service to ECS
         run: |
           aws ecs update-service \
-            --cluster quckchat-staging \
-            --service quckchat-auth-service \
+            --cluster quckapp-staging \
+            --service quckapp-auth-service \
             --force-new-deployment
 
       - name: Deploy Realtime to ECS
         run: |
           aws ecs update-service \
-            --cluster quckchat-staging \
-            --service quckchat-realtime \
+            --cluster quckapp-staging \
+            --service quckapp-realtime \
             --force-new-deployment
 
       - name: Wait for deployments
         run: |
           aws ecs wait services-stable \
-            --cluster quckchat-staging \
-            --services quckchat-backend quckchat-auth-service quckchat-realtime
+            --cluster quckapp-staging \
+            --services quckapp-backend quckapp-auth-service quckapp-realtime
 
   # ============================================
   # Deploy to Production
@@ -260,42 +260,42 @@ jobs:
       - name: Deploy Backend to ECS
         run: |
           aws ecs update-service \
-            --cluster quckchat-production \
-            --service quckchat-backend \
+            --cluster quckapp-production \
+            --service quckapp-backend \
             --force-new-deployment
 
       - name: Deploy Auth Service to ECS
         run: |
           aws ecs update-service \
-            --cluster quckchat-production \
-            --service quckchat-auth-service \
+            --cluster quckapp-production \
+            --service quckapp-auth-service \
             --force-new-deployment
 
       - name: Deploy Realtime to ECS
         run: |
           aws ecs update-service \
-            --cluster quckchat-production \
-            --service quckchat-realtime \
+            --cluster quckapp-production \
+            --service quckapp-realtime \
             --force-new-deployment
 
       - name: Wait for deployments
         run: |
           aws ecs wait services-stable \
-            --cluster quckchat-production \
-            --services quckchat-backend quckchat-auth-service quckchat-realtime
+            --cluster quckapp-production \
+            --services quckapp-backend quckapp-auth-service quckapp-realtime
 
       - name: Notify Slack
         uses: slackapi/slack-github-action@v1
         with:
           payload: |
             {
-              "text": "QuckChat deployed to production! :rocket:",
+              "text": "QuckApp deployed to production! :rocket:",
               "blocks": [
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "*QuckChat Production Deployment*\nCommit: `${{ github.sha }}`\nBy: ${{ github.actor }}"
+                    "text": "*QuckApp Production Deployment*\nCommit: `${{ github.sha }}`\nBy: ${{ github.actor }}"
                   }
                 }
               ]
