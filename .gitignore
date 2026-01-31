@@ -104,4 +104,3 @@ uploads/
 
 # Claude settings (keep local)
 .claude/settings.local.json
-apps/chat_app/

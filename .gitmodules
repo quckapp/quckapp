@@ -115,3 +115,6 @@
 [submodule "services/workspace-service"]
 	path = services/workspace-service
 	url = https://github.com/quckapp/workspace-service.git
+[submodule "apps/chat_app"]
+	path = apps/chat_app
+	url = https://github.com/quckapp/chat_app.git
