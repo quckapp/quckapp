@@ -1,17 +1,17 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../providers/auth_provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../bloc/bloc.dart';
 import '../../services/oauth_service.dart';
 
-class RegisterNameScreen extends ConsumerStatefulWidget {
+class RegisterNameScreen extends StatefulWidget {
   const RegisterNameScreen({super.key});
 
   @override
-  ConsumerState<RegisterNameScreen> createState() => _RegisterNameScreenState();
+  State<RegisterNameScreen> createState() => _RegisterNameScreenState();
 }
 
-class _RegisterNameScreenState extends ConsumerState<RegisterNameScreen> {
+class _RegisterNameScreenState extends State<RegisterNameScreen> {
   final _formKey = GlobalKey<FormState>();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
@@ -35,260 +35,264 @@ class _RegisterNameScreenState extends ConsumerState<RegisterNameScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(height: 12),
+    return BlocBuilder<AuthBloc, AuthState>(
+      builder: (context, authState) {
+        return Scaffold(
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24.0),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 12),
 
-                // Avatar or Welcome Icon
-                Center(
-                  child: _connectedAvatar != null
-                      ? CircleAvatar(
-                          radius: 40,
-                          backgroundImage: NetworkImage(_connectedAvatar!),
-                          backgroundColor: const Color(0xFF4F46E5).withValues(alpha: 0.1),
-                        )
-                      : Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF4F46E5).withValues(alpha: 0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.person_add,
-                            size: 40,
-                            color: Color(0xFF4F46E5),
-                          ),
-                        ),
-                ),
-                const SizedBox(height: 16),
+                    // Avatar or Welcome Icon
+                    Center(
+                      child: _connectedAvatar != null
+                          ? CircleAvatar(
+                              radius: 40,
+                              backgroundImage: NetworkImage(_connectedAvatar!),
+                              backgroundColor: const Color(0xFF4F46E5).withValues(alpha: 0.1),
+                            )
+                          : Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF4F46E5).withValues(alpha: 0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.person_add,
+                                size: 40,
+                                color: Color(0xFF4F46E5),
+                              ),
+                            ),
+                    ),
+                    const SizedBox(height: 16),
 
-                // Welcome Text
-                Text(
-                  'Complete Your Profile',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
+                    // Welcome Text
+                    Text(
+                      'Complete Your Profile',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Add your details to get started',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Colors.grey[600],
+                          ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // First Name
+                    TextFormField(
+                      controller: _firstNameController,
+                      decoration: const InputDecoration(
+                        labelText: 'First Name *',
+                        hintText: 'Enter your first name',
+                        prefixIcon: Icon(Icons.person_outline),
                       ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Add your details to get started',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.grey[600],
+                      textCapitalization: TextCapitalization.words,
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter your first name';
+                        }
+                        if (value.trim().length < 2) {
+                          return 'Name must be at least 2 characters';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Last Name
+                    TextFormField(
+                      controller: _lastNameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Last Name *',
+                        hintText: 'Enter your last name',
+                        prefixIcon: Icon(Icons.person_outline),
                       ),
-                ),
-                const SizedBox(height: 20),
-
-                // First Name
-                TextFormField(
-                  controller: _firstNameController,
-                  decoration: const InputDecoration(
-                    labelText: 'First Name *',
-                    hintText: 'Enter your first name',
-                    prefixIcon: Icon(Icons.person_outline),
-                  ),
-                  textCapitalization: TextCapitalization.words,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Please enter your first name';
-                    }
-                    if (value.trim().length < 2) {
-                      return 'Name must be at least 2 characters';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-
-                // Last Name
-                TextFormField(
-                  controller: _lastNameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Last Name *',
-                    hintText: 'Enter your last name',
-                    prefixIcon: Icon(Icons.person_outline),
-                  ),
-                  textCapitalization: TextCapitalization.words,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Please enter your last name';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-
-                // Username
-                TextFormField(
-                  controller: _usernameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Username *',
-                    hintText: 'Choose a unique username',
-                    prefixIcon: Icon(Icons.alternate_email),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Please enter a username';
-                    }
-                    if (value.trim().length < 3) {
-                      return 'Username must be at least 3 characters';
-                    }
-                    if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(value.trim())) {
-                      return 'Only letters, numbers, and underscore allowed';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-
-                // Show verified email if available
-                if (_isEmailVerified && _emailController.text.isNotEmpty) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey[300]!),
+                      textCapitalization: TextCapitalization.words,
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter your last name';
+                        }
+                        return null;
+                      },
                     ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.email_outlined, color: Colors.grey),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            _emailController.text,
-                            style: const TextStyle(fontSize: 16),
-                          ),
+                    const SizedBox(height: 12),
+
+                    // Username
+                    TextFormField(
+                      controller: _usernameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Username *',
+                        hintText: 'Choose a unique username',
+                        prefixIcon: Icon(Icons.alternate_email),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter a username';
+                        }
+                        if (value.trim().length < 3) {
+                          return 'Username must be at least 3 characters';
+                        }
+                        if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(value.trim())) {
+                          return 'Only letters, numbers, and underscore allowed';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Show verified email if available
+                    if (_isEmailVerified && _emailController.text.isNotEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey[300]!),
                         ),
-                        const Icon(Icons.verified, color: Colors.green, size: 20),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-
-                // Connected OAuth badge
-                if (_oauthProvider != null) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.green[50],
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.green[200]!),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          _oauthProvider == 'google'
-                              ? Icons.g_mobiledata
-                              : _oauthProvider == 'apple'
-                                  ? Icons.apple
-                                  : Icons.email,
-                          color: Colors.green[700],
-                          size: 22,
+                        child: Row(
+                          children: [
+                            const Icon(Icons.email_outlined, color: Colors.grey),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                _emailController.text,
+                                style: const TextStyle(fontSize: 16),
+                              ),
+                            ),
+                            const Icon(Icons.verified, color: Colors.green, size: 20),
+                          ],
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Connected with ${_oauthProvider == 'google' ? 'Google' : _oauthProvider == 'apple' ? 'Apple' : 'Email'}',
-                            style: TextStyle(
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // Connected OAuth badge
+                    if (_oauthProvider != null) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.green[50],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.green[200]!),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _oauthProvider == 'google'
+                                  ? Icons.g_mobiledata
+                                  : _oauthProvider == 'apple'
+                                      ? Icons.apple
+                                      : Icons.email,
                               color: Colors.green[700],
-                              fontWeight: FontWeight.w500,
-                              fontSize: 13,
+                              size: 22,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Connected with ${_oauthProvider == 'google' ? 'Google' : _oauthProvider == 'apple' ? 'Apple' : 'Email'}',
+                                style: TextStyle(
+                                  color: Colors.green[700],
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.close, color: Colors.green[700], size: 18),
+                              onPressed: _disconnectOAuth,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // Continue Button
+                    ElevatedButton(
+                      onPressed: _isLoading || _isOAuthLoading ? null : _saveAndContinue,
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text('Continue'),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Divider - only show if OAuth not connected
+                    if (_oauthProvider == null) ...[
+                      Row(
+                        children: [
+                          Expanded(child: Divider(color: Colors.grey[300])),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Text(
+                              'or connect account',
+                              style: TextStyle(color: Colors.grey[500], fontSize: 12),
                             ),
                           ),
-                        ),
-                        IconButton(
-                          icon: Icon(Icons.close, color: Colors.green[700], size: 18),
-                          onPressed: _disconnectOAuth,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-
-                // Continue Button
-                ElevatedButton(
-                  onPressed: _isLoading || _isOAuthLoading ? null : _saveAndContinue,
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text('Continue'),
-                ),
-                const SizedBox(height: 16),
-
-                // Divider - only show if OAuth not connected
-                if (_oauthProvider == null) ...[
-                  Row(
-                    children: [
-                      Expanded(child: Divider(color: Colors.grey[300])),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
-                          'or connect account',
-                          style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                        ),
+                          Expanded(child: Divider(color: Colors.grey[300])),
+                        ],
                       ),
-                      Expanded(child: Divider(color: Colors.grey[300])),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
+                      const SizedBox(height: 16),
 
-                  // OAuth Buttons Section
-                  // Google Sign-In - Android only (not available on web)
-                  if (!kIsWeb && Theme.of(context).platform == TargetPlatform.android) ...[
-                    _buildOAuthButton(
-                      icon: Icons.g_mobiledata,
-                      label: 'Continue with Google',
-                      color: Colors.white,
-                      textColor: Colors.black87,
-                      borderColor: Colors.grey[300],
-                      onTap: () => _connectOAuth('google'),
-                    ),
-                    const SizedBox(height: 10),
+                      // OAuth Buttons Section
+                      // Google Sign-In - Android only (not available on web)
+                      if (!kIsWeb && Theme.of(context).platform == TargetPlatform.android) ...[
+                        _buildOAuthButton(
+                          icon: Icons.g_mobiledata,
+                          label: 'Continue with Google',
+                          color: Colors.white,
+                          textColor: Colors.black87,
+                          borderColor: Colors.grey[300],
+                          onTap: () => _connectOAuth('google'),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                      // Apple Sign-In - iOS only (not available on web)
+                      if (!kIsWeb && Theme.of(context).platform == TargetPlatform.iOS) ...[
+                        _buildOAuthButton(
+                          icon: Icons.apple,
+                          label: 'Continue with Apple',
+                          color: Colors.black,
+                          textColor: Colors.white,
+                          onTap: () => _connectOAuth('apple'),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                      _buildOAuthButton(
+                        icon: Icons.email_outlined,
+                        label: 'Verify Email',
+                        color: const Color(0xFF4F46E5).withValues(alpha: 0.1),
+                        textColor: const Color(0xFF4F46E5),
+                        onTap: () => _showEmailVerificationDialog(),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                   ],
-                  // Apple Sign-In - iOS only (not available on web)
-                  if (!kIsWeb && Theme.of(context).platform == TargetPlatform.iOS) ...[
-                    _buildOAuthButton(
-                      icon: Icons.apple,
-                      label: 'Continue with Apple',
-                      color: Colors.black,
-                      textColor: Colors.white,
-                      onTap: () => _connectOAuth('apple'),
-                    ),
-                    const SizedBox(height: 10),
-                  ],
-                  _buildOAuthButton(
-                    icon: Icons.email_outlined,
-                    label: 'Verify Email',
-                    color: const Color(0xFF4F46E5).withValues(alpha: 0.1),
-                    textColor: const Color(0xFF4F46E5),
-                    onTap: () => _showEmailVerificationDialog(),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-              ],
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -429,8 +433,8 @@ class _RegisterNameScreenState extends ConsumerState<RegisterNameScreen> {
     await showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
           title: Text(otpSent ? 'Verify OTP' : 'Verify Email'),
           content: Form(
             key: formKey,
@@ -489,7 +493,7 @@ class _RegisterNameScreenState extends ConsumerState<RegisterNameScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: isLoading ? null : () => Navigator.pop(context),
+              onPressed: isLoading ? null : () => Navigator.pop(dialogContext),
               child: const Text('Cancel'),
             ),
             ElevatedButton(
@@ -503,8 +507,8 @@ class _RegisterNameScreenState extends ConsumerState<RegisterNameScreen> {
                       try {
                         if (!otpSent) {
                           // Send OTP to email via backend API
-                          await ref.read(authProvider.notifier).requestEmailOtp(
-                            email: emailController.text.trim(),
+                          context.read<AuthBloc>().add(
+                            AuthRequestEmailOtp(emailController.text.trim()),
                           );
 
                           setDialogState(() {
@@ -522,13 +526,15 @@ class _RegisterNameScreenState extends ConsumerState<RegisterNameScreen> {
                           }
                         } else {
                           // Verify OTP via backend API
-                          await ref.read(authProvider.notifier).verifyEmailOtp(
-                            email: emailController.text.trim(),
-                            code: otpController.text.trim(),
+                          context.read<AuthBloc>().add(
+                            AuthVerifyEmailOtp(
+                              email: emailController.text.trim(),
+                              code: otpController.text.trim(),
+                            ),
                           );
 
                           if (mounted) {
-                            Navigator.pop(context);
+                            Navigator.pop(dialogContext);
                             setState(() {
                               _oauthProvider = 'email';
                               _emailController.text = emailController.text.trim();
@@ -598,7 +604,7 @@ class _RegisterNameScreenState extends ConsumerState<RegisterNameScreen> {
       // If email is provided and verified, connect it first
       if (email.isNotEmpty && _isEmailVerified) {
         try {
-          await ref.read(authProvider.notifier).connectEmail(email: email);
+          context.read<AuthBloc>().add(AuthConnectEmail(email));
         } catch (e) {
           debugPrint('Email connect failed: $e');
           final errorMsg = e.toString().toLowerCase();
@@ -621,12 +627,12 @@ class _RegisterNameScreenState extends ConsumerState<RegisterNameScreen> {
       }
 
       // Update profile with name and username
-      await ref.read(authProvider.notifier).updateProfile(
+      context.read<AuthBloc>().add(AuthUpdateProfile(
             firstName: firstName,
             lastName: lastName,
             displayName: displayName,
             username: username,
-          );
+          ));
 
       // Success - router will redirect to home
     } catch (e) {
