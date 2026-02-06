@@ -37,7 +37,7 @@ HELM_VALUES ?= values.yaml
 
 # Services by stack
 NESTJS_SERVICES := backend-gateway notification-service realtime-service
-SPRING_SERVICES := auth-service user-service permission-service audit-service admin-service
+SPRING_SERVICES := auth-service user-service permission-service audit-service admin-service security-service
 ELIXIR_SERVICES := presence-service message-service call-service notification-orchestrator huddle-service event-broadcast-service
 GO_SERVICES := workspace-service channel-service thread-service search-service file-service media-service bookmark-service reminder-service attachment-service cdn-service
 PYTHON_SERVICES := analytics-service ml-service moderation-service export-service integration-service sentiment-service insights-service smart-reply-service

@@ -161,6 +161,9 @@ jobs:
           - name: admin-service
             context: services/spring/admin-service
             dockerfile: services/spring/admin-service/Dockerfile
+          - name: security-service
+            context: services/security-service
+            dockerfile: services/security-service/Dockerfile
           # Elixir Services
           - name: presence-service
             context: services/elixir/presence-service

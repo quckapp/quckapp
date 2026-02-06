@@ -1,6 +1,6 @@
 # QuckApp Microservices Architecture
 
-All **32 microservices** consolidated in `/services/` directory (matching documentation).
+All **33 microservices** consolidated in `/services/` directory (matching documentation).
 
 ## Complete Service Inventory
 
@@ -13,6 +13,7 @@ All **32 microservices** consolidated in `/services/` directory (matching docume
 | [permission-service](./services/permission-service) | 8083 | MySQL | RBAC, Casbin |
 | [audit-service](./services/audit-service) | 8084 | MySQL | Audit logging |
 | [admin-service](./services/admin-service) | 8085 | MySQL | Admin operations |
+| [security-service](./services/security-service) | 8086 | MySQL | Threat detection, WAF, audit & compliance |
 
 ### API & Notifications (NestJS)
 
@@ -67,7 +68,7 @@ All **32 microservices** consolidated in `/services/` directory (matching docume
 
 | Stack | Count | Services |
 |-------|-------|----------|
-| Spring Boot (Java) | 5 | auth, user, permission, audit, admin |
+| Spring Boot (Java) | 6 | auth, user, permission, audit, admin, security |
 | NestJS (Node.js) | 3 | backend-gateway, realtime-service, notification |
 | Phoenix (Elixir) | 6 | presence, call, message, notification-orchestrator, huddle, event-broadcast |
 | Gin (Go) | 10 | workspace, channel, search, thread, bookmark, reminder, media, file, attachment, cdn |
@@ -111,6 +112,7 @@ QuckApp/
 │   ├── smart-reply-service/        # Python FastAPI - AI replies
 │   ├── thread-service/             # Go Gin - Threads
 │   ├── user-service/               # Spring Boot - User management
+│   ├── security-service/            # Spring Boot - Security (Threat, WAF, Audit)
 │   └── workspace-service/          # Go Gin - Workspaces
 ├── web/                            # React frontend
 ├── mobile/                         # React Native app
@@ -151,4 +153,4 @@ docker-compose -f docker-compose.yml -f docker-compose.services.yml up -d
 | 3000-3001 | NestJS | backend-gateway, notification-service |
 | 4000-4006 | Elixir | realtime, presence, call, message, notification-orchestrator, huddle, event-broadcast |
 | 5001-5019 | Go/Python | All Go and Python services |
-| 8081-8085 | Spring Boot | auth, user, permission, audit, admin |
+| 8081-8086 | Spring Boot | auth, user, permission, audit, admin, security |

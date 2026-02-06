@@ -112,6 +112,9 @@
 [submodule "services/user-service"]
 	path = services/user-service
 	url = https://github.com/quckapp/user-service.git
+[submodule "services/security-service"]
+	path = services/security-service
+	url = https://github.com/quckapp/security-service.git
 [submodule "services/workspace-service"]
 	path = services/workspace-service
 	url = https://github.com/quckapp/workspace-service.git

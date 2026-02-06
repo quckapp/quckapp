@@ -58,6 +58,7 @@ jobs:
               - 'pnpm-lock.yaml'
             spring:
               - 'services/spring/**'
+              - 'services/security-service/**'
               - 'pom.xml'
             elixir:
               - 'services/elixir/**'
