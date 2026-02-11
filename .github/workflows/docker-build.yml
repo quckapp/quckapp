@@ -199,8 +199,8 @@ jobs:
         id: build
         uses: docker/build-push-action@v5
         with:
-          context: services/${{ matrix.stack }}/${{ matrix.name }}
-          file: services/${{ matrix.stack }}/${{ matrix.name }}/Dockerfile
+          context: services/${{ matrix.name }}
+          file: services/${{ matrix.name }}/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: ${{ inputs.push }}
           tags: ${{ steps.meta.outputs.tags }}

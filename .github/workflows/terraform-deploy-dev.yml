@@ -14,8 +14,8 @@ on:
     branches:
       - develop
     paths:
-      - 'terraform/environments/dev/**'
-      - 'terraform/modules/**'
+      - 'infrastructure/terraform/environments/dev/**'
+      - 'infrastructure/terraform/modules/**'
 
   # Allow manual trigger
   workflow_dispatch:
@@ -43,7 +43,7 @@ env:
   TF_VERSION: '1.6.0'
   AWS_REGION: 'us-east-1'
   ENVIRONMENT: 'dev'
-  TF_WORKING_DIR: 'terraform/environments/dev'
+  TF_WORKING_DIR: 'infrastructure/terraform/environments/dev'
 
 jobs:
   # ===========================================================================

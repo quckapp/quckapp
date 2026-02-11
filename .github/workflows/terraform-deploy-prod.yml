@@ -14,8 +14,8 @@ on:
     branches:
       - main
     paths:
-      - 'terraform/environments/prod/**'
-      - 'terraform/modules/**'
+      - 'infrastructure/terraform/environments/prod/**'
+      - 'infrastructure/terraform/modules/**'
 
   # Allow manual trigger
   workflow_dispatch:
@@ -44,7 +44,7 @@ env:
   TF_VERSION: '1.6.0'
   AWS_REGION: 'us-east-1'
   ENVIRONMENT: 'prod'
-  TF_WORKING_DIR: 'terraform/environments/prod'
+  TF_WORKING_DIR: 'infrastructure/terraform/environments/prod'
 
 jobs:
   # ===========================================================================
@@ -177,12 +177,12 @@ jobs:
       - name: Run tfsec on Plan
         uses: aquasecurity/tfsec-action@v1.0.3
         with:
-          working_directory: terraform/
+          working_directory: infrastructure/terraform/
           soft_fail: false
 
       - name: Check for Sensitive Changes
         run: |
-          if grep -E "(iam|kms|security_group|nacl)" terraform/environments/prod/plan_output.txt; then
+          if grep -E "(iam|kms|security_group|nacl)" infrastructure/terraform/environments/prod/plan_output.txt; then
             echo "::warning::Plan contains security-sensitive changes. Please review carefully."
           fi
 

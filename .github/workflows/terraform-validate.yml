@@ -17,7 +17,7 @@ on:
       - main
       - develop
     paths:
-      - 'terraform/**'
+      - 'infrastructure/terraform/**'
       - '.github/workflows/terraform-*.yml'
 
   # Allow manual trigger
@@ -64,13 +64,13 @@ jobs:
         with:
           filters: |
             dev:
-              - 'terraform/environments/dev/**'
-              - 'terraform/modules/**'
+              - 'infrastructure/terraform/environments/dev/**'
+              - 'infrastructure/terraform/modules/**'
             prod:
-              - 'terraform/environments/prod/**'
-              - 'terraform/modules/**'
+              - 'infrastructure/terraform/environments/prod/**'
+              - 'infrastructure/terraform/modules/**'
             modules:
-              - 'terraform/modules/**'
+              - 'infrastructure/terraform/modules/**'
 
   # ===========================================================================
   # Format Check
@@ -89,7 +89,7 @@ jobs:
 
       - name: Terraform Format Check
         id: fmt
-        run: terraform fmt -check -recursive -diff terraform/
+        run: terraform fmt -check -recursive -diff infrastructure/terraform/
         continue-on-error: true
 
       - name: Comment on PR (format failure)
@@ -118,7 +118,7 @@ jobs:
     if: needs.detect-changes.outputs.dev == 'true' || github.event.inputs.environment == 'dev'
     defaults:
       run:
-        working-directory: terraform/environments/dev
+        working-directory: infrastructure/terraform/environments/dev
 
     steps:
       - name: Checkout
@@ -174,7 +174,7 @@ jobs:
     if: needs.detect-changes.outputs.prod == 'true' || github.event.inputs.environment == 'prod'
     defaults:
       run:
-        working-directory: terraform/environments/prod
+        working-directory: infrastructure/terraform/environments/prod
 
     steps:
       - name: Checkout
@@ -213,7 +213,7 @@ jobs:
       - name: Run tfsec
         uses: aquasecurity/tfsec-action@v1.0.3
         with:
-          working_directory: terraform/
+          working_directory: infrastructure/terraform/
           soft_fail: true
           format: sarif
           out: tfsec-results.sarif
@@ -227,7 +227,7 @@ jobs:
       - name: Run Checkov
         uses: bridgecrewio/checkov-action@v12
         with:
-          directory: terraform/
+          directory: infrastructure/terraform/
           framework: terraform
           soft_fail: true
           output_format: cli,sarif
@@ -249,7 +249,7 @@ jobs:
     if: needs.validate-dev.result == 'success'
     defaults:
       run:
-        working-directory: terraform/environments/dev
+        working-directory: infrastructure/terraform/environments/dev
 
     steps:
       - name: Checkout
@@ -320,7 +320,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: tfplan-dev
-          path: terraform/environments/dev/tfplan
+          path: infrastructure/terraform/environments/dev/tfplan
           retention-days: 5
 
   # ===========================================================================
@@ -333,7 +333,7 @@ jobs:
     if: needs.validate-prod.result == 'success'
     defaults:
       run:
-        working-directory: terraform/environments/prod
+        working-directory: infrastructure/terraform/environments/prod
 
     steps:
       - name: Checkout
@@ -404,7 +404,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: tfplan-prod
-          path: terraform/environments/prod/tfplan
+          path: infrastructure/terraform/environments/prod/tfplan
           retention-days: 5
 
   # ===========================================================================
@@ -432,10 +432,10 @@ jobs:
         env:
           INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
         run: |
-          infracost breakdown --path=terraform/environments/dev \
+          infracost breakdown --path=infrastructure/terraform/environments/dev \
             --format=json --out-file=/tmp/dev.json || true
 
-          infracost breakdown --path=terraform/environments/prod \
+          infracost breakdown --path=infrastructure/terraform/environments/prod \
             --format=json --out-file=/tmp/prod.json || true
 
       - name: Post Infracost Comment
