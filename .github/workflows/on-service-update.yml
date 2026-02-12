@@ -81,7 +81,7 @@ jobs:
                 \"startEnvironment\": \"dev\"
               }
             }" \
-            "https://dev.azure.com/${{ vars.AZURE_DEVOPS_ORG }}/${{ vars.AZURE_DEVOPS_PROJECT }}/_apis/pipelines/${{ vars.AZURE_CD_PIPELINE_ID }}/runs?api-version=7.1" \
+            "https://dev.azure.com/AtomiverX/QuckApp/_apis/pipelines/${{ vars.AZURE_CD_PIPELINE_ID }}/runs?api-version=7.1" \
             -o response.json
 
           echo "Azure DevOps response:"
