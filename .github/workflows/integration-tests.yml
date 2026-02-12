@@ -1,0 +1,81 @@
+# =============================================================================
+# Integration Tests
+# =============================================================================
+# Runs cross-service integration tests when submodules are updated
+# =============================================================================
+
+name: Integration Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/**'
+  workflow_dispatch:
+
+concurrency:
+  group: integration-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration-tests:
+    name: Cross-Service Integration Tests
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: testpassword
+          MYSQL_DATABASE: quckapp_test
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: --health-cmd="mongosh --eval 'db.runCommand({ping:1})'" --health-interval=10s --health-timeout=5s --health-retries=3
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: --health-cmd="redis-cli ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Verify infrastructure services
+        run: |
+          echo "Checking MySQL..."
+          mysql -h 127.0.0.1 -u root -ptestpassword -e "SELECT 1" quckapp_test
+          echo "MySQL: OK"
+
+          echo "Checking MongoDB..."
+          mongosh --host 127.0.0.1 --eval "db.runCommand({ping:1})" --quiet
+          echo "MongoDB: OK"
+
+          echo "Checking Redis..."
+          redis-cli -h 127.0.0.1 ping
+          echo "Redis: OK"
+
+      - name: Run API contract tests
+        run: |
+          echo "API contract tests would run here"
+          echo "Validating service-to-service contracts..."
+          # Future: newman run tests/api-contracts/*.json
+          # Future: dredd validate services/backend-gateway/openapi.yaml
+
+      - name: Summary
+        run: |
+          echo "### Integration Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| MySQL | Connected |" >> $GITHUB_STEP_SUMMARY
+          echo "| MongoDB | Connected |" >> $GITHUB_STEP_SUMMARY
+          echo "| Redis | Connected |" >> $GITHUB_STEP_SUMMARY

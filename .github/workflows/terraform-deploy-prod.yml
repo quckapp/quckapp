@@ -42,7 +42,6 @@ permissions:
 
 env:
   TF_VERSION: '1.6.0'
-  AWS_REGION: 'us-east-1'
   ENVIRONMENT: 'prod'
   TF_WORKING_DIR: 'infrastructure/terraform/environments/prod'
 
@@ -96,11 +95,12 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Azure Login
+        uses: azure/login@v2
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN_PROD }}
-          aws-region: ${{ env.AWS_REGION }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Terraform Init
         id: init
@@ -231,11 +231,12 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Azure Login
+        uses: azure/login@v2
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN_PROD }}
-          aws-region: ${{ env.AWS_REGION }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Download Plan
         uses: actions/download-artifact@v4
@@ -293,27 +294,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Azure Login
+        uses: azure/login@v2
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN_PROD }}
-          aws-region: ${{ env.AWS_REGION }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Verify S3 Buckets
+      - name: Verify AKS Cluster
         run: |
-          echo "Verifying S3 buckets..."
-          aws s3 ls | grep quckapp || echo "::warning::No QuckApp buckets found"
+          echo "Verifying AKS cluster..."
+          az aks show --resource-group rg-quckapp-prod --name aks-quckapp-prod --query "{Status:provisioningState,K8sVersion:kubernetesVersion}" -o table || echo "::warning::AKS cluster check failed"
 
-      - name: Verify CloudFront
+      - name: Verify ACR
         run: |
-          echo "Verifying CloudFront distributions..."
-          aws cloudfront list-distributions --query 'DistributionList.Items[?contains(Aliases.Items, `quckapp`)].{Id:Id,Status:Status}' || true
+          echo "Verifying ACR..."
+          az acr show --name ${{ secrets.ACR_NAME }} --query "{Status:provisioningState,SKU:sku.name,LoginServer:loginServer}" -o table || echo "::warning::ACR check failed"
+
+      - name: Verify Key Vault
+        run: |
+          echo "Verifying Key Vault..."
+          az keyvault show --name kv-quckapp-prod --query "{Status:properties.provisioningState,SKU:properties.sku.name}" -o table || echo "::warning::Key Vault check failed"
 
       - name: Health Check
         run: |
           echo "Running health checks..."
-          # Add your health check commands here
-          # curl -f https://api.quckapp.com/health || exit 1
+          # curl -f https://api.quckapp.io/health || exit 1
 
   # ===========================================================================
   # Notifications
