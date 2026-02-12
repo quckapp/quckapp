@@ -1,0 +1,101 @@
+{
+  "name": "QuckApp Development",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "devcontainer",
+  "workspaceFolder": "/workspace",
+  "shutdownAction": "stopCompose",
+
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/go:1": {
+      "version": "1.21"
+    },
+    "ghcr.io/devcontainers/features/java:1": {
+      "version": "17",
+      "installMaven": "true"
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    },
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.12"
+    },
+    "ghcr.io/devcontainers/features/rust:1": {},
+    "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
+      "helm": "latest",
+      "kubectl": "latest",
+      "minikube": "none"
+    }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.Go",
+        "ms-python.python",
+        "vscjava.vscode-java-pack",
+        "dbaeumer.vscode-eslint",
+        "ms-azuretools.vscode-docker",
+        "JakeBecker.elixir-ls",
+        "redhat.vscode-yaml",
+        "ms-kubernetes-tools.vscode-kubernetes-tools",
+        "rust-lang.rust-analyzer",
+        "esbenp.prettier-vscode",
+        "ms-vscode.vscode-typescript-next",
+        "bradlc.vscode-tailwindcss",
+        "eamodio.gitlens"
+      ],
+      "settings": {
+        "go.toolsManagement.autoUpdate": true,
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "[go]": {
+          "editor.defaultFormatter": "golang.Go"
+        },
+        "[java]": {
+          "editor.defaultFormatter": "redhat.java"
+        },
+        "[rust]": {
+          "editor.defaultFormatter": "rust-lang.rust-analyzer"
+        }
+      }
+    }
+  },
+
+  "postCreateCommand": "bash scripts/bootstrap.sh",
+
+  "forwardPorts": [
+    3000,
+    3306,
+    5432,
+    27017,
+    6379,
+    9200,
+    29092,
+    8085,
+    8123,
+    9010,
+    9011
+  ],
+
+  "portsAttributes": {
+    "3000": { "label": "Frontend (Web)" },
+    "3306": { "label": "MySQL" },
+    "5432": { "label": "PostgreSQL" },
+    "27017": { "label": "MongoDB" },
+    "6379": { "label": "Redis" },
+    "9200": { "label": "Elasticsearch" },
+    "29092": { "label": "Kafka" },
+    "8085": { "label": "ClickHouse HTTP" },
+    "8123": { "label": "ClickHouse Native" },
+    "9010": { "label": "MinIO API" },
+    "9011": { "label": "MinIO Console" }
+  },
+
+  "remoteEnv": {
+    "NODE_ENV": "development",
+    "GO111MODULE": "on",
+    "GOPATH": "/home/vscode/go"
+  }
+}

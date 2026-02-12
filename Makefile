@@ -72,6 +72,24 @@ help: ## Show this help message
 	@echo ""
 
 # -----------------------------------------------------------------------------
+# Bootstrap & Environment Setup
+# -----------------------------------------------------------------------------
+bootstrap: ## Full dev environment setup (infra + seed + buckets)
+	@echo "$(CYAN)Running full bootstrap...$(RESET)"
+	@bash scripts/bootstrap.sh
+
+seed: ## Re-run seed scripts for all databases
+	@echo "$(CYAN)Seeding databases...$(RESET)"
+	@bash infrastructure/docker/seed-scripts/seed-elasticsearch.sh
+	@echo "$(GREEN)Seeding complete!$(RESET)"
+
+reset-db: ## Reset all databases (stops infra, removes volumes, re-bootstraps)
+	@echo "$(RED)Resetting all databases and infrastructure...$(RESET)"
+	@$(DOCKER_COMPOSE) -f infrastructure/docker/docker-compose.infra.yml down -v
+	@bash scripts/bootstrap.sh
+	@echo "$(GREEN)Database reset complete!$(RESET)"
+
+# -----------------------------------------------------------------------------
 # Installation & Setup
 # -----------------------------------------------------------------------------
 install: ## Install all dependencies for all stacks

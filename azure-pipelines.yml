@@ -1,0 +1,43 @@
+# =============================================================================
+# QuckApp Root Pipeline - Auto-discovered by Azure DevOps
+# =============================================================================
+# This file is the entry point for Azure DevOps pipeline auto-discovery.
+# It references the CI pipeline template in the infrastructure submodule.
+# =============================================================================
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    exclude:
+      - '*.md'
+      - 'docs/**'
+      - '.devcontainer/**'
+      - '.github/**'
+      - 'LICENSE'
+      - 'CONTRIBUTING.md'
+      - 'DEPLOYMENT.md'
+      - 'SERVICES.md'
+
+pr:
+  branches:
+    include:
+      - main
+  paths:
+    exclude:
+      - '*.md'
+      - 'docs/**'
+      - '.devcontainer/**'
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  - group: QuckApp-Global-Variables
+  - group: quckapp-ci-common
+
+extends:
+  template: infrastructure/azure-pipelines/ci-main.yml
+  parameters:
+    forceAll: false
