@@ -127,3 +127,6 @@
 [submodule "packages/go-auth"]
 	path = packages/go-auth
 	url = https://github.com/quckapp/go-auth.git
+[submodule "packages/secure-url"]
+	path = packages/secure-url
+	url = https://github.com/quckapp/secure-url.git
