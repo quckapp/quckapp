@@ -17,7 +17,7 @@ import java.time.Instant;
 public class SecurityEvent {
 
     @Id
-    @Column(length = 36)
+    @Column(length = 36, columnDefinition = "char(36)")
     private String id;
 
     @Column(name = "event_type", nullable = false, length = 50)
@@ -30,7 +30,7 @@ public class SecurityEvent {
     @Column(name = "source_service", length = 100)
     private String sourceService;
 
-    @Column(name = "user_id", length = 36)
+    @Column(name = "user_id", length = 36, columnDefinition = "char(36)")
     private String userId;
 
     @Column(name = "user_email")

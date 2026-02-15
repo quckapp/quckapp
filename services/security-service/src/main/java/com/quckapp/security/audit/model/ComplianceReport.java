@@ -18,7 +18,7 @@ import java.time.Instant;
 public class ComplianceReport {
 
     @Id
-    @Column(length = 36)
+    @Column(length = 36, columnDefinition = "char(36)")
     private String id;
 
     @Column(name = "report_type", nullable = false, length = 50)

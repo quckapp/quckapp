@@ -18,7 +18,7 @@ import java.time.Instant;
 public class GeoBlockRule {
 
     @Id
-    @Column(length = 36)
+    @Column(length = 36, columnDefinition = "char(36)")
     private String id;
 
     @Column(name = "country_code", nullable = false, length = 10, unique = true)

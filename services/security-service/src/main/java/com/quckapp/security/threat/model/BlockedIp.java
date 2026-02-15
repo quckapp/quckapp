@@ -18,7 +18,7 @@ import java.time.Instant;
 public class BlockedIp {
 
     @Id
-    @Column(length = 36)
+    @Column(length = 36, columnDefinition = "char(36)")
     private String id;
 
     @Column(name = "ip_address", nullable = false, length = 45)

@@ -18,7 +18,7 @@ import java.time.Instant;
 public class EncryptionKey {
 
     @Id
-    @Column(length = 36)
+    @Column(length = 36, columnDefinition = "char(36)")
     private String id;
 
     @Column(name = "key_alias", nullable = false, unique = true)

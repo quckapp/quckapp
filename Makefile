@@ -36,9 +36,9 @@ HELM_CHART := ./infrastructure/helm/quckapp
 HELM_VALUES ?= values.yaml
 
 # Services by stack
-NESTJS_SERVICES := backend-gateway notification-service realtime-service
+NESTJS_SERVICES := backend-gateway notification-service
 SPRING_SERVICES := auth-service user-service permission-service audit-service admin-service security-service
-ELIXIR_SERVICES := presence-service message-service call-service notification-orchestrator huddle-service event-broadcast-service
+ELIXIR_SERVICES := presence-service message-service call-service notification-orchestrator huddle-service event-broadcast-service realtime-service
 GO_SERVICES := workspace-service channel-service thread-service search-service file-service media-service bookmark-service reminder-service attachment-service cdn-service
 PYTHON_SERVICES := analytics-service ml-service moderation-service export-service integration-service sentiment-service insights-service smart-reply-service
 ALL_SERVICES := $(NESTJS_SERVICES) $(SPRING_SERVICES) $(ELIXIR_SERVICES) $(GO_SERVICES) $(PYTHON_SERVICES)
@@ -291,7 +291,7 @@ docker-up: ## Start all services with Docker Compose
 docker-up-infra: ## Start infrastructure only (databases, cache, etc.)
 	@echo "$(CYAN)Starting infrastructure...$(RESET)"
 	@$(DOCKER_COMPOSE) -f $(DOCKER_COMPOSE_FILE) up -d \
-		mongodb mysql postgres redis elasticsearch kafka zookeeper minio nginx
+		postgres mysql mongodb redis elasticsearch clickhouse zookeeper kafka minio
 	@echo "$(GREEN)Infrastructure started!$(RESET)"
 
 docker-up-monitoring: ## Start monitoring stack

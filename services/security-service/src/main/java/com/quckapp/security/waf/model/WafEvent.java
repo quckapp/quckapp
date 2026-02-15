@@ -17,10 +17,10 @@ import java.time.Instant;
 public class WafEvent {
 
     @Id
-    @Column(length = 36)
+    @Column(length = 36, columnDefinition = "char(36)")
     private String id;
 
-    @Column(name = "rule_id", length = 36)
+    @Column(name = "rule_id", length = 36, columnDefinition = "char(36)")
     private String ruleId;
 
     @Column(name = "rule_name")

@@ -17,7 +17,7 @@ import java.time.Instant;
 public class ThreatEvent {
 
     @Id
-    @Column(length = 36)
+    @Column(length = 36, columnDefinition = "char(36)")
     private String id;
 
     @Column(name = "event_type", nullable = false, length = 50)
@@ -30,7 +30,7 @@ public class ThreatEvent {
     @Column(name = "source_ip", length = 45)
     private String sourceIp;
 
-    @Column(name = "target_user_id", length = 36)
+    @Column(name = "target_user_id", length = 36, columnDefinition = "char(36)")
     private String targetUserId;
 
     @Column(name = "target_email")

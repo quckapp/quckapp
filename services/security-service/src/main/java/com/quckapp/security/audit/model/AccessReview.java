@@ -18,7 +18,7 @@ import java.time.Instant;
 public class AccessReview {
 
     @Id
-    @Column(length = 36)
+    @Column(length = 36, columnDefinition = "char(36)")
     private String id;
 
     @Column(name = "review_type", nullable = false, length = 50)
@@ -29,7 +29,7 @@ public class AccessReview {
     @Builder.Default
     private String status = "PENDING";
 
-    @Column(name = "user_id", nullable = false, length = 36)
+    @Column(name = "user_id", nullable = false, length = 36, columnDefinition = "char(36)")
     private String userId;
 
     @Column(name = "user_email")
@@ -44,7 +44,7 @@ public class AccessReview {
     @Column(length = 50)
     private String recommendation;
 
-    @Column(name = "reviewer_id", length = 36)
+    @Column(name = "reviewer_id", length = 36, columnDefinition = "char(36)")
     private String reviewerId;
 
     @Column(name = "reviewer_email")
