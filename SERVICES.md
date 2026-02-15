@@ -122,6 +122,37 @@ QuckApp/
 
 ---
 
+## Shared Packages
+
+| Package | Path | Description |
+|---------|------|-------------|
+| [@quckapp/api-client](./packages/api-client) | `packages/api-client/` | Auto-generated TypeScript API client from OpenAPI spec |
+| [@quckapp/secure-url](./packages/secure-url) | `packages/secure-url/` | URL validation, SSRF protection, service registry, Firebase provider, safe HTTP client |
+
+### @quckapp/secure-url
+
+Security-focused URL management package providing:
+- **URL Validator** — SSRF protection, private IP blocking, HTTPS enforcement, domain allowlisting
+- **URL Registry** — Typed service URL registry with all 33 QuckApp service URLs as defaults
+- **Firebase Provider** — Unified Firebase Admin SDK initialization from env vars (dev/prod split)
+- **Safe HTTP Client** — Axios wrapper that validates URLs through the security layer before requests
+- **NestJS Module** — `SecureUrlModule.forRoot()` for easy integration into NestJS services
+
+```typescript
+// NestJS integration
+import { SecureUrlModule, SecureUrlService } from '@quckapp/secure-url';
+
+@Module({
+  imports: [SecureUrlModule.forRoot({ firebaseEnabled: true })],
+})
+export class AppModule {}
+
+// Standalone usage
+import { UrlValidator, SafeHttpClient, UrlRegistry } from '@quckapp/secure-url';
+```
+
+---
+
 ## Health Endpoints
 
 All services expose:

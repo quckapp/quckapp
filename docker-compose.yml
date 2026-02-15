@@ -1,0 +1,1117 @@
+# =============================================================================
+# QUCKAPP - ROOT DOCKER COMPOSE
+# =============================================================================
+# Starts ALL infrastructure + application services for local development.
+#
+# Usage:
+#   make docker-up              # Start everything
+#   make docker-up-infra        # Start infrastructure only
+#   make docker-down            # Stop everything
+#   docker compose up -d        # Direct usage
+#
+# Each service uses its own Dockerfile from services/{name}/Dockerfile.
+# Ports match each service's Dockerfile EXPOSE value.
+# =============================================================================
+
+include:
+  - path: infrastructure/docker/docker-compose.infra.yml
+
+services:
+  # ===========================================================================
+  # KONG API GATEWAY (DB-less / Declarative)
+  # ===========================================================================
+
+  kong:
+    image: kong:3.9
+    container_name: quckapp-kong
+    restart: unless-stopped
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /etc/kong/kong.yml
+      KONG_PROXY_LISTEN: "0.0.0.0:8000, 0.0.0.0:8443 ssl"
+      KONG_ADMIN_LISTEN: "0.0.0.0:8001"
+      KONG_LOG_LEVEL: info
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+    volumes:
+      - ./kong/kong.yml:/etc/kong/kong.yml:ro
+    ports:
+      - "8080:8000"
+      - "8443:8443"
+      - "8001:8001"
+    networks:
+      - quckapp-network
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ===========================================================================
+  # BACKEND-GATEWAY / BFF (NestJS) — downstream service behind Kong
+  # ===========================================================================
+
+  backend-gateway:
+    build:
+      context: ./services/backend-gateway
+      dockerfile: Dockerfile
+    container_name: quckapp-backend-gateway
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://quckapp:quckapp_secret@postgres:5432/quckapp
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: redis_secret
+      MONGODB_URI: mongodb://admin:admin_secret@mongodb:27017/quckapp_gateway?authSource=admin
+      KAFKA_BROKERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+      AUTH_SERVICE_URL: http://auth-service:8081
+      USER_SERVICE_URL: http://user-service:8082
+      WORKSPACE_SERVICE_URL: http://workspace-service:5004
+      CHANNEL_SERVICE_URL: http://channel-service:5005
+      MESSAGE_SERVICE_URL: http://message-service:4003
+      FILE_SERVICE_URL: http://file-service:5002
+      SEARCH_SERVICE_URL: http://search-service:5006
+      NOTIFICATION_SERVICE_URL: http://notification-service:3001
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    # No host port mapping — Kong is the external entry point (port 8000)
+    expose:
+      - "3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000/api/v1/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ===========================================================================
+  # SPRING BOOT SERVICES
+  # ===========================================================================
+
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+    container_name: quckapp-auth-service
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SERVER_PORT: 8081
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/quckapp_auth?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-quckapp}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-quckapp123}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: redis_secret
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-placeholder}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-placeholder}
+      APPLE_CLIENT_ID: ${APPLE_CLIENT_ID:-placeholder}
+      APPLE_CLIENT_SECRET: ${APPLE_CLIENT_SECRET:-placeholder}
+      FACEBOOK_CLIENT_ID: ${FACEBOOK_CLIENT_ID:-placeholder}
+      FACEBOOK_CLIENT_SECRET: ${FACEBOOK_CLIENT_SECRET:-placeholder}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-placeholder}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-placeholder}
+      OTEL_EXPORTER_JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "8081:8081"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8081/api/auth/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  user-service:
+    build:
+      context: ./services/user-service
+      dockerfile: Dockerfile
+    container_name: quckapp-user-service
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SERVER_PORT: 8082
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/quckapp_users?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-quckapp}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-quckapp123}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: redis_secret
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+      OTEL_EXPORTER_JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "8082:8082"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+
+  permission-service:
+    build:
+      context: ./services/permission-service
+      dockerfile: Dockerfile
+    container_name: quckapp-permission-service
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SERVER_PORT: 8083
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/quckapp_permissions?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-quckapp}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-quckapp123}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: redis_secret
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+      OTEL_EXPORTER_JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "8083:8083"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+
+  audit-service:
+    build:
+      context: ./services/audit-service
+      dockerfile: Dockerfile
+    container_name: quckapp-audit-service
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SERVER_PORT: 8084
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/quckapp_audit?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-quckapp}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-quckapp123}
+      SPRING_DATA_MONGODB_URI: mongodb://admin:admin_secret@mongodb:27017/quckapp_audit?authSource=admin
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      ELASTICSEARCH_URI: elasticsearch:9200
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+      OTEL_EXPORTER_JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "8084:8084"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+
+  admin-service:
+    build:
+      context: ./services/admin-service
+      dockerfile: Dockerfile
+    container_name: quckapp-admin-service
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8085
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: quckapp_admin
+      MYSQL_USERNAME: ${MYSQL_USER:-quckapp}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-quckapp123}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: redis_secret
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+      OTEL_EXPORTER_JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "18085:8085"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+
+  security-service:
+    build:
+      context: ./services/security-service
+      dockerfile: Dockerfile
+    container_name: quckapp-security-service
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8086
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/quckapp_security?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-quckapp}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-quckapp123}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: redis_secret
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_SECRET: ZGV2X2p3dF9zZWNyZXRfY2hhbmdlX2luX3Byb2R1Y3Rpb25fbWluXzMyX2NoYXJzX2xvbmdfZW5vdWdo
+      OTEL_EXPORTER_JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "8086:8086"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8086/api/security/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ===========================================================================
+  # NESTJS SERVICES
+  # ===========================================================================
+
+  notification-service:
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+    container_name: quckapp-notification-service
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: quckapp
+      DB_PASSWORD: quckapp_secret
+      DB_NAME: quckapp_notifications
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: redis_secret
+      KAFKA_BROKERS: kafka:9092
+      FCM_PROJECT_ID: ${FCM_PROJECT_ID:-}
+      FCM_PRIVATE_KEY: ${FCM_PRIVATE_KEY:-}
+      FCM_CLIENT_EMAIL: ${FCM_CLIENT_EMAIL:-}
+      APNS_KEY_ID: ${APNS_KEY_ID:-}
+      APNS_TEAM_ID: ${APNS_TEAM_ID:-}
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ===========================================================================
+  # GO SERVICES
+  # ===========================================================================
+
+  workspace-service:
+    build:
+      context: ./services/workspace-service
+      dockerfile: Dockerfile
+    container_name: quckapp-workspace-service
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: development
+      PORT: 5004
+      DATABASE_URL: ${MYSQL_USER:-quckapp}:${MYSQL_PASSWORD:-quckapp123}@tcp(mysql:3306)/quckapp_workspaces?parseTime=true
+      REDIS_URL: redis:6379
+      KAFKA_BROKERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "5004:5004"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+
+  channel-service:
+    build:
+      context: ./services/channel-service
+      dockerfile: Dockerfile
+    container_name: quckapp-channel-service
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: development
+      PORT: 5005
+      DATABASE_URL: ${MYSQL_USER:-quckapp}:${MYSQL_PASSWORD:-quckapp123}@tcp(mysql:3306)/quckapp_channels?parseTime=true
+      REDIS_URL: redis:6379
+      KAFKA_BROKERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "5005:5005"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+
+  thread-service:
+    build:
+      context: ./services/thread-service
+      dockerfile: Dockerfile
+    container_name: quckapp-thread-service
+    restart: unless-stopped
+    environment:
+      ENV: development
+      PORT: 3005
+      DATABASE_URL: ${MYSQL_USER:-quckapp}:${MYSQL_PASSWORD:-quckapp123}@tcp(mysql:3306)/quckapp_threads?parseTime=true
+      KAFKA_BROKERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "3005:3005"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+
+  file-service:
+    build:
+      context: ./services/file-service
+      dockerfile: Dockerfile
+    container_name: quckapp-file-service
+    restart: unless-stopped
+    environment:
+      ENV: development
+      PORT: 5002
+      MONGODB_URI: mongodb://admin:admin_secret@mongodb:27017
+      MONGODB_DATABASE: quckapp_files
+      REDIS_URL: redis:6379
+      REDIS_PASSWORD: redis_secret
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_TOPIC: file-events
+      S3_BUCKET: quckapp-files
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      S3_ENDPOINT: http://minio:9000
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "5002:5002"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+
+  media-service:
+    build:
+      context: ./services/media-service
+      dockerfile: Dockerfile
+    container_name: quckapp-media-service
+    restart: unless-stopped
+    environment:
+      ENV: development
+      PORT: 5001
+      MONGODB_URI: mongodb://admin:admin_secret@mongodb:27017/quckapp_media?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: redis_secret
+      KAFKA_BROKERS: kafka:9092
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      AWS_S3_BUCKET: quckapp-media
+      S3_ENDPOINT: http://minio:9000
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "5001:5001"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+
+  search-service:
+    build:
+      context: ./services/search-service
+      dockerfile: Dockerfile
+    container_name: quckapp-search-service
+    restart: unless-stopped
+    environment:
+      ENV: development
+      PORT: 5006
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      REDIS_URL: redis://:redis_secret@redis:6379
+      KAFKA_BROKERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "5006:5006"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+
+  bookmark-service:
+    build:
+      context: .
+      dockerfile: services/bookmark-service/Dockerfile
+    container_name: quckapp-bookmark-service
+    restart: unless-stopped
+    environment:
+      ENV: development
+      PORT: 5010
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: ${MYSQL_USER:-quckapp}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-quckapp123}
+      DB_NAME: quckapp_bookmarks
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "5010:5010"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5010/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  reminder-service:
+    build:
+      context: ./services/reminder-service
+      dockerfile: Dockerfile
+    container_name: quckapp-reminder-service
+    restart: unless-stopped
+    environment:
+      ENV: development
+      PORT: 4010
+      MONGODB_URL: mongodb://admin:admin_secret@mongodb:27017/?authSource=admin
+      DATABASE_NAME: quckapp_reminders
+      REDIS_URL: redis:6379
+      KAFKA_BROKERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "4010:4010"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+
+  attachment-service:
+    build:
+      context: ./services/attachment-service
+      dockerfile: Dockerfile
+    container_name: quckapp-attachment-service
+    restart: unless-stopped
+    environment:
+      ENV: development
+      PORT: 4011
+      MONGODB_URL: mongodb://admin:admin_secret@mongodb:27017/?authSource=admin
+      DATABASE_NAME: quckapp_attachments
+      KAFKA_BROKERS: kafka:9092
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: quckapp-attachments
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      S3_REGION: us-east-1
+      CDN_BASE_URL: http://cdn-service:4012
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "4011:4011"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+
+  cdn-service:
+    build:
+      context: ./services/cdn-service
+      dockerfile: Dockerfile
+    container_name: quckapp-cdn-service
+    restart: unless-stopped
+    environment:
+      ENV: development
+      PORT: 4012
+      REDIS_URL: redis:6379
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: quckapp-attachments
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      S3_REGION: us-east-1
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "4012:4012"
+    depends_on:
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+
+  # ===========================================================================
+  # ELIXIR SERVICES
+  # ===========================================================================
+
+  realtime-service:
+    build:
+      context: ./services/realtime-service
+      dockerfile: Dockerfile
+    container_name: quckapp-realtime-service
+    restart: unless-stopped
+    environment:
+      MIX_ENV: prod
+      PORT: 4000
+      DATABASE_URL: mysql://${MYSQL_USER:-quckapp}:${MYSQL_PASSWORD:-quckapp123}@mysql:3306/quckapp_realtime
+      DATABASE_SSL: "false"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: redis_secret
+      KAFKA_BROKERS: kafka:9092
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:-dev_secret_key_base_min_64_chars_long_for_phoenix_app_1234567890abcdef}
+      RELEASE_COOKIE: ${ERLANG_COOKIE:-quckapp_dev_cookie}
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+      HOST: localhost
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "4000:4000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+
+  presence-service:
+    build:
+      context: ./services/presence-service
+      dockerfile: Dockerfile
+    container_name: quckapp-presence-service
+    restart: unless-stopped
+    environment:
+      MIX_ENV: prod
+      PORT: 4001
+      MONGODB_URI: mongodb://admin:admin_secret@mongodb:27017/quckapp_presence?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: redis_secret
+      KAFKA_BROKERS: kafka:9092
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:-dev_secret_key_base_min_64_chars_long_for_phoenix_app_1234567890abcdef}
+      RELEASE_COOKIE: ${ERLANG_COOKIE:-quckapp_dev_cookie}
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "4001:4001"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+
+  call-service:
+    build:
+      context: ./services/call-service
+      dockerfile: Dockerfile
+    container_name: quckapp-call-service
+    restart: unless-stopped
+    environment:
+      MIX_ENV: prod
+      PORT: 4002
+      MONGODB_URI: mongodb://admin:admin_secret@mongodb:27017/quckapp_calls?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: redis_secret
+      KAFKA_BROKERS: kafka:9092
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:-dev_secret_key_base_min_64_chars_long_for_phoenix_app_1234567890abcdef}
+      RELEASE_COOKIE: ${ERLANG_COOKIE:-quckapp_dev_cookie}
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "4002:4002"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+
+  message-service:
+    build:
+      context: ./services/message-service
+      dockerfile: Dockerfile
+    container_name: quckapp-message-service
+    restart: unless-stopped
+    environment:
+      MIX_ENV: prod
+      PORT: 4003
+      MONGODB_URI: mongodb://admin:admin_secret@mongodb:27017/quckapp_messages?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: redis_secret
+      KAFKA_BROKERS: kafka:9092
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:-dev_secret_key_base_min_64_chars_long_for_phoenix_app_1234567890abcdef}
+      RELEASE_COOKIE: ${ERLANG_COOKIE:-quckapp_dev_cookie}
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "4003:4003"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+
+  notification-orchestrator:
+    build:
+      context: ./services/notification-orchestrator
+      dockerfile: Dockerfile
+    container_name: quckapp-notification-orchestrator
+    restart: unless-stopped
+    environment:
+      MIX_ENV: prod
+      PORT: 4004
+      MONGODB_URI: mongodb://admin:admin_secret@mongodb:27017/quckapp_notifications?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: redis_secret
+      KAFKA_BROKERS: kafka:9092
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:-dev_secret_key_base_min_64_chars_long_for_phoenix_app_1234567890abcdef}
+      RELEASE_COOKIE: ${ERLANG_COOKIE:-quckapp_dev_cookie}
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "4004:4004"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+
+  huddle-service:
+    build:
+      context: ./services/huddle-service
+      dockerfile: Dockerfile
+    container_name: quckapp-huddle-service
+    restart: unless-stopped
+    environment:
+      MIX_ENV: dev
+      PORT: 4005
+      DATABASE_URL: postgresql://quckapp:quckapp_secret@postgres:5432/quckapp
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: redis_secret
+      KAFKA_BROKERS: kafka:9092
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:-dev_secret_key_base_min_64_chars_long_for_phoenix_app_1234567890abcdef}
+      RELEASE_COOKIE: ${ERLANG_COOKIE:-quckapp_dev_cookie}
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "4005:4005"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+
+  event-broadcast-service:
+    build:
+      context: ./services/event-broadcast-service
+      dockerfile: Dockerfile
+    container_name: quckapp-event-broadcast-service
+    restart: unless-stopped
+    environment:
+      MIX_ENV: prod
+      PORT: 4006
+      MONGODB_URL: mongodb://admin:admin_secret@mongodb:27017/quckapp_events?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: redis_secret
+      KAFKA_HOST: kafka
+      KAFKA_PORT: 9092
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:-dev_secret_key_base_min_64_chars_long_for_phoenix_app_1234567890abcdef}
+      RELEASE_COOKIE: ${ERLANG_COOKIE:-quckapp_dev_cookie}
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "4006:4006"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+
+  # ===========================================================================
+  # PYTHON SERVICES (FastAPI/Uvicorn)
+  # ===========================================================================
+
+  analytics-service:
+    build:
+      context: ./services/analytics-service
+      dockerfile: Dockerfile
+    container_name: quckapp-analytics-service
+    restart: unless-stopped
+    environment:
+      ENV: development
+      PORT: 5007
+      MYSQL_URL: mysql+aiomysql://${MYSQL_USER:-quckapp}:${MYSQL_PASSWORD:-quckapp123}@mysql:3306/quckapp_analytics
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 9000
+      CLICKHOUSE_USER: quckapp
+      CLICKHOUSE_PASSWORD: clickhouse_secret
+      CLICKHOUSE_DB: quckapp_analytics
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: redis_secret
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_ENABLED: "true"
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "5007:5007"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+
+  ml-service:
+    build:
+      context: ./services/ml-service
+      dockerfile: Dockerfile
+    container_name: quckapp-ml-service
+    restart: unless-stopped
+    environment:
+      ENV: development
+      PORT: 5008
+      DATABASE_URL: postgresql://quckapp:quckapp_secret@postgres:5432/quckapp
+      REDIS_URL: redis://:redis_secret@redis:6379
+      KAFKA_BROKERS: kafka:9092
+      MODEL_PATH: /app/models
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "5008:5008"
+    volumes:
+      - ml_models:/app/models
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+
+  moderation-service:
+    build:
+      context: ./services/moderation-service
+      dockerfile: Dockerfile
+    container_name: quckapp-moderation-service
+    restart: unless-stopped
+    environment:
+      ENV: development
+      PORT: 5014
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: ${MYSQL_USER:-quckapp}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-quckapp123}
+      DB_NAME: quckapp_moderation
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BROKERS: kafka:9092
+      ML_SERVICE_URL: http://ml-service:5008
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "5014:5014"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      ml-service:
+        condition: service_started
+    networks:
+      - quckapp-network
+
+  sentiment-service:
+    build:
+      context: ./services/sentiment-service
+      dockerfile: Dockerfile
+    container_name: quckapp-sentiment-service
+    restart: unless-stopped
+    environment:
+      ENV: development
+      PORT: 5017
+      DATABASE_URL: postgresql://quckapp:quckapp_secret@postgres:5432/quckapp
+      REDIS_URL: redis://:redis_secret@redis:6379
+      KAFKA_BROKERS: kafka:9092
+      ML_SERVICE_URL: http://ml-service:5008
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "5017:5017"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      ml-service:
+        condition: service_started
+    networks:
+      - quckapp-network
+
+  export-service:
+    build:
+      context: ./services/export-service
+      dockerfile: Dockerfile
+    container_name: quckapp-export-service
+    restart: unless-stopped
+    environment:
+      ENV: development
+      PORT: 5015
+      DATABASE_URL: mysql+asyncmy://${MYSQL_USER:-quckapp}:${MYSQL_PASSWORD:-quckapp123}@mysql:3306/quckapp_exports
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      KAFKA_BROKERS: kafka:9092
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      AWS_REGION: us-east-1
+      S3_BUCKET: quckapp-exports
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "5015:5015"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+
+  integration-service:
+    build:
+      context: ./services/integration-service
+      dockerfile: Dockerfile
+    container_name: quckapp-integration-service
+    restart: unless-stopped
+    environment:
+      ENV: development
+      PORT: 5016
+      DATABASE_URL: mysql+asyncmy://${MYSQL_USER:-quckapp}:${MYSQL_PASSWORD:-quckapp123}@mysql:3306/quckapp_integrations
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BROKERS: kafka:9092
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "5016:5016"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+
+  insights-service:
+    build:
+      context: ./services/insights-service
+      dockerfile: Dockerfile
+    container_name: quckapp-insights-service
+    restart: unless-stopped
+    environment:
+      ENV: development
+      PORT: 5018
+      DATABASE_URL: mysql+asyncmy://${MYSQL_USER:-quckapp}:${MYSQL_PASSWORD:-quckapp123}@mysql:3306/quckapp_insights
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 9000
+      CLICKHOUSE_USER: quckapp
+      CLICKHOUSE_PASSWORD: clickhouse_secret
+      CLICKHOUSE_DB: quckapp_analytics
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: redis_secret
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      KAFKA_BROKERS: kafka:9092
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "5018:5018"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+
+  smart-reply-service:
+    build:
+      context: ./services/smart-reply-service
+      dockerfile: Dockerfile
+    container_name: quckapp-smart-reply-service
+    restart: unless-stopped
+    environment:
+      ENV: development
+      PORT: 5019
+      DATABASE_URL: postgresql://quckapp:quckapp_secret@postgres:5432/quckapp
+      REDIS_URL: redis://:redis_secret@redis:6379
+      KAFKA_BROKERS: kafka:9092
+      ML_SERVICE_URL: http://ml-service:5008
+      JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    ports:
+      - "5019:5019"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      ml-service:
+        condition: service_started
+    networks:
+      - quckapp-network
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+volumes:
+  ml_models:
+    driver: local

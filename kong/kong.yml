@@ -1,0 +1,962 @@
+_format_version: "3.0"
+_transform: true
+
+# =============================================================================
+# SERVICES — upstream microservices Kong routes traffic to
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Group 1: Auth & Security (MySQL + Redis — fast reads)
+  # ---------------------------------------------------------------------------
+
+  - name: auth-service
+    url: http://auth-service:8081
+    connect_timeout: 10000
+    write_timeout: 10000
+    read_timeout: 10000
+    retries: 3
+    routes:
+      - name: auth-routes
+        paths:
+          - /api/auth
+        strip_path: false
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 100
+          policy: local
+          fault_tolerant: true
+          hide_client_headers: false
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Correlation-ID]
+          credentials: true
+          max_age: 3600
+      - name: request-size-limiting
+        config:
+          allowed_payload_size: 1
+          size_unit: megabytes
+
+  - name: permission-service
+    url: http://permission-service:8083
+    connect_timeout: 10000
+    write_timeout: 10000
+    read_timeout: 10000
+    retries: 3
+    routes:
+      - name: permission-routes
+        paths:
+          - /permissions
+        strip_path: false
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 100
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+
+  - name: security-service
+    url: http://security-service:8086
+    connect_timeout: 10000
+    write_timeout: 10000
+    read_timeout: 10000
+    retries: 3
+    routes:
+      - name: security-routes
+        paths:
+          - /api/security
+        strip_path: false
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 100
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+
+  # ---------------------------------------------------------------------------
+  # Group 2: User & Admin (MySQL — standard CRUD)
+  # ---------------------------------------------------------------------------
+
+  - name: user-service
+    url: http://user-service:8082
+    connect_timeout: 15000
+    write_timeout: 15000
+    read_timeout: 15000
+    retries: 2
+    routes:
+      - name: user-routes
+        paths:
+          - /users
+        strip_path: false
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 50
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+
+  - name: admin-service
+    url: http://admin-service:8085
+    connect_timeout: 15000
+    write_timeout: 15000
+    read_timeout: 15000
+    retries: 2
+    routes:
+      - name: admin-routes
+        paths:
+          - /admin
+        strip_path: false
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 50
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+      - name: ip-restriction
+        config:
+          allow:
+            - 127.0.0.0/8
+            - 10.0.0.0/8
+            - 172.16.0.0/12
+            - 192.168.0.0/16
+
+  - name: audit-service
+    url: http://audit-service:8084
+    connect_timeout: 15000
+    write_timeout: 15000
+    read_timeout: 15000
+    retries: 2
+    routes:
+      - name: audit-routes
+        paths:
+          - /audit
+        strip_path: false
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 50
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+
+  # ---------------------------------------------------------------------------
+  # Group 3: Workspace & Channels (MySQL + Kafka)
+  # ---------------------------------------------------------------------------
+
+  - name: workspace-service
+    url: http://workspace-service:5004
+    connect_timeout: 15000
+    write_timeout: 15000
+    read_timeout: 15000
+    retries: 2
+    routes:
+      - name: workspace-routes
+        paths:
+          - /workspaces
+        strip_path: false
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 200
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+
+  - name: channel-service
+    url: http://channel-service:5005
+    connect_timeout: 15000
+    write_timeout: 15000
+    read_timeout: 15000
+    retries: 2
+    routes:
+      - name: channel-routes
+        paths:
+          - /channels
+        strip_path: false
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 200
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+
+  - name: thread-service
+    url: http://thread-service:3005
+    connect_timeout: 15000
+    write_timeout: 15000
+    read_timeout: 15000
+    retries: 2
+    routes:
+      - name: thread-routes
+        paths:
+          - /threads
+        strip_path: false
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 200
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+
+  # ---------------------------------------------------------------------------
+  # Group 4: Messaging (MongoDB + Elasticsearch — heavier reads)
+  # ---------------------------------------------------------------------------
+
+  - name: message-service
+    url: http://message-service:4003
+    connect_timeout: 20000
+    write_timeout: 20000
+    read_timeout: 20000
+    retries: 3
+    routes:
+      - name: message-routes
+        paths:
+          - /api/v1/messages
+        strip_path: false
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 300
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+
+  - name: search-service
+    url: http://search-service:5006
+    connect_timeout: 30000
+    write_timeout: 30000
+    read_timeout: 30000
+    retries: 2
+    routes:
+      - name: search-routes
+        paths:
+          - /api/v1/search
+        strip_path: false
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 300
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+
+  - name: bookmark-service
+    url: http://bookmark-service:5010
+    connect_timeout: 15000
+    write_timeout: 15000
+    read_timeout: 15000
+    retries: 2
+    routes:
+      - name: bookmark-routes
+        paths:
+          - /api/bookmarks
+          - /api/bookmark-folders
+        strip_path: false
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 200
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+
+  # ---------------------------------------------------------------------------
+  # Group 5: Real-time (WebSocket — long-lived connections)
+  # ---------------------------------------------------------------------------
+
+  - name: realtime-service
+    url: http://realtime-service:4000
+    connect_timeout: 10000
+    write_timeout: 3600000
+    read_timeout: 3600000
+    retries: 0
+    routes:
+      - name: realtime-routes
+        paths:
+          - /realtime
+          - /socket
+        strip_path: false
+        preserve_host: true
+        protocols:
+          - http
+          - https
+    plugins:
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID, Upgrade, Connection]
+          credentials: true
+          max_age: 3600
+
+  - name: presence-service
+    url: http://presence-service:4001
+    connect_timeout: 10000
+    write_timeout: 3600000
+    read_timeout: 3600000
+    retries: 0
+    routes:
+      - name: presence-routes
+        paths:
+          - /api/v1/presence
+        strip_path: false
+        preserve_host: true
+        protocols:
+          - http
+          - https
+    plugins:
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID, Upgrade, Connection]
+          credentials: true
+          max_age: 3600
+
+  - name: call-service
+    url: http://call-service:4002
+    connect_timeout: 10000
+    write_timeout: 3600000
+    read_timeout: 3600000
+    retries: 0
+    routes:
+      - name: call-routes
+        paths:
+          - /api/v1/calls
+        strip_path: false
+        preserve_host: true
+        protocols:
+          - http
+          - https
+    plugins:
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID, Upgrade, Connection]
+          credentials: true
+          max_age: 3600
+
+  - name: huddle-service
+    url: http://huddle-service:4005
+    connect_timeout: 10000
+    write_timeout: 3600000
+    read_timeout: 3600000
+    retries: 0
+    routes:
+      - name: huddle-routes
+        paths:
+          - /api/v1/huddles
+        strip_path: false
+        preserve_host: true
+        protocols:
+          - http
+          - https
+    plugins:
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID, Upgrade, Connection]
+          credentials: true
+          max_age: 3600
+
+  # ---------------------------------------------------------------------------
+  # Group 6: File & Media (MongoDB + MinIO — large payloads)
+  # ---------------------------------------------------------------------------
+
+  - name: file-service
+    url: http://file-service:5002
+    connect_timeout: 10000
+    write_timeout: 120000
+    read_timeout: 120000
+    retries: 0
+    routes:
+      - name: file-routes
+        paths:
+          - /api/v1/files
+        strip_path: false
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 50
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+      - name: request-size-limiting
+        config:
+          allowed_payload_size: 100
+          size_unit: megabytes
+
+  - name: media-service
+    url: http://media-service:5001
+    connect_timeout: 10000
+    write_timeout: 120000
+    read_timeout: 120000
+    retries: 0
+    routes:
+      - name: media-routes
+        paths:
+          - /api/v1/media
+        strip_path: false
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 50
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+      - name: request-size-limiting
+        config:
+          allowed_payload_size: 100
+          size_unit: megabytes
+
+  - name: attachment-service
+    url: http://attachment-service:4011
+    connect_timeout: 10000
+    write_timeout: 120000
+    read_timeout: 120000
+    retries: 0
+    routes:
+      - name: attachment-routes
+        paths:
+          - /api/v1/attachments
+        strip_path: false
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 50
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+      - name: request-size-limiting
+        config:
+          allowed_payload_size: 100
+          size_unit: megabytes
+
+  - name: cdn-service
+    url: http://cdn-service:4012
+    connect_timeout: 10000
+    write_timeout: 30000
+    read_timeout: 30000
+    retries: 2
+    routes:
+      - name: cdn-routes
+        paths:
+          - /cdn
+        strip_path: true
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 500
+          policy: local
+          fault_tolerant: true
+
+  # ---------------------------------------------------------------------------
+  # Group 7: Notifications & Events (MongoDB + Kafka)
+  # ---------------------------------------------------------------------------
+
+  - name: notification-service
+    url: http://notification-service:3001
+    connect_timeout: 20000
+    write_timeout: 20000
+    read_timeout: 20000
+    retries: 3
+    routes:
+      - name: notification-routes
+        paths:
+          - /api/notifications
+          - /api/templates
+          - /api/devices
+          - /api/preferences
+          - /api/health
+        strip_path: false
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 200
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+
+  - name: notification-orchestrator
+    url: http://notification-orchestrator:4004
+    connect_timeout: 20000
+    write_timeout: 20000
+    read_timeout: 20000
+    retries: 3
+    routes:
+      - name: notification-orchestrator-routes
+        paths:
+          - /api/v1/notification-orchestrator
+        strip_path: false
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 200
+          policy: local
+          fault_tolerant: true
+
+  - name: event-broadcast-service
+    url: http://event-broadcast-service:4006
+    connect_timeout: 20000
+    write_timeout: 20000
+    read_timeout: 20000
+    retries: 3
+    routes:
+      - name: event-broadcast-routes
+        paths:
+          - /api/v1/broadcast
+          - /api/v1/events
+        strip_path: false
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 200
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+
+  - name: reminder-service
+    url: http://reminder-service:4010
+    connect_timeout: 20000
+    write_timeout: 20000
+    read_timeout: 20000
+    retries: 3
+    routes:
+      - name: reminder-routes
+        paths:
+          - /api/v1/reminders
+        strip_path: false
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 200
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+
+  # ---------------------------------------------------------------------------
+  # Group 8: Analytics & Insights (ClickHouse + MySQL — OLAP slow queries)
+  # ---------------------------------------------------------------------------
+
+  - name: analytics-service
+    url: http://analytics-service:5007
+    connect_timeout: 10000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 1
+    routes:
+      - name: analytics-routes
+        paths:
+          - /api/v1/analytics
+        strip_path: false
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 30
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+
+  - name: insights-service
+    url: http://insights-service:5018
+    connect_timeout: 10000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 1
+    routes:
+      - name: insights-routes
+        paths:
+          - /api/v1/insights
+          - /api/v1/reports
+        strip_path: false
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 30
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+
+  # ---------------------------------------------------------------------------
+  # Group 9: AI & ML (Python + Redis — CPU-bound inference)
+  # ---------------------------------------------------------------------------
+
+  - name: ml-service
+    url: http://ml-service:5008
+    connect_timeout: 10000
+    write_timeout: 30000
+    read_timeout: 30000
+    retries: 1
+    routes:
+      - name: ml-routes
+        paths:
+          - /api/v1/ml
+        strip_path: false
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 60
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+
+  - name: moderation-service
+    url: http://moderation-service:5014
+    connect_timeout: 10000
+    write_timeout: 30000
+    read_timeout: 30000
+    retries: 1
+    routes:
+      - name: moderation-routes
+        paths:
+          - /api/moderation
+        strip_path: false
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 60
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+
+  - name: sentiment-service
+    url: http://sentiment-service:5017
+    connect_timeout: 10000
+    write_timeout: 30000
+    read_timeout: 30000
+    retries: 1
+    routes:
+      - name: sentiment-routes
+        paths:
+          - /api/sentiment
+        strip_path: false
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 60
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+
+  - name: smart-reply-service
+    url: http://smart-reply-service:5019
+    connect_timeout: 10000
+    write_timeout: 30000
+    read_timeout: 30000
+    retries: 1
+    routes:
+      - name: smart-reply-routes
+        paths:
+          - /api/v1/replies
+        strip_path: false
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 60
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+
+  # ---------------------------------------------------------------------------
+  # Group 10: Data Export & Integration (MySQL + Celery — async jobs)
+  # ---------------------------------------------------------------------------
+
+  - name: export-service
+    url: http://export-service:5015
+    connect_timeout: 10000
+    write_timeout: 120000
+    read_timeout: 120000
+    retries: 1
+    routes:
+      - name: export-routes
+        paths:
+          - /api/v1/exports
+          - /api/v1/jobs
+        strip_path: false
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 20
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+
+  - name: integration-service
+    url: http://integration-service:5016
+    connect_timeout: 10000
+    write_timeout: 30000
+    read_timeout: 30000
+    retries: 2
+    routes:
+      - name: integration-routes
+        paths:
+          - /api/v1/integrations
+          - /api/v1/webhooks
+          - /api/v1/oauth
+        strip_path: false
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 60
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+
+  # ---------------------------------------------------------------------------
+  # Group 11: BFF / Aggregation (NestJS backend-gateway)
+  # ---------------------------------------------------------------------------
+
+  - name: backend-gateway
+    url: http://backend-gateway:3000
+    connect_timeout: 10000
+    write_timeout: 30000
+    read_timeout: 30000
+    retries: 2
+    routes:
+      - name: gateway-api-routes
+        paths:
+          - /api/v1
+        strip_path: false
+        preserve_host: true
+        # Lower priority so specific service routes take precedence
+        regex_priority: 0
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 300
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID, Upgrade, Connection]
+          credentials: true
+          max_age: 3600
+
+  # Backend-gateway Socket.IO (WebSocket) — separate service entry for long timeouts
+  - name: backend-gateway-ws
+    url: http://backend-gateway:3000
+    connect_timeout: 10000
+    write_timeout: 3600000
+    read_timeout: 3600000
+    retries: 0
+    routes:
+      - name: gateway-websocket-routes
+        paths:
+          - /socket.io
+          - /chat
+        strip_path: false
+        preserve_host: true
+        protocols:
+          - http
+          - https
+    plugins:
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, OPTIONS]
+          headers: [Authorization, Content-Type, Upgrade, Connection, Sec-WebSocket-Key, Sec-WebSocket-Version, Sec-WebSocket-Extensions, Sec-WebSocket-Protocol]
+          credentials: true
+          max_age: 3600
+
+# =============================================================================
+# GLOBAL PLUGINS — applied to all services
+# =============================================================================
+
+plugins:
+  - name: correlation-id
+    config:
+      header_name: X-Request-ID
+      generator: uuid
+      echo_downstream: true

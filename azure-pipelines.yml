@@ -1,0 +1,28 @@
+# =============================================================================
+# QuckApp CI Pipeline - Root Entry Point
+# =============================================================================
+# Auto-discovered by Azure DevOps. Triggers CI on main branch push.
+# CD pipeline is triggered separately via cd-main.yml after CI succeeds.
+# =============================================================================
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    exclude:
+      - '*.md'
+      - 'docs/**'
+      - '.devcontainer/**'
+      - '.github/**'
+
+pr: none
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  - group: QuckApp-Global
+
+stages:
+  - template: infrastructure/azure-pipelines/ci-main.yml
