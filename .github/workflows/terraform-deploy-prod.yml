@@ -14,8 +14,8 @@ on:
     branches:
       - main
     paths:
-      - 'infrastructure/terraform/environments/prod/**'
-      - 'infrastructure/terraform/modules/**'
+      - 'terraform/environments/prod/**'
+      - 'terraform/modules/**'
 
   # Allow manual trigger
   workflow_dispatch:
@@ -42,8 +42,9 @@ permissions:
 
 env:
   TF_VERSION: '1.6.0'
+  AWS_REGION: 'us-east-1'
   ENVIRONMENT: 'prod'
-  TF_WORKING_DIR: 'infrastructure/terraform/environments/prod'
+  TF_WORKING_DIR: 'terraform/environments/prod'
 
 jobs:
   # ===========================================================================
@@ -95,12 +96,11 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Azure Login
-        uses: azure/login@v2
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_PROD }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Terraform Init
         id: init
@@ -177,12 +177,12 @@ jobs:
       - name: Run tfsec on Plan
         uses: aquasecurity/tfsec-action@v1.0.3
         with:
-          working_directory: infrastructure/terraform/
+          working_directory: terraform/
           soft_fail: false
 
       - name: Check for Sensitive Changes
         run: |
-          if grep -E "(iam|kms|security_group|nacl)" infrastructure/terraform/environments/prod/plan_output.txt; then
+          if grep -E "(iam|kms|security_group|nacl)" terraform/environments/prod/plan_output.txt; then
             echo "::warning::Plan contains security-sensitive changes. Please review carefully."
           fi
 
@@ -231,12 +231,11 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Azure Login
-        uses: azure/login@v2
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_PROD }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Download Plan
         uses: actions/download-artifact@v4
@@ -294,32 +293,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Azure Login
-        uses: azure/login@v2
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_PROD }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Verify AKS Cluster
+      - name: Verify S3 Buckets
         run: |
-          echo "Verifying AKS cluster..."
-          az aks show --resource-group rg-quckapp-prod --name aks-quckapp-prod --query "{Status:provisioningState,K8sVersion:kubernetesVersion}" -o table || echo "::warning::AKS cluster check failed"
+          echo "Verifying S3 buckets..."
+          aws s3 ls | grep quckapp || echo "::warning::No QuckApp buckets found"
 
-      - name: Verify ACR
+      - name: Verify CloudFront
         run: |
-          echo "Verifying ACR..."
-          az acr show --name ${{ secrets.ACR_NAME }} --query "{Status:provisioningState,SKU:sku.name,LoginServer:loginServer}" -o table || echo "::warning::ACR check failed"
-
-      - name: Verify Key Vault
-        run: |
-          echo "Verifying Key Vault..."
-          az keyvault show --name kv-quckapp-prod --query "{Status:properties.provisioningState,SKU:properties.sku.name}" -o table || echo "::warning::Key Vault check failed"
+          echo "Verifying CloudFront distributions..."
+          aws cloudfront list-distributions --query 'DistributionList.Items[?contains(Aliases.Items, `quckapp`)].{Id:Id,Status:Status}' || true
 
       - name: Health Check
         run: |
           echo "Running health checks..."
-          # curl -f https://api.quckapp.io/health || exit 1
+          # Add your health check commands here
+          # curl -f https://api.quckapp.com/health || exit 1
 
   # ===========================================================================
   # Notifications

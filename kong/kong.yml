@@ -51,7 +51,7 @@ services:
     routes:
       - name: permission-routes
         paths:
-          - /permissions
+          - /api/permissions
         strip_path: false
         preserve_host: true
     plugins:
@@ -107,7 +107,7 @@ services:
     routes:
       - name: user-routes
         paths:
-          - /users
+          - /api/users
         strip_path: false
         preserve_host: true
     plugins:
@@ -133,7 +133,7 @@ services:
     routes:
       - name: admin-routes
         paths:
-          - /admin
+          - /api/admin
         strip_path: false
         preserve_host: true
     plugins:
@@ -166,7 +166,7 @@ services:
     routes:
       - name: audit-routes
         paths:
-          - /audit
+          - /api/audit
         strip_path: false
         preserve_host: true
     plugins:
@@ -196,7 +196,8 @@ services:
     routes:
       - name: workspace-routes
         paths:
-          - /workspaces
+          - /api/v1/workspaces
+          - /api/v1/invites
         strip_path: false
         preserve_host: true
     plugins:
@@ -222,7 +223,8 @@ services:
     routes:
       - name: channel-routes
         paths:
-          - /channels
+          - /api/v1/channels
+          - /api/v1/templates
         strip_path: false
         preserve_host: true
     plugins:
@@ -248,7 +250,7 @@ services:
     routes:
       - name: thread-routes
         paths:
-          - /threads
+          - /api/v1/threads
         strip_path: false
         preserve_host: true
     plugins:
@@ -361,8 +363,8 @@ services:
     routes:
       - name: realtime-routes
         paths:
-          - /realtime
           - /socket
+          - /api/realtime
         strip_path: false
         preserve_host: true
         protocols:
@@ -579,7 +581,6 @@ services:
           - /api/templates
           - /api/devices
           - /api/preferences
-          - /api/health
         strip_path: false
         preserve_host: true
     plugins:
@@ -605,7 +606,7 @@ services:
     routes:
       - name: notification-orchestrator-routes
         paths:
-          - /api/v1/notification-orchestrator
+          - /api/v1/notifications
         strip_path: false
         preserve_host: true
     plugins:

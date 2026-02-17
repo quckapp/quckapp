@@ -39,6 +39,7 @@ permissions:
 
 env:
   TF_VERSION: '1.6.0'
+  AWS_REGION: 'us-east-1'
 
 jobs:
   # ===========================================================================
@@ -52,7 +53,7 @@ jobs:
       has_drift: ${{ steps.drift.outputs.has_drift }}
     defaults:
       run:
-        working-directory: infrastructure/terraform/environments/dev
+        working-directory: terraform/environments/dev
 
     steps:
       - name: Checkout
@@ -63,12 +64,11 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Azure Login (OIDC)
-        uses: azure/login@v2
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID_DEV }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_DEV }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Terraform Init
         run: terraform init
@@ -94,7 +94,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: drift-report-dev
-          path: infrastructure/terraform/environments/dev/drift_output.txt
+          path: terraform/environments/dev/drift_output.txt
           retention-days: 7
 
       - name: Create Drift Issue
@@ -103,7 +103,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const driftOutput = fs.readFileSync('infrastructure/terraform/environments/dev/drift_output.txt', 'utf8');
+            const driftOutput = fs.readFileSync('terraform/environments/dev/drift_output.txt', 'utf8');
             const truncated = driftOutput.length > 60000
               ? driftOutput.substring(0, 60000) + '\n\n... (truncated)'
               : driftOutput;
@@ -185,7 +185,7 @@ jobs:
       has_drift: ${{ steps.drift.outputs.has_drift }}
     defaults:
       run:
-        working-directory: infrastructure/terraform/environments/prod
+        working-directory: terraform/environments/prod
 
     steps:
       - name: Checkout
@@ -196,12 +196,11 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Azure Login (OIDC)
-        uses: azure/login@v2
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID_PROD }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_PROD }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Terraform Init
         run: terraform init
@@ -227,7 +226,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: drift-report-prod
-          path: infrastructure/terraform/environments/prod/drift_output.txt
+          path: terraform/environments/prod/drift_output.txt
           retention-days: 30
 
       - name: Create Critical Drift Issue
@@ -236,7 +235,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const driftOutput = fs.readFileSync('infrastructure/terraform/environments/prod/drift_output.txt', 'utf8');
+            const driftOutput = fs.readFileSync('terraform/environments/prod/drift_output.txt', 'utf8');
             const truncated = driftOutput.length > 60000
               ? driftOutput.substring(0, 60000) + '\n\n... (truncated)'
               : driftOutput;

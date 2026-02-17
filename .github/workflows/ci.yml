@@ -1,0 +1,464 @@
+# QuckApp CI Pipeline
+# Runs on all PRs and pushes to main/develop branches
+
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'release/**'
+  pull_request:
+    branches:
+      - main
+      - develop
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+  JAVA_VERSION: '17'
+  GO_VERSION: '1.21'
+  PYTHON_VERSION: '3.11'
+  ELIXIR_VERSION: '1.15'
+  OTP_VERSION: '26'
+
+jobs:
+  # ==========================================================================
+  # Detect Changes
+  # ==========================================================================
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      nestjs: ${{ steps.filter.outputs.nestjs }}
+      spring: ${{ steps.filter.outputs.spring }}
+      elixir: ${{ steps.filter.outputs.elixir }}
+      go: ${{ steps.filter.outputs.go }}
+      python: ${{ steps.filter.outputs.python }}
+      helm: ${{ steps.filter.outputs.helm }}
+      docker: ${{ steps.filter.outputs.docker }}
+      docs: ${{ steps.filter.outputs.docs }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Filter paths
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            nestjs:
+              - 'services/nestjs/**'
+              - 'packages/shared/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+            spring:
+              - 'services/spring/**'
+              - 'services/security-service/**'
+              - 'pom.xml'
+            elixir:
+              - 'services/elixir/**'
+              - 'mix.exs'
+              - 'mix.lock'
+            go:
+              - 'services/go/**'
+              - 'go.mod'
+              - 'go.sum'
+            python:
+              - 'services/python/**'
+              - 'requirements*.txt'
+              - 'pyproject.toml'
+            helm:
+              - 'infrastructure/helm/**'
+            docker:
+              - 'docker-compose*.yml'
+              - 'Dockerfile*'
+              - '.dockerignore'
+            docs:
+              - 'docs/**'
+              - '*.md'
+
+  # ==========================================================================
+  # NestJS Services
+  # ==========================================================================
+  nestjs:
+    name: NestJS Services
+    needs: changes
+    if: needs.changes.outputs.nestjs == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/nestjs
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          cache-dependency-path: services/nestjs/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Type check
+        run: pnpm type-check
+
+      - name: Unit tests
+        run: pnpm test:cov
+        env:
+          CI: true
+
+      - name: Build
+        run: pnpm build
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: services/nestjs/coverage/lcov.info
+          flags: nestjs
+          fail_ci_if_error: false
+
+  # ==========================================================================
+  # Spring Boot Services
+  # ==========================================================================
+  spring:
+    name: Spring Boot Services
+    needs: changes
+    if: needs.changes.outputs.spring == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/spring
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Lint (Checkstyle)
+        run: mvn checkstyle:check -B
+
+      - name: Unit tests
+        run: mvn test -B
+
+      - name: Build
+        run: mvn package -DskipTests -B
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: services/spring/**/target/site/jacoco/jacoco.xml
+          flags: spring
+          fail_ci_if_error: false
+
+  # ==========================================================================
+  # Elixir Services
+  # ==========================================================================
+  elixir:
+    name: Elixir Services
+    needs: changes
+    if: needs.changes.outputs.elixir == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/elixir
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: ${{ env.ELIXIR_VERSION }}
+          otp-version: ${{ env.OTP_VERSION }}
+
+      - name: Cache deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            services/elixir/deps
+            services/elixir/_build
+          key: ${{ runner.os }}-elixir-${{ env.ELIXIR_VERSION }}-${{ env.OTP_VERSION }}-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-elixir-${{ env.ELIXIR_VERSION }}-${{ env.OTP_VERSION }}-
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Check formatting
+        run: mix format --check-formatted
+
+      - name: Compile (warnings as errors)
+        run: mix compile --warnings-as-errors
+
+      - name: Credo (static analysis)
+        run: mix credo --strict
+
+      - name: Unit tests
+        run: mix test --cover
+        env:
+          MIX_ENV: test
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: services/elixir/cover/excoveralls.json
+          flags: elixir
+          fail_ci_if_error: false
+
+  # ==========================================================================
+  # Go Services
+  # ==========================================================================
+  go:
+    name: Go Services
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/go
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: services/go/go.sum
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Verify dependencies
+        run: go mod verify
+
+      - name: Lint (golangci-lint)
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: latest
+          working-directory: services/go
+          args: --timeout=5m
+
+      - name: Unit tests
+        run: go test -v -race -coverprofile=coverage.out ./...
+
+      - name: Build
+        run: |
+          for service in */; do
+            if [ -f "${service}main.go" ]; then
+              echo "Building ${service%/}..."
+              CGO_ENABLED=0 go build -o bin/${service%/} ./${service}
+            fi
+          done
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: services/go/coverage.out
+          flags: go
+          fail_ci_if_error: false
+
+  # ==========================================================================
+  # Python Services
+  # ==========================================================================
+  python:
+    name: Python Services
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/python
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: services/python/requirements*.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Format check (black)
+        run: black --check .
+
+      - name: Type check (mypy)
+        run: mypy .
+
+      - name: Security check (bandit)
+        run: bandit -r . -ll
+
+      - name: Unit tests
+        run: pytest --cov=. --cov-report=xml -v
+        env:
+          PYTHONPATH: .
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: services/python/coverage.xml
+          flags: python
+          fail_ci_if_error: false
+
+  # ==========================================================================
+  # Helm Chart Validation
+  # ==========================================================================
+  helm:
+    name: Helm Charts
+    needs: changes
+    if: needs.changes.outputs.helm == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'v3.13.0'
+
+      - name: Add Helm repos
+        run: |
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm repo add elastic https://helm.elastic.co
+          helm repo add minio https://charts.min.io/
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo add grafana https://grafana.github.io/helm-charts
+          helm repo add jaegertracing https://jaegertracing.github.io/helm-charts
+          helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+          helm repo update
+
+      - name: Lint charts
+        run: |
+          helm lint infrastructure/helm/quckapp
+          helm lint infrastructure/helm/quckapp -f infrastructure/helm/quckapp/values-development.yaml
+          helm lint infrastructure/helm/quckapp -f infrastructure/helm/quckapp/values-staging.yaml
+          helm lint infrastructure/helm/quckapp -f infrastructure/helm/quckapp/values-production.yaml
+
+      - name: Template validation
+        run: |
+          helm template quckapp infrastructure/helm/quckapp -f infrastructure/helm/quckapp/values-development.yaml > /dev/null
+          helm template quckapp infrastructure/helm/quckapp -f infrastructure/helm/quckapp/values-production.yaml > /dev/null
+
+      - name: Install chart-testing
+        uses: helm/chart-testing-action@v2
+
+      - name: Run chart-testing (lint)
+        run: ct lint --config .github/ct.yaml --charts infrastructure/helm/quckapp
+
+  # ==========================================================================
+  # Docker Compose Validation
+  # ==========================================================================
+  docker:
+    name: Docker Compose
+    needs: changes
+    if: needs.changes.outputs.docker == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate docker-compose files
+        run: |
+          docker compose -f docker-compose.yml config
+          docker compose -f docker-compose.yml -f docker-compose.services.yml config
+
+  # ==========================================================================
+  # Security Scanning
+  # ==========================================================================
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner (repo)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # ==========================================================================
+  # Summary
+  # ==========================================================================
+  ci-success:
+    name: CI Success
+    needs: [changes, nestjs, spring, elixir, go, python, helm, docker, security]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check all jobs
+        run: |
+          if [[ "${{ needs.nestjs.result }}" == "failure" ]] || \
+             [[ "${{ needs.spring.result }}" == "failure" ]] || \
+             [[ "${{ needs.elixir.result }}" == "failure" ]] || \
+             [[ "${{ needs.go.result }}" == "failure" ]] || \
+             [[ "${{ needs.python.result }}" == "failure" ]] || \
+             [[ "${{ needs.helm.result }}" == "failure" ]] || \
+             [[ "${{ needs.docker.result }}" == "failure" ]] || \
+             [[ "${{ needs.security.result }}" == "failure" ]]; then
+            echo "One or more jobs failed"
+            exit 1
+          fi
+          echo "All CI checks passed!"

@@ -58,7 +58,7 @@ jobs:
       - name: Build Java code
         if: matrix.language == 'java'
         run: |
-          cd services/auth-service
+          cd services/spring
           mvn compile -DskipTests -B || true
 
       - name: Setup Go (for Go analysis)
@@ -94,7 +94,7 @@ jobs:
 
       - name: Audit Node.js dependencies
         run: |
-          cd services/backend-gateway
+          cd services/nestjs
           npm audit --audit-level=high || true
         continue-on-error: true
 
@@ -109,7 +109,7 @@ jobs:
 
       - name: Audit Python dependencies
         run: |
-          cd services/analytics-service
+          cd services/python
           pip-audit -r requirements.txt || true
         continue-on-error: true
 
@@ -124,7 +124,7 @@ jobs:
 
       - name: Audit Go dependencies
         run: |
-          cd services/workspace-service
+          cd services/go
           govulncheck ./... || true
         continue-on-error: true
 
@@ -248,7 +248,7 @@ jobs:
       - name: Run Checkov
         uses: bridgecrewio/checkov-action@v12
         with:
-          directory: infrastructure/helm
+          directory: infrastructure/helm/
           framework: helm
           output_format: sarif
           output_file_path: checkov-results.sarif
@@ -264,7 +264,7 @@ jobs:
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'config'
-          scan-ref: 'infrastructure/helm'
+          scan-ref: 'infrastructure/helm/'
           format: 'sarif'
           output: 'trivy-iac-results.sarif'
           severity: 'CRITICAL,HIGH,MEDIUM'

@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  devcontainer:
+    image: mcr.microsoft.com/devcontainers/base:ubuntu-22.04
+    volumes:
+      - ..:/workspace:cached
+    command: sleep infinity
+    network_mode: host
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker.sock
