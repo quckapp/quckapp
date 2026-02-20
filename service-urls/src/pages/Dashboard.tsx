@@ -9,6 +9,7 @@ import {
   Boxes,
   Flame,
   Database,
+  Globe,
   ArrowRight,
   RefreshCw,
 } from 'lucide-react';
@@ -33,6 +34,7 @@ const envIcons: Record<string, React.ElementType> = {
   uat3: Server,
   staging: Boxes,
   production: Flame,
+  live: Globe,
 };
 
 export default function Dashboard() {
@@ -97,6 +99,9 @@ export default function Dashboard() {
                         )}
                         {env === 'production' && (
                           <Badge variant="danger" size="sm">Prod</Badge>
+                        )}
+                        {env === 'live' && (
+                          <Badge variant="success" size="sm">Live</Badge>
                         )}
                       </div>
                       {summary.lastUpdated && (

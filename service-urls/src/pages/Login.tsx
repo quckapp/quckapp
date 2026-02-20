@@ -1,7 +1,7 @@
 import { useState, FormEvent } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Navigate } from 'react-router-dom';
-import { Link2, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { login, clearError } from '../store/slices/authSlice';
 import type { RootState, AppDispatch } from '../store';
 import { Button } from '../components/UI';
@@ -27,9 +27,11 @@ export default function Login() {
     <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-600 rounded-xl mb-4">
-            <Link2 className="w-8 h-8 text-white" />
-          </div>
+          <img
+            src="/quckchat-icon.jpg"
+            alt="QuckChat"
+            className="w-16 h-16 rounded-xl mb-4 mx-auto"
+          />
           <h1 className="text-2xl font-bold text-white">QuckApp Service URLs</h1>
           <p className="text-gray-400 mt-2">Sign in to manage service configurations</p>
         </div>

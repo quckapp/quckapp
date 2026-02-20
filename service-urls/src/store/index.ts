@@ -1,12 +1,14 @@
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from './slices/authSlice';
 import serviceUrlsReducer from './slices/serviceUrlsSlice';
+import apiKeysReducer from './slices/apiKeysSlice';
 import toastReducer from './slices/toastSlice';
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
     serviceUrls: serviceUrlsReducer,
+    apiKeys: apiKeysReducer,
     toast: toastReducer,
   },
 });

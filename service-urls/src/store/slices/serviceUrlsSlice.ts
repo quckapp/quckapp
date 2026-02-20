@@ -5,13 +5,16 @@ import type {
   ServiceUrlConfig,
   InfrastructureConfig,
   FirebaseConfig,
+  SecretConfig,
   EnvironmentSummary,
   ServiceCategory,
+  SecretCategory,
 } from '../../types';
 
 interface ServiceUrlsState {
   services: ServiceUrlConfig[];
   infrastructure: InfrastructureConfig[];
+  secrets: SecretConfig[];
   firebase: FirebaseConfig | null;
   summaries: EnvironmentSummary[];
   loading: boolean;
@@ -22,6 +25,7 @@ interface ServiceUrlsState {
 const initialState: ServiceUrlsState = {
   services: [],
   infrastructure: [],
+  secrets: [],
   firebase: null,
   summaries: [],
   loading: false,
@@ -128,6 +132,41 @@ export const upsertFirebase = createAsyncThunk(
   }
 );
 
+// ── Secrets & Config ──
+
+export const fetchSecrets = createAsyncThunk(
+  'serviceUrls/fetchSecrets',
+  async ({ env, category }: { env: Environment; category?: SecretCategory }) => {
+    const params = category ? { category } : {};
+    const response = await api.get(`${BASE}/${env}/secrets`, { params });
+    return response.data.data;
+  }
+);
+
+export const upsertSecret = createAsyncThunk(
+  'serviceUrls/upsertSecret',
+  async ({ env, data }: { env: Environment; data: { secretKey: string; category: SecretCategory; value: string; description: string; isRequired?: boolean } }) => {
+    const response = await api.put(`${BASE}/${env}/secrets/${data.secretKey}`, data);
+    return response.data.data;
+  }
+);
+
+export const upsertSecretsBatch = createAsyncThunk(
+  'serviceUrls/upsertSecretsBatch',
+  async ({ env, data }: { env: Environment; data: { secretKey: string; category: SecretCategory; value: string; description: string; isRequired?: boolean }[] }) => {
+    const response = await api.put(`${BASE}/${env}/secrets`, { secrets: data });
+    return response.data.data;
+  }
+);
+
+export const deleteSecret = createAsyncThunk(
+  'serviceUrls/deleteSecret',
+  async ({ env, secretKey }: { env: Environment; secretKey: string }) => {
+    await api.delete(`${BASE}/${env}/secrets/${secretKey}`);
+    return secretKey;
+  }
+);
+
 // ── Bulk Operations ──
 
 export const bulkExport = createAsyncThunk(
@@ -182,6 +221,7 @@ const serviceUrlsSlice = createSlice({
     clearEnvironmentData: (state) => {
       state.services = [];
       state.infrastructure = [];
+      state.secrets = [];
       state.firebase = null;
     },
   },
@@ -318,6 +358,53 @@ const serviceUrlsSlice = createSlice({
       .addCase(upsertFirebase.rejected, (state, action) => {
         state.saveLoading = false;
         state.error = action.error.message || 'Failed to update firebase config';
+      })
+
+      // Secrets
+      .addCase(fetchSecrets.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchSecrets.fulfilled, (state, action) => {
+        state.loading = false;
+        state.secrets = action.payload;
+      })
+      .addCase(fetchSecrets.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || 'Failed to fetch secrets';
+      })
+
+      .addCase(upsertSecret.pending, (state) => {
+        state.saveLoading = true;
+      })
+      .addCase(upsertSecret.fulfilled, (state, action) => {
+        state.saveLoading = false;
+        const idx = state.secrets.findIndex((s) => s.secretKey === action.payload.secretKey);
+        if (idx !== -1) {
+          state.secrets[idx] = action.payload;
+        } else {
+          state.secrets.push(action.payload);
+        }
+      })
+      .addCase(upsertSecret.rejected, (state, action) => {
+        state.saveLoading = false;
+        state.error = action.error.message || 'Failed to save secret';
+      })
+
+      .addCase(upsertSecretsBatch.pending, (state) => {
+        state.saveLoading = true;
+      })
+      .addCase(upsertSecretsBatch.fulfilled, (state, action) => {
+        state.saveLoading = false;
+        state.secrets = action.payload;
+      })
+      .addCase(upsertSecretsBatch.rejected, (state, action) => {
+        state.saveLoading = false;
+        state.error = action.error.message || 'Failed to save secrets';
+      })
+
+      .addCase(deleteSecret.fulfilled, (state, action) => {
+        state.secrets = state.secrets.filter((s) => s.secretKey !== action.payload);
       })
 
       // Bulk import

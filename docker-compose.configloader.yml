@@ -1,0 +1,150 @@
+# =============================================================================
+# QUCKAPP - CONFIG LOADER OVERLAY
+# =============================================================================
+# Use this alongside the main docker-compose.yml to pull config from service-urls API.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.configloader.yml up -d
+#
+# This adds SERVICE_URLS_API and CONFIG_ENV to every service, enabling them to
+# fetch config from the service-urls API at startup (via go-configloader or fetch-config.sh).
+#
+# The service-urls-api must be reachable from the docker network.
+# You can run it alongside by including the service-urls stack,
+# or point to an external URL.
+# =============================================================================
+
+services:
+
+  # ─── Service URLs API (added to the main network) ─────────────────────────
+  local-service-urls-api:
+    build:
+      context: ./service-urls/api
+      dockerfile: Dockerfile
+    container_name: quckapp-local-service-urls-api
+    restart: unless-stopped
+    environment:
+      PORT: "8085"
+      MYSQL_HOST: local-service-urls-db
+      MYSQL_PORT: "3306"
+      MYSQL_DATABASE: quckapp_admin
+      MYSQL_USERNAME: root
+      MYSQL_PASSWORD: root_secret
+      JWT_SECRET: ${JWT_SECRET:-local-dev-jwt-secret-change-in-production-min-32-chars}
+      GIN_MODE: release
+    expose:
+      - "8085"
+    depends_on:
+      local-service-urls-db:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+
+  local-service-urls-db:
+    image: mysql:8.0
+    container_name: quckapp-local-service-urls-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_secret
+      MYSQL_DATABASE: quckapp_admin
+      MYSQL_USER: quckapp
+      MYSQL_PASSWORD: quckapp_secret
+    volumes:
+      - service_urls_data:/var/lib/mysql
+      - ./service-urls/docker/init:/docker-entrypoint-initdb.d
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_secret"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - quckapp-network
+
+  # ─── Go Services (use go-configloader natively) ───────────────────────────
+
+  local-workspace-service:
+    environment:
+      SERVICE_URLS_API: http://local-service-urls-api:8085
+      CONFIG_ENV: development
+      CONFIG_API_KEY: ${CONFIG_API_KEY:-qk_dev_masterkey_2024}
+
+  local-channel-service:
+    environment:
+      SERVICE_URLS_API: http://local-service-urls-api:8085
+      CONFIG_ENV: development
+      CONFIG_API_KEY: ${CONFIG_API_KEY:-qk_dev_masterkey_2024}
+
+  local-search-service:
+    environment:
+      SERVICE_URLS_API: http://local-service-urls-api:8085
+      CONFIG_ENV: development
+      CONFIG_API_KEY: ${CONFIG_API_KEY:-qk_dev_masterkey_2024}
+
+  local-media-service:
+    environment:
+      SERVICE_URLS_API: http://local-service-urls-api:8085
+      CONFIG_ENV: development
+      CONFIG_API_KEY: ${CONFIG_API_KEY:-qk_dev_masterkey_2024}
+
+  local-bookmark-service:
+    environment:
+      SERVICE_URLS_API: http://local-service-urls-api:8085
+      CONFIG_ENV: development
+      CONFIG_API_KEY: ${CONFIG_API_KEY:-qk_dev_masterkey_2024}
+
+  local-reminder-service:
+    environment:
+      SERVICE_URLS_API: http://local-service-urls-api:8085
+      CONFIG_ENV: development
+      CONFIG_API_KEY: ${CONFIG_API_KEY:-qk_dev_masterkey_2024}
+
+  # ─── Non-Go Services (use fetch-config.sh entrypoint) ─────────────────────
+  # These need the fetch-config.sh script added to their Dockerfile:
+  #   COPY scripts/fetch-config.sh /usr/local/bin/fetch-config.sh
+  #   RUN chmod +x /usr/local/bin/fetch-config.sh
+  #   ENTRYPOINT ["fetch-config.sh"]
+  #   CMD ["node", "dist/main.js"]  (or whatever the original CMD was)
+
+  local-notification-service:
+    environment:
+      SERVICE_URLS_API: http://local-service-urls-api:8085
+      CONFIG_ENV: development
+      CONFIG_API_KEY: ${CONFIG_API_KEY:-qk_dev_masterkey_2024}
+      CONFIG_OPTIONAL: "true"
+
+  local-security-service:
+    environment:
+      SERVICE_URLS_API: http://local-service-urls-api:8085
+      CONFIG_ENV: development
+      CONFIG_API_KEY: ${CONFIG_API_KEY:-qk_dev_masterkey_2024}
+      CONFIG_OPTIONAL: "true"
+
+  local-presence-service:
+    environment:
+      SERVICE_URLS_API: http://local-service-urls-api:8085
+      CONFIG_ENV: development
+      CONFIG_API_KEY: ${CONFIG_API_KEY:-qk_dev_masterkey_2024}
+      CONFIG_OPTIONAL: "true"
+
+  local-message-service:
+    environment:
+      SERVICE_URLS_API: http://local-service-urls-api:8085
+      CONFIG_ENV: development
+      CONFIG_API_KEY: ${CONFIG_API_KEY:-qk_dev_masterkey_2024}
+      CONFIG_OPTIONAL: "true"
+
+  local-backend-gateway:
+    environment:
+      SERVICE_URLS_API: http://local-service-urls-api:8085
+      CONFIG_ENV: development
+      CONFIG_API_KEY: ${CONFIG_API_KEY:-qk_dev_masterkey_2024}
+      CONFIG_OPTIONAL: "true"
+
+volumes:
+  service_urls_data:
+    driver: local
