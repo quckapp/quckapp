@@ -49,38 +49,165 @@ services:
       start_period: 15s
 
   # ===========================================================================
-  # BACKEND-GATEWAY / BFF (NestJS) — downstream service behind Kong
+  # ENVOY PROXY — WebSocket traffic router
+  # ===========================================================================
+  # Clients connect here (port 8090) for WebSocket connections.
+  # WS traffic → Elixir real-time services, REST → falls through to Kong.
+
+  envoy:
+    image: envoyproxy/envoy:v1.31-latest
+    container_name: quckapp-envoy
+    restart: unless-stopped
+    volumes:
+      - ./infrastructure/envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
+    ports:
+      - "8090:8090"
+      - "9901:9901"
+    networks:
+      - quckapp-network
+    depends_on:
+      - kong
+
+  # ===========================================================================
+  # LIVEKIT — SFU for video/audio calls (1-to-1 + group)
   # ===========================================================================
 
-  backend-gateway:
+  livekit:
+    image: livekit/livekit-server:v1.7
+    container_name: quckapp-livekit
+    restart: unless-stopped
+    command: --config /etc/livekit.yaml
+    volumes:
+      - ./infrastructure/livekit/livekit.yaml:/etc/livekit.yaml:ro
+    environment:
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-secret_dev_change_in_production}
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - quckapp-network
+
+  # ===========================================================================
+  # COTURN — TURN relay for WebRTC NAT traversal
+  # ===========================================================================
+
+  coturn:
+    image: coturn/coturn:4.6
+    container_name: quckapp-coturn
+    restart: unless-stopped
+    volumes:
+      - ./infrastructure/coturn/turnserver.conf:/etc/turnserver.conf:ro
+    ports:
+      - "3478:3478"
+      - "3478:3478/udp"
+      - "5349:5349"
+      - "5349:5349/udp"
+    networks:
+      - quckapp-network
+
+  # ===========================================================================
+  # BACKEND-GATEWAY / BFF (NestJS) — DEPRECATED: replaced by go-bff
+  # Kept commented out for reference during migration. Remove after
+  # go-bff is confirmed stable.
+  # ===========================================================================
+
+  # backend-gateway:
+  #   build:
+  #     context: ./services/backend-gateway
+  #     dockerfile: Dockerfile
+  #   container_name: quckapp-backend-gateway
+  #   restart: unless-stopped
+  #   environment:
+  #     NODE_ENV: production
+  #     PORT: 3000
+  #     DATABASE_URL: postgresql://quckapp:quckapp_secret@postgres:5432/quckapp
+  #     REDIS_HOST: redis
+  #     REDIS_PORT: 6379
+  #     REDIS_PASSWORD: redis_secret
+  #     MONGODB_URI: mongodb://admin:admin_secret@mongodb:27017/quckapp_gateway?authSource=admin
+  #     KAFKA_BROKERS: kafka:9092
+  #     JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+  #     AUTH_SERVICE_URL: http://auth-service:8081
+  #     USER_SERVICE_URL: http://user-service:8082
+  #     WORKSPACE_SERVICE_URL: http://workspace-service:5004
+  #     CHANNEL_SERVICE_URL: http://channel-service:5005
+  #     MESSAGE_SERVICE_URL: http://message-service:4003
+  #     FILE_SERVICE_URL: http://file-service:5002
+  #     SEARCH_SERVICE_URL: http://search-service:5006
+  #     NOTIFICATION_SERVICE_URL: http://notification-service:3001
+  #     JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+  #   # No host port mapping — Kong is the external entry point (port 8000)
+  #   expose:
+  #     - "3000"
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #     kafka:
+  #       condition: service_healthy
+  #   networks:
+  #     - quckapp-network
+  #   healthcheck:
+  #     test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000/api/v1/health/live"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+
+  # ===========================================================================
+  # GO BFF — replaces NestJS backend-gateway
+  # ===========================================================================
+
+  go-bff:
     build:
-      context: ./services/backend-gateway
+      context: ./services/go-bff
       dockerfile: Dockerfile
-    container_name: quckapp-backend-gateway
+    container_name: quckapp-go-bff
     restart: unless-stopped
     environment:
-      NODE_ENV: production
       PORT: 3000
-      DATABASE_URL: postgresql://quckapp:quckapp_secret@postgres:5432/quckapp
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+      SCYLLA_HOSTS: scylladb-node1,scylladb-node2,scylladb-node3
+      SCYLLA_KEYSPACE: quckapp
+      POSTGRES_URL: postgresql://quckapp:quckapp_secret@postgres:5432/quckapp
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: redis_secret
-      MONGODB_URI: mongodb://admin:admin_secret@mongodb:27017/quckapp_gateway?authSource=admin
       KAFKA_BROKERS: kafka:9092
-      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+      MINIO_ENDPOINT: minio:9010
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      LIVEKIT_URL: http://livekit:7880
+      LIVEKIT_API_KEY: devkey
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-secret_dev_change_in_production}
       AUTH_SERVICE_URL: http://auth-service:8081
       USER_SERVICE_URL: http://user-service:8082
+      PERMISSION_SERVICE_URL: http://permission-service:8083
       WORKSPACE_SERVICE_URL: http://workspace-service:5004
       CHANNEL_SERVICE_URL: http://channel-service:5005
       MESSAGE_SERVICE_URL: http://message-service:4003
-      FILE_SERVICE_URL: http://file-service:5002
       SEARCH_SERVICE_URL: http://search-service:5006
       NOTIFICATION_SERVICE_URL: http://notification-service:3001
+      MEDIA_SERVICE_URL: http://media-service:5001
+      FILE_SERVICE_URL: http://file-service:5002
+      CALL_SERVICE_URL: http://call-service:4002
+      PRESENCE_SERVICE_URL: http://presence-service:4001
+      REALTIME_SERVICE_URL: http://realtime-service:4000
+      BOOKMARK_SERVICE_URL: http://bookmark-service:5010
+      EXPORT_SERVICE_URL: http://export-service:5015
+      HUDDLE_SERVICE_URL: http://huddle-service:4005
+      ADMIN_SERVICE_URL: http://admin-service:8085
       JAEGER_ENDPOINT: http://jaeger:14268/api/traces
-    # No host port mapping — Kong is the external entry point (port 8000)
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev_internal_api_key}
     expose:
       - "3000"
     depends_on:
+      scylladb-node1:
+        condition: service_healthy
       postgres:
         condition: service_healthy
       redis:
@@ -90,7 +217,7 @@ services:
     networks:
       - quckapp-network
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000/api/v1/health/live"]
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -723,6 +850,9 @@ services:
       SECRET_KEY_BASE: ${SECRET_KEY_BASE:-dev_secret_key_base_min_64_chars_long_for_phoenix_app_1234567890abcdef}
       RELEASE_COOKIE: ${ERLANG_COOKIE:-quckapp_dev_cookie}
       JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+      LIVEKIT_URL: http://livekit:7880
+      LIVEKIT_API_KEY: devkey
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-secret_dev_change_in_production}
       JAEGER_ENDPOINT: http://jaeger:14268/api/traces
     ports:
       - "4002:4002"

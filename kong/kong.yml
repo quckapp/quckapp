@@ -894,17 +894,19 @@ services:
           max_age: 3600
 
   # ---------------------------------------------------------------------------
-  # Group 11: BFF / Aggregation (NestJS backend-gateway)
+  # Group 11: BFF / Aggregation (Go BFF — replaces NestJS backend-gateway)
   # ---------------------------------------------------------------------------
+  # WebSocket traffic now handled by Envoy (port 8090), NOT Kong.
+  # This service only handles REST API aggregation.
 
-  - name: backend-gateway
-    url: http://backend-gateway:3000
+  - name: go-bff
+    url: http://go-bff:3000
     connect_timeout: 10000
     write_timeout: 30000
     read_timeout: 30000
     retries: 2
     routes:
-      - name: gateway-api-routes
+      - name: bff-api-routes
         paths:
           - /api/v1
         strip_path: false
@@ -921,33 +923,7 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID, Upgrade, Connection]
-          credentials: true
-          max_age: 3600
-
-  # Backend-gateway Socket.IO (WebSocket) — separate service entry for long timeouts
-  - name: backend-gateway-ws
-    url: http://backend-gateway:3000
-    connect_timeout: 10000
-    write_timeout: 3600000
-    read_timeout: 3600000
-    retries: 0
-    routes:
-      - name: gateway-websocket-routes
-        paths:
-          - /socket.io
-          - /chat
-        strip_path: false
-        preserve_host: true
-        protocols:
-          - http
-          - https
-    plugins:
-      - name: cors
-        config:
-          origins: ["*"]
-          methods: [GET, POST, OPTIONS]
-          headers: [Authorization, Content-Type, Upgrade, Connection, Sec-WebSocket-Key, Sec-WebSocket-Version, Sec-WebSocket-Extensions, Sec-WebSocket-Protocol]
+          headers: [Authorization, Content-Type, X-Request-ID]
           credentials: true
           max_age: 3600
 
