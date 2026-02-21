@@ -121,3 +121,6 @@
 [submodule "apps/chat_app"]
 	path = apps/chat_app
 	url = https://github.com/quckapp/chat_app.git
+[submodule "services/go-bff"]
+	path = services/go-bff
+	url = https://github.com/quckapp/go-bff.git
