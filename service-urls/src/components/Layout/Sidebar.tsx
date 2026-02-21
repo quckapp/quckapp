@@ -2,7 +2,6 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
   LogOut,
-  Link2,
   Monitor,
   Code2,
   Cpu,
@@ -10,6 +9,8 @@ import {
   Boxes,
   Database,
   Flame,
+  Globe,
+  KeyRound,
 } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../../store/slices/authSlice';
@@ -25,6 +26,7 @@ const envIcons: Record<string, React.ElementType> = {
   uat3: Server,
   staging: Boxes,
   production: Flame,
+  live: Globe,
 };
 
 export default function Sidebar() {
@@ -39,9 +41,11 @@ export default function Sidebar() {
     <aside className="fixed left-0 top-0 h-screen w-64 bg-gray-900 text-white flex flex-col">
       <div className="p-6 border-b border-gray-800">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center">
-            <Link2 className="w-6 h-6" />
-          </div>
+          <img
+            src="/quckchat-icon.jpg"
+            alt="QuckChat"
+            className="w-10 h-10 rounded-lg object-cover"
+          />
           <div>
             <h1 className="font-bold text-lg">QuckApp</h1>
             <p className="text-xs text-gray-400">Service URLs</p>
@@ -94,6 +98,28 @@ export default function Sidebar() {
               </li>
             );
           })}
+
+          <li className="pt-4 pb-2">
+            <span className="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              Admin
+            </span>
+          </li>
+
+          <li>
+            <NavLink
+              to="/api-keys"
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${
+                  isActive
+                    ? 'bg-primary-600 text-white'
+                    : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                }`
+              }
+            >
+              <KeyRound className="w-4 h-4" />
+              <span className="text-sm">API Keys</span>
+            </NavLink>
+          </li>
         </ul>
       </nav>
 

@@ -3,7 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { Layout } from './components/Layout';
 import { ToastContainer } from './components/UI';
-import { Login, Dashboard, EnvironmentDetail } from './pages';
+import { Login, Dashboard, EnvironmentDetail, APIKeys } from './pages';
 import { checkAuth } from './store/slices/authSlice';
 import type { RootState, AppDispatch } from './store';
 
@@ -47,6 +47,7 @@ function App() {
         >
           <Route index element={<Dashboard />} />
           <Route path="env/:envName" element={<EnvironmentDetail />} />
+          <Route path="api-keys" element={<APIKeys />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

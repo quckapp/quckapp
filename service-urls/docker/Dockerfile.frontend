@@ -1,0 +1,23 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json package-lock.json* ./
+
+# Install dependencies
+RUN npm install
+
+# Copy source code
+COPY . .
+
+# Expose Vite dev port
+EXPOSE 3003
+
+# Set API proxy target for Docker (used in vite.config.ts)
+ENV VITE_PROXY_TARGET=http://service-urls-api:8085
+# Set client-side API base URL to relative path so requests go through Vite proxy
+ENV VITE_API_URL=/api/v1
+
+# Run Vite dev server (accessible on all interfaces)
+CMD ["npx", "vite", "--host", "0.0.0.0", "--port", "3003"]
