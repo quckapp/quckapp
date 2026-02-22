@@ -124,3 +124,6 @@
 [submodule "services/go-bff"]
 	path = services/go-bff
 	url = https://github.com/quckapp/go-bff.git
+[submodule "packages/secure-url"]
+	path = packages/secure-url
+	url = https://github.com/quckapp/secure-url.git
