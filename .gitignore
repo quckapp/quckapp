@@ -104,3 +104,10 @@ uploads/
 
 # Claude settings (keep local)
 .claude/settings.local.json
+
+# Debug/test output files
+*_output.txt
+*_output_full.txt
+test_*.txt
+build_*.txt
+auth-logs.txt
