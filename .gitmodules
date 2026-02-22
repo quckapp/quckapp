@@ -127,3 +127,12 @@
 [submodule "services/go-bff"]
 	path = services/go-bff
 	url = https://github.com/quckapp/go-bff.git
+[submodule "service-urls"]
+	path = service-urls
+	url = https://github.com/quckapp/service-urls.git
+[submodule "packages/go-configloader"]
+	path = packages/go-configloader
+	url = https://github.com/quckapp/go-configloader.git
+[submodule "packages/go-auth"]
+	path = packages/go-auth
+	url = https://github.com/quckapp/go-auth.git
