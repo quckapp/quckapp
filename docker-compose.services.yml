@@ -1,0 +1,487 @@
+
+# =============================================================================
+# QuckApp Microservices
+# Usage: docker compose -f docker-compose.infra.yml -f docker-compose.services.yml up -d
+# =============================================================================
+
+x-spring-common: &spring-common
+  environment: &spring-env
+    SPRING_PROFILES_ACTIVE: docker
+    MYSQL_URL: jdbc:mysql://mysql:3306/${MYSQL_DB:-quckapp}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    MYSQL_USERNAME: ${MYSQL_USER:-quckapp}
+    MYSQL_PASSWORD: ${MYSQL_PASSWORD:-quckapp123}
+    REDIS_HOST: redis
+    REDIS_PORT: 6379
+    KAFKA_BROKERS: kafka:9092
+    JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production-minimum-256-bits}
+  restart: unless-stopped
+
+x-nestjs-common: &nestjs-common
+  environment: &nestjs-env
+    NODE_ENV: production
+    JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production-minimum-256-bits}
+    REDIS_HOST: redis
+    REDIS_PORT: 6379
+    KAFKA_BROKERS: kafka:9092
+  restart: unless-stopped
+
+x-nodejs-common: &nodejs-common
+  environment: &nodejs-env
+    NODE_ENV: production
+    JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production-minimum-256-bits}
+    REDIS_URL: redis://redis:6379
+    KAFKA_BROKERS: kafka:9092
+  restart: unless-stopped
+
+x-go-common: &go-common
+  environment: &go-env
+    JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production-minimum-256-bits}
+    REDIS_URL: redis://redis:6379
+    KAFKA_BROKERS: kafka:9092
+  restart: unless-stopped
+
+x-python-common: &python-common
+  environment: &python-env
+    JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production-minimum-256-bits}
+    REDIS_URL: redis://redis:6379
+    KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    DATABASE_URL: mysql+pymysql://quckapp:quckapp123@mysql:3306/${MYSQL_DB:-quckapp}
+  restart: unless-stopped
+
+services:
+
+  # ===========================================================================
+  # SPRING BOOT SERVICES (Java 21)
+  # ===========================================================================
+
+  auth-service:
+    <<: *spring-common
+    build: ./services/auth-service
+    container_name: quckapp-auth
+    environment:
+      <<: *spring-env
+      MYSQL_URL: jdbc:mysql://mysql:3306/quckapp_auth?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    ports:
+      - "8081:8081"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  user-service:
+    <<: *spring-common
+    build: ./services/user-service
+    container_name: quckapp-users
+    environment:
+      <<: *spring-env
+      MYSQL_URL: jdbc:mysql://mysql:3306/quckapp_users?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    ports:
+      - "8082:8082"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  permission-service:
+    <<: *spring-common
+    build: ./services/permission-service
+    container_name: quckapp-permissions
+    environment:
+      <<: *spring-env
+      MYSQL_URL: jdbc:mysql://mysql:3306/quckapp_permissions?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    ports:
+      - "8083:8083"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  audit-service:
+    <<: *spring-common
+    build: ./services/audit-service
+    container_name: quckapp-audit
+    environment:
+      <<: *spring-env
+      MYSQL_URL: jdbc:mysql://mysql:3306/quckapp_audit?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    ports:
+      - "8084:8084"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  admin-service:
+    <<: *spring-common
+    build: ./services/admin-service
+    container_name: quckapp-admin
+    environment:
+      <<: *spring-env
+      MYSQL_URL: jdbc:mysql://mysql:3306/quckapp_admin?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    ports:
+      - "8085:8085"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  security-service:
+    <<: *spring-common
+    build: ./services/security-service
+    container_name: quckapp-security
+    environment:
+      <<: *spring-env
+      MYSQL_URL: jdbc:mysql://mysql:3306/quckapp_security?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    ports:
+      - "8086:8086"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  spark-etl:
+    <<: *spring-common
+    build: ./services/spark-etl
+    container_name: quckapp-etl
+    environment:
+      <<: *spring-env
+      MYSQL_URL: jdbc:mysql://mysql:3306/quckapp_etl?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    ports:
+      - "5020:5020"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # ===========================================================================
+  # NESTJS SERVICES (TypeScript)
+  # ===========================================================================
+
+  backend-gateway:
+    <<: *nestjs-common
+    build: ./services/backend-gateway
+    container_name: quckapp-gateway
+    environment:
+      <<: *nestjs-env
+      DATABASE_URL: postgres://quckapp:quckapp123@postgres:5432/quckapp_gateway
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  notification-service:
+    <<: *nestjs-common
+    build: ./services/notification-service
+    container_name: quckapp-notification
+    environment:
+      <<: *nestjs-env
+      DATABASE_URL: postgres://quckapp:quckapp123@postgres:5432/quckapp_notification
+      PORT: 3001
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  realtime-service:
+    <<: *nestjs-common
+    build: ./services/realtime-service
+    container_name: quckapp-realtime
+    environment:
+      <<: *nestjs-env
+      PORT: 4000
+    ports:
+      - "4000:4000"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # ===========================================================================
+  # NODE.JS/EXPRESS SERVICES (TypeScript)
+  # ===========================================================================
+
+  message-service:
+    <<: *nodejs-common
+    build: ./services/message-service
+    container_name: quckapp-messages
+    environment:
+      <<: *nodejs-env
+      PORT: 4003
+    ports:
+      - "4003:4003"
+
+  presence-service:
+    <<: *nodejs-common
+    build: ./services/presence-service
+    container_name: quckapp-presence
+    environment:
+      <<: *nodejs-env
+      PORT: 4001
+    ports:
+      - "4001:4001"
+
+  call-service:
+    <<: *nodejs-common
+    build: ./services/call-service
+    container_name: quckapp-calls
+    environment:
+      <<: *nodejs-env
+      PORT: 4002
+    ports:
+      - "4002:4002"
+
+  event-broadcast-service:
+    <<: *nodejs-common
+    build: ./services/event-broadcast-service
+    container_name: quckapp-events
+    environment:
+      <<: *nodejs-env
+      PORT: 4006
+    ports:
+      - "4006:4006"
+
+  huddle-service:
+    <<: *nodejs-common
+    build: ./services/huddle-service
+    container_name: quckapp-huddles
+    environment:
+      <<: *nodejs-env
+      PORT: 4005
+    ports:
+      - "4005:4005"
+
+  notification-orchestrator:
+    <<: *nodejs-common
+    build: ./services/notification-orchestrator
+    container_name: quckapp-notif-orch
+    environment:
+      <<: *nodejs-env
+      PORT: 4004
+    ports:
+      - "4004:4004"
+
+  # ===========================================================================
+  # GO SERVICES (Gin)
+  # ===========================================================================
+
+  workspace-service:
+    <<: *go-common
+    build: ./services/workspace-service
+    container_name: quckapp-workspace
+    environment:
+      <<: *go-env
+      PORT: 5004
+      DATABASE_URL: quckapp_workspace.db
+    ports:
+      - "5004:5004"
+
+  channel-service:
+    <<: *go-common
+    build: ./services/channel-service
+    container_name: quckapp-channel
+    environment:
+      <<: *go-env
+      PORT: 5005
+      DATABASE_URL: quckapp_channel.db
+    ports:
+      - "5005:5005"
+
+  search-service:
+    <<: *go-common
+    build: ./services/search-service
+    container_name: quckapp-search
+    environment:
+      <<: *go-env
+      PORT: 5006
+      DATABASE_URL: quckapp_search.db
+    ports:
+      - "5006:5006"
+
+  thread-service:
+    <<: *go-common
+    build: ./services/thread-service
+    container_name: quckapp-thread
+    environment:
+      <<: *go-env
+      PORT: 5009
+      DATABASE_URL: quckapp_thread.db
+    ports:
+      - "5009:5009"
+
+  bookmark-service:
+    <<: *go-common
+    build: ./services/bookmark-service
+    container_name: quckapp-bookmark
+    environment:
+      <<: *go-env
+      PORT: 5010
+      DATABASE_URL: quckapp_bookmark.db
+    ports:
+      - "5010:5010"
+
+  reminder-service:
+    <<: *go-common
+    build: ./services/reminder-service
+    container_name: quckapp-reminder
+    environment:
+      <<: *go-env
+      PORT: 5011
+      DATABASE_URL: quckapp_reminder.db
+    ports:
+      - "5011:5011"
+
+  media-service:
+    <<: *go-common
+    build: ./services/media-service
+    container_name: quckapp-media
+    environment:
+      <<: *go-env
+      PORT: 5001
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
+    ports:
+      - "5001:5001"
+
+  file-service:
+    <<: *go-common
+    build: ./services/file-service
+    container_name: quckapp-file
+    environment:
+      <<: *go-env
+      PORT: 5002
+      DATABASE_URL: quckapp_file.db
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
+    ports:
+      - "5002:5002"
+
+  attachment-service:
+    <<: *go-common
+    build: ./services/attachment-service
+    container_name: quckapp-attachment
+    environment:
+      <<: *go-env
+      PORT: 5012
+      DATABASE_URL: quckapp_attachment.db
+    ports:
+      - "5012:5012"
+
+  cdn-service:
+    <<: *go-common
+    build: ./services/cdn-service
+    container_name: quckapp-cdn
+    environment:
+      <<: *go-env
+      PORT: 5013
+    ports:
+      - "5013:5013"
+
+  # ===========================================================================
+  # PYTHON SERVICES (FastAPI)
+  # ===========================================================================
+
+  analytics-service:
+    <<: *python-common
+    build: ./services/analytics-service
+    container_name: quckapp-analytics
+    environment:
+      <<: *python-env
+      PORT: 6001
+      DATABASE_URL: mysql+pymysql://quckapp:quckapp123@mysql:3306/quckapp_analytics
+    ports:
+      - "6001:6001"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  moderation-service:
+    <<: *python-common
+    build: ./services/moderation-service
+    container_name: quckapp-moderation
+    environment:
+      <<: *python-env
+      PORT: 6002
+      DATABASE_URL: mysql+pymysql://quckapp:quckapp123@mysql:3306/quckapp_moderation
+    ports:
+      - "6002:6002"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  export-service:
+    <<: *python-common
+    build: ./services/export-service
+    container_name: quckapp-export
+    environment:
+      <<: *python-env
+      PORT: 6003
+      DATABASE_URL: mysql+pymysql://quckapp:quckapp123@mysql:3306/quckapp_export
+    ports:
+      - "6003:6003"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  integration-service:
+    <<: *python-common
+    build: ./services/integration-service
+    container_name: quckapp-integration
+    environment:
+      <<: *python-env
+      PORT: 6004
+      DATABASE_URL: mysql+pymysql://quckapp:quckapp123@mysql:3306/quckapp_integration
+    ports:
+      - "6004:6004"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  ml-service:
+    <<: *python-common
+    build: ./services/ml-service
+    container_name: quckapp-ml
+    environment:
+      <<: *python-env
+      PORT: 6005
+    ports:
+      - "6005:6005"
+
+  sentiment-service:
+    <<: *python-common
+    build: ./services/sentiment-service
+    container_name: quckapp-sentiment
+    environment:
+      <<: *python-env
+      PORT: 6006
+    ports:
+      - "6006:6006"
+
+  insights-service:
+    <<: *python-common
+    build: ./services/insights-service
+    container_name: quckapp-insights
+    environment:
+      <<: *python-env
+      PORT: 6007
+    ports:
+      - "6007:6007"
+
+  smart-reply-service:
+    <<: *python-common
+    build: ./services/smart-reply-service
+    container_name: quckapp-smart-reply
+    environment:
+      <<: *python-env
+      PORT: 6008
+    ports:
+      - "6008:6008"
+
+networks:
+  default:
+    name: quckapp-network
