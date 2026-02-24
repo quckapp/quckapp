@@ -4,15 +4,23 @@ _transform: true
 # =============================================================================
 # SERVICES — upstream microservices Kong routes traffic to
 # =============================================================================
+#
+# URL Convention: ALL client-facing paths follow /api/v1/<service-name>/**
+#
+# Category A (Spring Boot): strip_path: true — rewrites /api/v1/<svc> → backend /api/<svc>/v1
+# Category B (Go/Elixir):   strip_path: false — backend already uses /api/v1/<resource>
+# Category C (NestJS):       strip_path: true — rewrites /api/v1/<resource> → backend /api/<resource>
+# =============================================================================
 
 services:
 
   # ---------------------------------------------------------------------------
-  # Group 1: Auth & Security (MySQL + Redis — fast reads)
+  # Group 1: Auth & Security (Spring Boot — backend expects /api/<svc>/v1/*)
+  # strip_path: true rewrites /api/v1/auth/* → /api/auth/v1/*
   # ---------------------------------------------------------------------------
 
   - name: auth-service
-    url: http://auth-service:8081
+    url: http://auth-service:8081/api/auth/v1
     connect_timeout: 10000
     write_timeout: 10000
     read_timeout: 10000
@@ -20,8 +28,8 @@ services:
     routes:
       - name: auth-routes
         paths:
-          - /api/auth
-        strip_path: false
+          - /api/v1/auth
+        strip_path: true
         preserve_host: true
     plugins:
       - name: rate-limiting
@@ -43,7 +51,7 @@ services:
           size_unit: megabytes
 
   - name: permission-service
-    url: http://permission-service:8083
+    url: http://permission-service:8083/api/permissions
     connect_timeout: 10000
     write_timeout: 10000
     read_timeout: 10000
@@ -51,8 +59,8 @@ services:
     routes:
       - name: permission-routes
         paths:
-          - /api/permissions
-        strip_path: false
+          - /api/v1/permissions
+        strip_path: true
         preserve_host: true
     plugins:
       - name: rate-limiting
@@ -69,7 +77,7 @@ services:
           max_age: 3600
 
   - name: security-service
-    url: http://security-service:8086
+    url: http://security-service:8086/api/security/v1
     connect_timeout: 10000
     write_timeout: 10000
     read_timeout: 10000
@@ -77,8 +85,8 @@ services:
     routes:
       - name: security-routes
         paths:
-          - /api/security
-        strip_path: false
+          - /api/v1/security
+        strip_path: true
         preserve_host: true
     plugins:
       - name: rate-limiting
@@ -95,11 +103,11 @@ services:
           max_age: 3600
 
   # ---------------------------------------------------------------------------
-  # Group 2: User & Admin (MySQL — standard CRUD)
+  # Group 2: User & Admin (Spring Boot — backend expects /api/<svc>/*)
   # ---------------------------------------------------------------------------
 
   - name: user-service
-    url: http://user-service:8082
+    url: http://user-service:8082/api/users
     connect_timeout: 15000
     write_timeout: 15000
     read_timeout: 15000
@@ -107,8 +115,8 @@ services:
     routes:
       - name: user-routes
         paths:
-          - /api/users
-        strip_path: false
+          - /api/v1/users
+        strip_path: true
         preserve_host: true
     plugins:
       - name: rate-limiting
@@ -125,7 +133,7 @@ services:
           max_age: 3600
 
   - name: admin-service
-    url: http://admin-service:8085
+    url: http://admin-service:8085/api/admin
     connect_timeout: 15000
     write_timeout: 15000
     read_timeout: 15000
@@ -133,8 +141,8 @@ services:
     routes:
       - name: admin-routes
         paths:
-          - /api/admin
-        strip_path: false
+          - /api/v1/admin
+        strip_path: true
         preserve_host: true
     plugins:
       - name: rate-limiting
@@ -158,7 +166,7 @@ services:
             - 192.168.0.0/16
 
   - name: audit-service
-    url: http://audit-service:8084
+    url: http://audit-service:8084/api/audit
     connect_timeout: 15000
     write_timeout: 15000
     read_timeout: 15000
@@ -166,8 +174,8 @@ services:
     routes:
       - name: audit-routes
         paths:
-          - /api/audit
-        strip_path: false
+          - /api/v1/audit
+        strip_path: true
         preserve_host: true
     plugins:
       - name: rate-limiting
@@ -184,7 +192,8 @@ services:
           max_age: 3600
 
   # ---------------------------------------------------------------------------
-  # Group 3: Workspace & Channels (MySQL + Kafka)
+  # Group 3: Workspace & Channels (Go — backend already uses /api/v1/<resource>)
+  # strip_path: false — path passes through unchanged
   # ---------------------------------------------------------------------------
 
   - name: workspace-service
@@ -198,6 +207,7 @@ services:
         paths:
           - /api/v1/workspaces
           - /api/v1/invites
+          - /api/v1/join
         strip_path: false
         preserve_host: true
     plugins:
@@ -224,8 +234,33 @@ services:
       - name: channel-routes
         paths:
           - /api/v1/channels
-          - /api/v1/templates
         strip_path: false
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 200
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+
+  - name: channel-service-templates
+    url: http://channel-service:5005/api/v1/templates
+    connect_timeout: 15000
+    write_timeout: 15000
+    read_timeout: 15000
+    retries: 2
+    routes:
+      - name: channel-template-routes
+        paths:
+          - /api/v1/channel-templates
+        strip_path: true
         preserve_host: true
     plugins:
       - name: rate-limiting
@@ -268,7 +303,7 @@ services:
           max_age: 3600
 
   # ---------------------------------------------------------------------------
-  # Group 4: Messaging (MongoDB + Elasticsearch — heavier reads)
+  # Group 4: Messaging (Elixir/Go — backend already uses /api/v1/<resource>)
   # ---------------------------------------------------------------------------
 
   - name: message-service
@@ -323,8 +358,8 @@ services:
           credentials: true
           max_age: 3600
 
-  - name: bookmark-service
-    url: http://bookmark-service:5010
+  - name: bookmark-service-bookmarks
+    url: http://bookmark-service:5010/api/bookmarks
     connect_timeout: 15000
     write_timeout: 15000
     read_timeout: 15000
@@ -332,9 +367,34 @@ services:
     routes:
       - name: bookmark-routes
         paths:
-          - /api/bookmarks
-          - /api/bookmark-folders
-        strip_path: false
+          - /api/v1/bookmarks
+        strip_path: true
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 200
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+
+  - name: bookmark-service-folders
+    url: http://bookmark-service:5010/api/bookmark-folders
+    connect_timeout: 15000
+    write_timeout: 15000
+    read_timeout: 15000
+    retries: 2
+    routes:
+      - name: bookmark-folder-routes
+        paths:
+          - /api/v1/bookmark-folders
+        strip_path: true
         preserve_host: true
     plugins:
       - name: rate-limiting
@@ -351,21 +411,44 @@ services:
           max_age: 3600
 
   # ---------------------------------------------------------------------------
-  # Group 5: Real-time (WebSocket — long-lived connections)
+  # Group 5: Real-time (Elixir — backend uses /api/v1/<resource>)
   # ---------------------------------------------------------------------------
 
-  - name: realtime-service
+  - name: realtime-service-socket
     url: http://realtime-service:4000
     connect_timeout: 10000
     write_timeout: 3600000
     read_timeout: 3600000
     retries: 0
     routes:
-      - name: realtime-routes
+      - name: realtime-socket-routes
         paths:
           - /socket
-          - /api/realtime
         strip_path: false
+        preserve_host: true
+        protocols:
+          - http
+          - https
+    plugins:
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID, Upgrade, Connection]
+          credentials: true
+          max_age: 3600
+
+  - name: realtime-service-rest
+    url: http://realtime-service:4000/api/realtime
+    connect_timeout: 10000
+    write_timeout: 3600000
+    read_timeout: 3600000
+    retries: 0
+    routes:
+      - name: realtime-rest-routes
+        paths:
+          - /api/v1/realtime
+        strip_path: true
         preserve_host: true
         protocols:
           - http
@@ -452,7 +535,7 @@ services:
           max_age: 3600
 
   # ---------------------------------------------------------------------------
-  # Group 6: File & Media (MongoDB + MinIO — large payloads)
+  # Group 6: File & Media (Go — backend uses /api/v1/<resource>)
   # ---------------------------------------------------------------------------
 
   - name: file-service
@@ -565,11 +648,11 @@ services:
           fault_tolerant: true
 
   # ---------------------------------------------------------------------------
-  # Group 7: Notifications & Events (MongoDB + Kafka)
+  # Group 7: Notifications & Events
   # ---------------------------------------------------------------------------
 
-  - name: notification-service
-    url: http://notification-service:3001
+  - name: notification-service-notifications
+    url: http://notification-service:3001/api/notifications
     connect_timeout: 20000
     write_timeout: 20000
     read_timeout: 20000
@@ -577,11 +660,86 @@ services:
     routes:
       - name: notification-routes
         paths:
-          - /api/notifications
-          - /api/templates
-          - /api/devices
-          - /api/preferences
-        strip_path: false
+          - /api/v1/notifications
+        strip_path: true
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 200
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+
+  - name: notification-service-templates
+    url: http://notification-service:3001/api/templates
+    connect_timeout: 20000
+    write_timeout: 20000
+    read_timeout: 20000
+    retries: 3
+    routes:
+      - name: notification-template-routes
+        paths:
+          - /api/v1/notification-templates
+        strip_path: true
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 200
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+
+  - name: notification-service-devices
+    url: http://notification-service:3001/api/devices
+    connect_timeout: 20000
+    write_timeout: 20000
+    read_timeout: 20000
+    retries: 3
+    routes:
+      - name: device-routes
+        paths:
+          - /api/v1/devices
+        strip_path: true
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 200
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+
+  - name: notification-service-preferences
+    url: http://notification-service:3001/api/preferences
+    connect_timeout: 20000
+    write_timeout: 20000
+    read_timeout: 20000
+    retries: 3
+    routes:
+      - name: preference-routes
+        paths:
+          - /api/v1/preferences
+        strip_path: true
         preserve_host: true
     plugins:
       - name: rate-limiting
@@ -606,7 +764,7 @@ services:
     routes:
       - name: notification-orchestrator-routes
         paths:
-          - /api/v1/notifications
+          - /api/v1/notification-orchestrator
         strip_path: false
         preserve_host: true
     plugins:
@@ -670,7 +828,7 @@ services:
           max_age: 3600
 
   # ---------------------------------------------------------------------------
-  # Group 8: Analytics & Insights (ClickHouse + MySQL — OLAP slow queries)
+  # Group 8: Analytics & Insights (Go — backend uses /api/v1/<resource>)
   # ---------------------------------------------------------------------------
 
   - name: analytics-service
@@ -727,7 +885,7 @@ services:
           max_age: 3600
 
   # ---------------------------------------------------------------------------
-  # Group 9: AI & ML (Python + Redis — CPU-bound inference)
+  # Group 9: AI & ML (Python)
   # ---------------------------------------------------------------------------
 
   - name: ml-service
@@ -757,7 +915,7 @@ services:
           max_age: 3600
 
   - name: moderation-service
-    url: http://moderation-service:5014
+    url: http://moderation-service:5014/api/moderation
     connect_timeout: 10000
     write_timeout: 30000
     read_timeout: 30000
@@ -765,8 +923,8 @@ services:
     routes:
       - name: moderation-routes
         paths:
-          - /api/moderation
-        strip_path: false
+          - /api/v1/moderation
+        strip_path: true
         preserve_host: true
     plugins:
       - name: rate-limiting
@@ -783,7 +941,7 @@ services:
           max_age: 3600
 
   - name: sentiment-service
-    url: http://sentiment-service:5017
+    url: http://sentiment-service:5017/api/sentiment
     connect_timeout: 10000
     write_timeout: 30000
     read_timeout: 30000
@@ -791,8 +949,8 @@ services:
     routes:
       - name: sentiment-routes
         paths:
-          - /api/sentiment
-        strip_path: false
+          - /api/v1/sentiment
+        strip_path: true
         preserve_host: true
     plugins:
       - name: rate-limiting
@@ -835,7 +993,7 @@ services:
           max_age: 3600
 
   # ---------------------------------------------------------------------------
-  # Group 10: Data Export & Integration (MySQL + Celery — async jobs)
+  # Group 10: Data Export & Integration (Go — backend uses /api/v1/<resource>)
   # ---------------------------------------------------------------------------
 
   - name: export-service
@@ -894,10 +1052,10 @@ services:
           max_age: 3600
 
   # ---------------------------------------------------------------------------
-  # Group 11: BFF / Aggregation (Go BFF — replaces NestJS backend-gateway)
+  # Group 11: BFF / Aggregation (Go BFF — handles /api/v1/conversations)
   # ---------------------------------------------------------------------------
-  # WebSocket traffic now handled by Envoy (port 8090), NOT Kong.
-  # This service only handles REST API aggregation.
+  # WebSocket traffic handled by Envoy (port 8090), NOT Kong.
+  # BFF handles REST API aggregation for conversations.
 
   - name: go-bff
     url: http://go-bff:3000
@@ -906,13 +1064,11 @@ services:
     read_timeout: 30000
     retries: 2
     routes:
-      - name: bff-api-routes
+      - name: bff-conversation-routes
         paths:
-          - /api/v1
+          - /api/v1/conversations
         strip_path: false
         preserve_host: true
-        # Lower priority so specific service routes take precedence
-        regex_priority: 0
     plugins:
       - name: rate-limiting
         config:
