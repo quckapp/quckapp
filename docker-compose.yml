@@ -124,11 +124,11 @@ services:
   #   environment:
   #     NODE_ENV: production
   #     PORT: 3000
-  #     DATABASE_URL: postgresql://quckapp:quckapp_secret@postgres:5432/quckapp
+  #     DATABASE_URL: postgresql://quckapp:quckapp123@postgres:5432/quckapp
   #     REDIS_HOST: redis
   #     REDIS_PORT: 6379
   #     REDIS_PASSWORD: redis_secret
-  #     MONGODB_URI: mongodb://admin:admin_secret@mongodb:27017/quckapp_gateway?authSource=admin
+  #     MONGODB_URI: mongodb://admin:localdev123@mongodb:27017/quckapp_gateway?authSource=admin
   #     KAFKA_BROKERS: kafka:9092
   #     JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
   #     AUTH_SERVICE_URL: http://auth-service:8081
@@ -164,8 +164,8 @@ services:
 
   go-bff:
     build:
-      context: ./services/go-bff
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/go-bff/Dockerfile
     container_name: quckapp-go-bff
     restart: unless-stopped
     environment:
@@ -173,7 +173,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
       SCYLLA_HOSTS: scylladb-node1,scylladb-node2,scylladb-node3
       SCYLLA_KEYSPACE: quckapp
-      POSTGRES_URL: postgresql://quckapp:quckapp_secret@postgres:5432/quckapp
+      POSTGRES_URL: postgresql://quckapp:quckapp123@postgres:5432/quckapp?sslmode=disable
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: redis_secret
@@ -205,6 +205,8 @@ services:
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev_internal_api_key}
     expose:
       - "3000"
+    ports:
+      - "3000:3000"
     depends_on:
       scylladb-node1:
         condition: service_healthy
@@ -242,6 +244,7 @@ services:
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_DATA_REDIS_PASSWORD: redis_secret
       JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+      JWT_ISSUER: quckapp-auth
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-placeholder}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-placeholder}
       APPLE_CLIENT_ID: ${APPLE_CLIENT_ID:-placeholder}
@@ -250,6 +253,7 @@ services:
       FACEBOOK_CLIENT_SECRET: ${FACEBOOK_CLIENT_SECRET:-placeholder}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-placeholder}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-placeholder}
+      KAFKA_BROKERS: kafka:9092
       OTEL_EXPORTER_JAEGER_ENDPOINT: http://jaeger:14268/api/traces
     ports:
       - "8081:8081"
@@ -257,6 +261,8 @@ services:
       mysql:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
     networks:
       - quckapp-network
@@ -286,6 +292,7 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
       JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+      JWT_ISSUER: quckapp-auth
       OTEL_EXPORTER_JAEGER_ENDPOINT: http://jaeger:14268/api/traces
     ports:
       - "8082:8082"
@@ -317,6 +324,7 @@ services:
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_DATA_REDIS_PASSWORD: redis_secret
       JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+      JWT_ISSUER: quckapp-auth
       OTEL_EXPORTER_JAEGER_ENDPOINT: http://jaeger:14268/api/traces
     ports:
       - "8083:8083"
@@ -340,10 +348,11 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/quckapp_audit?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-quckapp}
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-quckapp123}
-      SPRING_DATA_MONGODB_URI: mongodb://admin:admin_secret@mongodb:27017/quckapp_audit?authSource=admin
+      SPRING_DATA_MONGODB_URI: mongodb://admin:localdev123@mongodb:27017/quckapp_audit?authSource=admin
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       ELASTICSEARCH_URI: elasticsearch:9200
       JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+      JWT_ISSUER: quckapp-auth
       OTEL_EXPORTER_JAEGER_ENDPOINT: http://jaeger:14268/api/traces
     ports:
       - "8084:8084"
@@ -378,6 +387,7 @@ services:
       REDIS_PASSWORD: redis_secret
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+      JWT_ISSUER: quckapp-auth
       OTEL_EXPORTER_JAEGER_ENDPOINT: http://jaeger:14268/api/traces
     ports:
       - "18085:8085"
@@ -442,7 +452,7 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USERNAME: quckapp
-      DB_PASSWORD: quckapp_secret
+      DB_PASSWORD: quckapp123
       DB_NAME: quckapp_notifications
       REDIS_HOST: redis
       REDIS_PORT: 6379
@@ -491,7 +501,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
       JAEGER_ENDPOINT: http://jaeger:14268/api/traces
     ports:
-      - "5004:5004"
+      - "15004:5004"
     depends_on:
       mysql:
         condition: service_healthy
@@ -560,7 +570,7 @@ services:
     environment:
       ENV: development
       PORT: 5002
-      MONGODB_URI: mongodb://admin:admin_secret@mongodb:27017
+      MONGODB_URI: mongodb://admin:localdev123@mongodb:27017
       MONGODB_DATABASE: quckapp_files
       REDIS_URL: redis:6379
       REDIS_PASSWORD: redis_secret
@@ -596,7 +606,7 @@ services:
     environment:
       ENV: development
       PORT: 5001
-      MONGODB_URI: mongodb://admin:admin_secret@mongodb:27017/quckapp_media?authSource=admin
+      MONGODB_URI: mongodb://admin:localdev123@mongodb:27017/quckapp_media?authSource=admin
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: redis_secret
@@ -632,7 +642,9 @@ services:
       ENV: development
       PORT: 5006
       ELASTICSEARCH_URL: http://elasticsearch:9200
-      REDIS_URL: redis://:redis_secret@redis:6379
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: redis_secret
       KAFKA_BROKERS: kafka:9092
       JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
       JAEGER_ENDPOINT: http://jaeger:14268/api/traces
@@ -690,7 +702,7 @@ services:
     environment:
       ENV: development
       PORT: 4010
-      MONGODB_URL: mongodb://admin:admin_secret@mongodb:27017/?authSource=admin
+      MONGODB_URL: mongodb://admin:localdev123@mongodb:27017/?authSource=admin
       DATABASE_NAME: quckapp_reminders
       REDIS_URL: redis:6379
       KAFKA_BROKERS: kafka:9092
@@ -717,7 +729,7 @@ services:
     environment:
       ENV: development
       PORT: 4011
-      MONGODB_URL: mongodb://admin:admin_secret@mongodb:27017/?authSource=admin
+      MONGODB_URL: mongodb://admin:localdev123@mongodb:27017/?authSource=admin
       DATABASE_NAME: quckapp_attachments
       KAFKA_BROKERS: kafka:9092
       S3_ENDPOINT: http://minio:9000
@@ -750,6 +762,7 @@ services:
       ENV: development
       PORT: 4012
       REDIS_URL: redis:6379
+      REDIS_PASSWORD: redis_secret
       S3_ENDPOINT: http://minio:9000
       S3_BUCKET: quckapp-attachments
       S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
@@ -812,7 +825,7 @@ services:
     environment:
       MIX_ENV: prod
       PORT: 4001
-      MONGODB_URI: mongodb://admin:admin_secret@mongodb:27017/quckapp_presence?authSource=admin
+      MONGODB_URI: mongodb://admin:localdev123@mongodb:27017/quckapp_presence?authSource=admin
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: redis_secret
@@ -820,7 +833,10 @@ services:
       SECRET_KEY_BASE: ${SECRET_KEY_BASE:-dev_secret_key_base_min_64_chars_long_for_phoenix_app_1234567890abcdef}
       RELEASE_COOKIE: ${ERLANG_COOKIE:-quckapp_dev_cookie}
       JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+      JWT_ISSUER: quckapp-auth
       JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    volumes:
+      - ./config/overrides/presence-runtime.exs:/app/releases/1.0.0/runtime.exs:ro
     ports:
       - "4001:4001"
     depends_on:
@@ -842,7 +858,7 @@ services:
     environment:
       MIX_ENV: prod
       PORT: 4002
-      MONGODB_URI: mongodb://admin:admin_secret@mongodb:27017/quckapp_calls?authSource=admin
+      MONGODB_URI: mongodb://admin:localdev123@mongodb:27017/quckapp_calls?authSource=admin
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: redis_secret
@@ -875,7 +891,7 @@ services:
     environment:
       MIX_ENV: prod
       PORT: 4003
-      MONGODB_URI: mongodb://admin:admin_secret@mongodb:27017/quckapp_messages?authSource=admin
+      MONGODB_URI: mongodb://admin:localdev123@mongodb:27017/quckapp_messages?authSource=admin
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: redis_secret
@@ -884,7 +900,10 @@ services:
       SECRET_KEY_BASE: ${SECRET_KEY_BASE:-dev_secret_key_base_min_64_chars_long_for_phoenix_app_1234567890abcdef}
       RELEASE_COOKIE: ${ERLANG_COOKIE:-quckapp_dev_cookie}
       JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
+      JWT_ISSUER: quckapp-auth
       JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+    volumes:
+      - ./config/overrides/message-runtime.exs:/app/releases/1.0.0/runtime.exs:ro
     ports:
       - "4003:4003"
     depends_on:
@@ -908,7 +927,7 @@ services:
     environment:
       MIX_ENV: prod
       PORT: 4004
-      MONGODB_URI: mongodb://admin:admin_secret@mongodb:27017/quckapp_notifications?authSource=admin
+      MONGODB_URI: mongodb://admin:localdev123@mongodb:27017/quckapp_notifications?authSource=admin
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: redis_secret
@@ -937,11 +956,13 @@ services:
     environment:
       MIX_ENV: dev
       PORT: 4005
-      DATABASE_URL: postgresql://quckapp:quckapp_secret@postgres:5432/quckapp
+      DATABASE_URL: postgresql://quckapp:quckapp123@postgres:5432/quckapp
+      MONGODB_URL: mongodb://admin:localdev123@mongodb:27017/quckapp_huddles?authSource=admin
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: redis_secret
       KAFKA_BROKERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production_min_32_chars}
       SECRET_KEY_BASE: ${SECRET_KEY_BASE:-dev_secret_key_base_min_64_chars_long_for_phoenix_app_1234567890abcdef}
       RELEASE_COOKIE: ${ERLANG_COOKIE:-quckapp_dev_cookie}
       JAEGER_ENDPOINT: http://jaeger:14268/api/traces
@@ -949,6 +970,8 @@ services:
       - "4005:4005"
     depends_on:
       postgres:
+        condition: service_healthy
+      mongodb:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -966,7 +989,7 @@ services:
     environment:
       MIX_ENV: prod
       PORT: 4006
-      MONGODB_URL: mongodb://admin:admin_secret@mongodb:27017/quckapp_events?authSource=admin
+      MONGODB_URL: mongodb://admin:localdev123@mongodb:27017/quckapp_events?authSource=admin
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: redis_secret
@@ -1035,8 +1058,10 @@ services:
     environment:
       ENV: development
       PORT: 5008
-      DATABASE_URL: postgresql://quckapp:quckapp_secret@postgres:5432/quckapp
-      REDIS_URL: redis://:redis_secret@redis:6379
+      DATABASE_URL: postgresql://quckapp:quckapp123@postgres:5432/quckapp
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: redis_secret
       KAFKA_BROKERS: kafka:9092
       MODEL_PATH: /app/models
       JAEGER_ENDPOINT: http://jaeger:14268/api/traces
@@ -1096,8 +1121,10 @@ services:
     environment:
       ENV: development
       PORT: 5017
-      DATABASE_URL: postgresql://quckapp:quckapp_secret@postgres:5432/quckapp
-      REDIS_URL: redis://:redis_secret@redis:6379
+      DATABASE_URL: postgresql://quckapp:quckapp123@postgres:5432/quckapp
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: redis_secret
       KAFKA_BROKERS: kafka:9092
       ML_SERVICE_URL: http://ml-service:5008
       JAEGER_ENDPOINT: http://jaeger:14268/api/traces
@@ -1220,8 +1247,10 @@ services:
     environment:
       ENV: development
       PORT: 5019
-      DATABASE_URL: postgresql://quckapp:quckapp_secret@postgres:5432/quckapp
-      REDIS_URL: redis://:redis_secret@redis:6379
+      DATABASE_URL: postgresql://quckapp:quckapp123@postgres:5432/quckapp
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: redis_secret
       KAFKA_BROKERS: kafka:9092
       ML_SERVICE_URL: http://ml-service:5008
       JAEGER_ENDPOINT: http://jaeger:14268/api/traces
@@ -1395,7 +1424,7 @@ services:
         condition: service_healthy
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://quckapp:quckapp_secret@postgres:5432/quckapp_airflow
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://quckapp:quckapp123@postgres:5432/quckapp_airflow
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-81HqDtbqAywKSOumSha3BhWNOdQ26slT6K0YaZSd-Ro=}
     volumes:
       - airflow_logs:/opt/airflow/logs
@@ -1419,7 +1448,7 @@ services:
       - "18086:8080"   # Airflow Web UI
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://quckapp:quckapp_secret@postgres:5432/quckapp_airflow
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://quckapp:quckapp123@postgres:5432/quckapp_airflow
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-81HqDtbqAywKSOumSha3BhWNOdQ26slT6K0YaZSd-Ro=}
       AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY:-quckapp_airflow_secret_key_dev}
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
@@ -1445,7 +1474,7 @@ services:
         condition: service_completed_successfully
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://quckapp:quckapp_secret@postgres:5432/quckapp_airflow
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://quckapp:quckapp123@postgres:5432/quckapp_airflow
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-81HqDtbqAywKSOumSha3BhWNOdQ26slT6K0YaZSd-Ro=}
     volumes:
       - ./services/spark-etl/scripts/airflow/dags:/opt/airflow/dags:ro
