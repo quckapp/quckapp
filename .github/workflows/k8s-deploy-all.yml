@@ -64,7 +64,7 @@ jobs:
         run: |
           cd infrastructure/k8s/overlays/${{ inputs.environment }}
           kustomize edit set image \
-            quckapp/api=${{ env.ECR_REGISTRY }}/quckapp/api:${{ inputs.image_tag }} \
+            quckapp/api/v1=${{ env.ECR_REGISTRY }}/quckapp/api/v1:${{ inputs.image_tag }} \
             quckapp/worker=${{ env.ECR_REGISTRY }}/quckapp/worker:${{ inputs.image_tag }}
 
       - name: Deploy

@@ -86,7 +86,7 @@ jobs:
           else
             # Get latest tag from source environment
             TAG=$(aws ecr describe-images \
-              --repository-name quckapp/api \
+              --repository-name quckapp/api/v1 \
               --query 'sort_by(imageDetails,& imagePushedAt)[-1].imageTags[0]' \
               --output text \
               --filter tagStatus=TAGGED)
@@ -144,7 +144,7 @@ jobs:
         run: |
           cd infrastructure/k8s/overlays/${{ inputs.target_environment }}
           kustomize edit set image \
-            quckapp/api=${{ env.ECR_REGISTRY }}/quckapp/api:${{ env.IMAGE_TAG }} \
+            quckapp/api/v1=${{ env.ECR_REGISTRY }}/quckapp/api/v1:${{ env.IMAGE_TAG }} \
             quckapp/worker=${{ env.ECR_REGISTRY }}/quckapp/worker:${{ env.IMAGE_TAG }}
 
       - name: Deploy to target

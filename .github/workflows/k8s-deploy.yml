@@ -30,7 +30,7 @@ permissions:
 
 env:
   AWS_REGION: us-east-1
-  ECR_REPOSITORY_API: quckapp/api
+  ECR_REPOSITORY_API: quckapp/api/v1
   ECR_REPOSITORY_WORKER: quckapp/worker
   EKS_CLUSTER_DEV: quckapp
   EKS_CLUSTER_PROD: quckapp-prod
@@ -125,7 +125,7 @@ jobs:
         run: |
           cd infrastructure/k8s/overlays/dev
           kustomize edit set image \
-            quckapp/api=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_API }}:${{ needs.build.outputs.image_tag }} \
+            quckapp/api/v1=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_API }}:${{ needs.build.outputs.image_tag }} \
             quckapp/worker=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_WORKER }}:${{ needs.build.outputs.image_tag }}
 
       - name: Deploy to dev
@@ -174,7 +174,7 @@ jobs:
         run: |
           cd infrastructure/k8s/overlays/prod
           kustomize edit set image \
-            quckapp/api=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_API }}:${{ needs.build.outputs.image_tag }} \
+            quckapp/api/v1=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_API }}:${{ needs.build.outputs.image_tag }} \
             quckapp/worker=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_WORKER }}:${{ needs.build.outputs.image_tag }}
 
       - name: Deploy to prod
