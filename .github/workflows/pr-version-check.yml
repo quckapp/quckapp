@@ -1,0 +1,84 @@
+name: PR Version Validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'services/admin-service/src/**'
+      - '.github/workflows/reusable-service-deploy.yml'
+      - '.github/workflows/promote-environment.yml'
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  version-check:
+    name: Validate Version Promotion Rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for direct activation bypasses
+        id: bypass-check
+        run: |
+          # Scan for any code that directly sets status to ACTIVE without using promote()
+          VIOLATIONS=$(grep -rn "VersionStatus.ACTIVE" --include="*.java" services/admin-service/src/ \
+            | grep -v "VersionService.java" \
+            | grep -v "VersionStatus.java" \
+            || true)
+
+          if [ -n "$VIOLATIONS" ]; then
+            echo "::warning::Found direct VersionStatus.ACTIVE references outside VersionService:"
+            echo "$VIOLATIONS"
+            echo "bypass_found=true" >> "$GITHUB_OUTPUT"
+            echo "bypass_details<<EOF" >> "$GITHUB_OUTPUT"
+            echo "$VIOLATIONS" >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
+          else
+            echo "bypass_found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate promotion chain integrity
+        id: chain-check
+        run: |
+          # Verify EnvironmentChain.java still has the correct order
+          if ! grep -q '"local", "dev", "qa", "uat", "staging", "production", "live"' \
+            services/admin-service/src/main/java/com/quckapp/admin/domain/EnvironmentChain.java; then
+            echo "::error::EnvironmentChain order has been modified! Verify this is intentional."
+            echo "chain_modified=true" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          echo "chain_modified=false" >> "$GITHUB_OUTPUT"
+
+      - name: Post check summary
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const bypassFound = '${{ steps.bypass-check.outputs.bypass_found }}' === 'true';
+            const chainModified = '${{ steps.chain-check.outputs.chain_modified }}' === 'true';
+            const bypassDetails = `${{ steps.bypass-check.outputs.bypass_details }}`;
+
+            let body = '**Version Promotion Check Results:**\n\n';
+
+            if (chainModified) {
+              body += '- :x: **Environment chain order modified** — `EnvironmentChain.java` has been changed. Verify this is intentional.\n';
+            } else {
+              body += '- :white_check_mark: Environment chain order is intact.\n';
+            }
+
+            if (bypassFound) {
+              body += '- :warning: **Potential activation bypass detected** — Found direct `VersionStatus.ACTIVE` references outside `VersionService.java`:\n';
+              body += '```\n' + bypassDetails + '\n```\n';
+            } else {
+              body += '- :white_check_mark: No direct activation bypasses found.\n';
+            }
+
+            github.rest.pulls.createReview({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              event: 'COMMENT',
+              body: body
+            });

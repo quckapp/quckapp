@@ -14,6 +14,7 @@ on:
           - uat2
           - uat3
           - staging
+          - production
       target_environment:
         description: 'Target environment'
         required: true
@@ -24,6 +25,7 @@ on:
           - uat2
           - uat3
           - staging
+          - production
           - live
       image_tag:
         description: 'Image tag to promote (leave empty for latest from source)'
@@ -53,14 +55,14 @@ jobs:
 
           # Define valid promotion paths
           case "$SOURCE-$TARGET" in
-            dev-qa|qa-uat1|qa-uat2|qa-uat3|uat1-staging|uat2-staging|uat3-staging|staging-live)
+            dev-qa|qa-uat1|qa-uat2|qa-uat3|uat1-staging|uat2-staging|uat3-staging|staging-production|production-live)
               echo "valid=true" >> $GITHUB_OUTPUT
               echo "Valid promotion: $SOURCE -> $TARGET"
               ;;
             *)
               echo "valid=false" >> $GITHUB_OUTPUT
               echo "::error::Invalid promotion path: $SOURCE -> $TARGET"
-              echo "Valid paths: dev->qa, qa->uat*, uat*->staging, staging->live"
+              echo "Valid paths: dev->qa, qa->uat*, uat*->staging, staging->production, production->live"
               exit 1
               ;;
           esac
@@ -102,6 +104,27 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Check version promotion gate
+        if: vars.SERVICE_URLS_API_URL != ''
+        run: |
+          API_URL="${{ vars.SERVICE_URLS_API_URL }}/admin/service-urls"
+          TOKEN="${{ secrets.SERVICE_URLS_API_TOKEN }}"
+          TARGET="${{ inputs.target_environment }}"
+
+          # Check promotion gate for the target environment (fail-closed: block if API unreachable)
+          RESPONSE=$(curl -sf "$API_URL/can-promote?serviceKey=quckapp-api&apiVersion=v1&toEnvironment=$TARGET" \
+            -H "Authorization: Bearer $TOKEN")
+          if [ $? -ne 0 ]; then
+            echo "::error::Promotion gate API unreachable — failing closed"
+            exit 1
+          fi
+          ALLOWED=$(echo "$RESPONSE" | jq -r '.data.allowed')
+          if [ "$ALLOWED" != "true" ]; then
+            REASON=$(echo "$RESPONSE" | jq -r '.data.blockedReason')
+            echo "::error::Promotion gate blocked: $REASON"
+            exit 1
+          fi
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -169,3 +192,13 @@ jobs:
           echo "| Target | ${{ inputs.target_environment }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Image Tag | ${{ env.IMAGE_TAG }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Status | Success |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Record version promotions
+        if: vars.SERVICE_URLS_API_URL != ''
+        run: |
+          API_URL="${{ vars.SERVICE_URLS_API_URL }}/admin/service-urls"
+          TOKEN="${{ secrets.SERVICE_URLS_API_TOKEN }}"
+          TARGET="${{ inputs.target_environment }}"
+
+          curl -sf -X POST "$API_URL/$TARGET/versions/quckapp-api/v1/promote" \
+            -H "Authorization: Bearer $TOKEN" || echo "::warning::Promotion recording failed"

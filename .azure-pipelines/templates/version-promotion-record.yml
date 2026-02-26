@@ -1,0 +1,34 @@
+# =============================================================================
+# Version Promotion Record — Azure Pipelines Template
+# =============================================================================
+# Records a successful promotion after deployment.
+#
+# Usage:
+#   - template: templates/version-promotion-record.yml
+#     parameters:
+#       serviceKey: 'user-service'
+#       apiVersion: 'v1'
+#       targetEnvironment: 'production'
+#       serviceUrlsApiUrl: '$(SERVICE_URLS_API_URL)'
+# =============================================================================
+
+parameters:
+  - name: serviceKey
+    type: string
+  - name: apiVersion
+    type: string
+    default: 'v1'
+  - name: targetEnvironment
+    type: string
+  - name: serviceUrlsApiUrl
+    type: string
+
+steps:
+  - script: |
+      curl -sf -X POST "${{ parameters.serviceUrlsApiUrl }}/admin/service-urls/${{ parameters.targetEnvironment }}/versions/${{ parameters.serviceKey }}/${{ parameters.apiVersion }}/promote" \
+        -H "Authorization: Bearer $(SERVICE_URLS_API_TOKEN)" \
+        || echo "##vso[task.logissue type=warning]Version promotion recording failed (non-fatal)"
+
+      echo "Promotion recorded: ${{ parameters.serviceKey }} ${{ parameters.apiVersion }} -> ${{ parameters.targetEnvironment }}"
+    displayName: 'Record Version Promotion'
+    condition: succeeded()

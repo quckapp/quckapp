@@ -19,6 +19,11 @@ on:
       port:
         required: true
         type: string
+      api_version:
+        required: false
+        type: string
+        default: 'v1'
+        description: 'API version being deployed (e.g., v1, v2)'
     secrets:
       AZURE_CREDENTIALS:
         required: true
@@ -77,19 +82,38 @@ jobs:
           kubectl set image deployment/${{ inputs.service_name }} \
             ${{ inputs.service_name }}=${{ needs.build-push.outputs.image_tag }} \
             -n quckapp
-      - name: Mark version ready
+      - name: Mark version ready + promote to dev
         if: vars.SERVICE_URLS_API_URL != ''
         run: |
-          if [ -n "$NEW_API_VERSION" ]; then
-            curl -s -X POST "${{ vars.SERVICE_URLS_API_URL }}/admin/service-urls/development/versions/${{ inputs.service_name }}/$NEW_API_VERSION/ready" \
-              -H "Authorization: Bearer ${{ secrets.SERVICE_URLS_API_TOKEN }}" || true
-          fi
+          API_URL="${{ vars.SERVICE_URLS_API_URL }}/admin/service-urls"
+          TOKEN="${{ secrets.SERVICE_URLS_API_TOKEN }}"
+          SVC="${{ inputs.service_name }}"
+          VER="${{ inputs.api_version }}"
+
+          # Mark ready in dev
+          curl -sf -X POST "$API_URL/dev/versions/$SVC/$VER/ready" \
+            -H "Authorization: Bearer $TOKEN" || echo "::warning::Version ready marking failed (non-fatal)"
+
+          # Promote to dev (auto-activates)
+          curl -sf -X POST "$API_URL/dev/versions/$SVC/$VER/promote" \
+            -H "Authorization: Bearer $TOKEN" || echo "::warning::Version promotion failed (non-fatal)"
 
   deploy-qa:
     needs: [build-push, deploy-dev]
     runs-on: ubuntu-latest
     environment: qa
     steps:
+      - name: Check promotion gate
+        if: vars.SERVICE_URLS_API_URL != ''
+        run: |
+          RESPONSE=$(curl -sf "${{ vars.SERVICE_URLS_API_URL }}/admin/service-urls/can-promote?serviceKey=${{ inputs.service_name }}&apiVersion=${{ inputs.api_version }}&toEnvironment=qa" \
+            -H "Authorization: Bearer ${{ secrets.SERVICE_URLS_API_TOKEN }}")
+          ALLOWED=$(echo "$RESPONSE" | jq -r '.data.allowed')
+          if [ "$ALLOWED" != "true" ]; then
+            REASON=$(echo "$RESPONSE" | jq -r '.data.blockedReason')
+            echo "::error::Promotion gate blocked: $REASON"
+            exit 1
+          fi
       - uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
@@ -98,12 +122,28 @@ jobs:
           kubectl set image deployment/${{ inputs.service_name }} \
             ${{ inputs.service_name }}=${{ needs.build-push.outputs.image_tag }} \
             -n quckapp
+      - name: Record promotion
+        if: vars.SERVICE_URLS_API_URL != ''
+        run: |
+          curl -sf -X POST "${{ vars.SERVICE_URLS_API_URL }}/admin/service-urls/qa/versions/${{ inputs.service_name }}/${{ inputs.api_version }}/promote" \
+            -H "Authorization: Bearer ${{ secrets.SERVICE_URLS_API_TOKEN }}" || echo "::warning::Promotion recording failed"
 
   deploy-uat:
     needs: [build-push, deploy-qa]
     runs-on: ubuntu-latest
     environment: uat1
     steps:
+      - name: Check promotion gate
+        if: vars.SERVICE_URLS_API_URL != ''
+        run: |
+          RESPONSE=$(curl -sf "${{ vars.SERVICE_URLS_API_URL }}/admin/service-urls/can-promote?serviceKey=${{ inputs.service_name }}&apiVersion=${{ inputs.api_version }}&toEnvironment=uat1" \
+            -H "Authorization: Bearer ${{ secrets.SERVICE_URLS_API_TOKEN }}")
+          ALLOWED=$(echo "$RESPONSE" | jq -r '.data.allowed')
+          if [ "$ALLOWED" != "true" ]; then
+            REASON=$(echo "$RESPONSE" | jq -r '.data.blockedReason')
+            echo "::error::Promotion gate blocked: $REASON"
+            exit 1
+          fi
       - uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
@@ -112,12 +152,28 @@ jobs:
           kubectl set image deployment/${{ inputs.service_name }} \
             ${{ inputs.service_name }}=${{ needs.build-push.outputs.image_tag }} \
             -n quckapp
+      - name: Record promotion
+        if: vars.SERVICE_URLS_API_URL != ''
+        run: |
+          curl -sf -X POST "${{ vars.SERVICE_URLS_API_URL }}/admin/service-urls/uat1/versions/${{ inputs.service_name }}/${{ inputs.api_version }}/promote" \
+            -H "Authorization: Bearer ${{ secrets.SERVICE_URLS_API_TOKEN }}" || echo "::warning::Promotion recording failed"
 
   deploy-staging:
     needs: [build-push, deploy-uat]
     runs-on: ubuntu-latest
     environment: staging
     steps:
+      - name: Check promotion gate
+        if: vars.SERVICE_URLS_API_URL != ''
+        run: |
+          RESPONSE=$(curl -sf "${{ vars.SERVICE_URLS_API_URL }}/admin/service-urls/can-promote?serviceKey=${{ inputs.service_name }}&apiVersion=${{ inputs.api_version }}&toEnvironment=staging" \
+            -H "Authorization: Bearer ${{ secrets.SERVICE_URLS_API_TOKEN }}")
+          ALLOWED=$(echo "$RESPONSE" | jq -r '.data.allowed')
+          if [ "$ALLOWED" != "true" ]; then
+            REASON=$(echo "$RESPONSE" | jq -r '.data.blockedReason')
+            echo "::error::Promotion gate blocked: $REASON"
+            exit 1
+          fi
       - uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
@@ -126,12 +182,28 @@ jobs:
           kubectl set image deployment/${{ inputs.service_name }} \
             ${{ inputs.service_name }}=${{ needs.build-push.outputs.image_tag }} \
             -n quckapp
+      - name: Record promotion
+        if: vars.SERVICE_URLS_API_URL != ''
+        run: |
+          curl -sf -X POST "${{ vars.SERVICE_URLS_API_URL }}/admin/service-urls/staging/versions/${{ inputs.service_name }}/${{ inputs.api_version }}/promote" \
+            -H "Authorization: Bearer ${{ secrets.SERVICE_URLS_API_TOKEN }}" || echo "::warning::Promotion recording failed"
 
   deploy-production:
     needs: [build-push, deploy-staging]
     runs-on: ubuntu-latest
     environment: production
     steps:
+      - name: Check promotion gate
+        if: vars.SERVICE_URLS_API_URL != ''
+        run: |
+          RESPONSE=$(curl -sf "${{ vars.SERVICE_URLS_API_URL }}/admin/service-urls/can-promote?serviceKey=${{ inputs.service_name }}&apiVersion=${{ inputs.api_version }}&toEnvironment=production" \
+            -H "Authorization: Bearer ${{ secrets.SERVICE_URLS_API_TOKEN }}")
+          ALLOWED=$(echo "$RESPONSE" | jq -r '.data.allowed')
+          if [ "$ALLOWED" != "true" ]; then
+            REASON=$(echo "$RESPONSE" | jq -r '.data.blockedReason')
+            echo "::error::Promotion gate blocked: $REASON"
+            exit 1
+          fi
       - uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
@@ -140,12 +212,28 @@ jobs:
           kubectl set image deployment/${{ inputs.service_name }} \
             ${{ inputs.service_name }}=${{ needs.build-push.outputs.image_tag }} \
             -n quckapp
+      - name: Record promotion
+        if: vars.SERVICE_URLS_API_URL != ''
+        run: |
+          curl -sf -X POST "${{ vars.SERVICE_URLS_API_URL }}/admin/service-urls/production/versions/${{ inputs.service_name }}/${{ inputs.api_version }}/promote" \
+            -H "Authorization: Bearer ${{ secrets.SERVICE_URLS_API_TOKEN }}" || echo "::warning::Promotion recording failed"
 
   deploy-live:
     needs: [build-push, deploy-production]
     runs-on: ubuntu-latest
     environment: live
     steps:
+      - name: Check promotion gate
+        if: vars.SERVICE_URLS_API_URL != ''
+        run: |
+          RESPONSE=$(curl -sf "${{ vars.SERVICE_URLS_API_URL }}/admin/service-urls/can-promote?serviceKey=${{ inputs.service_name }}&apiVersion=${{ inputs.api_version }}&toEnvironment=live" \
+            -H "Authorization: Bearer ${{ secrets.SERVICE_URLS_API_TOKEN }}")
+          ALLOWED=$(echo "$RESPONSE" | jq -r '.data.allowed')
+          if [ "$ALLOWED" != "true" ]; then
+            REASON=$(echo "$RESPONSE" | jq -r '.data.blockedReason')
+            echo "::error::Promotion gate blocked: $REASON"
+            exit 1
+          fi
       - uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
@@ -154,3 +242,8 @@ jobs:
           kubectl set image deployment/${{ inputs.service_name }} \
             ${{ inputs.service_name }}=${{ needs.build-push.outputs.image_tag }} \
             -n quckapp
+      - name: Record promotion
+        if: vars.SERVICE_URLS_API_URL != ''
+        run: |
+          curl -sf -X POST "${{ vars.SERVICE_URLS_API_URL }}/admin/service-urls/live/versions/${{ inputs.service_name }}/${{ inputs.api_version }}/promote" \
+            -H "Authorization: Bearer ${{ secrets.SERVICE_URLS_API_TOKEN }}" || echo "::warning::Promotion recording failed"

@@ -1,0 +1,42 @@
+# =============================================================================
+# Version Promotion Gate — Azure Pipelines Template
+# =============================================================================
+# Calls the service-urls API to validate that a version can be promoted
+# to the target environment. Fails the pipeline if blocked.
+#
+# Usage:
+#   - template: templates/version-promotion-gate.yml
+#     parameters:
+#       serviceKey: 'user-service'
+#       apiVersion: 'v1'
+#       targetEnvironment: 'production'
+#       serviceUrlsApiUrl: '$(SERVICE_URLS_API_URL)'
+# =============================================================================
+
+parameters:
+  - name: serviceKey
+    type: string
+  - name: apiVersion
+    type: string
+    default: 'v1'
+  - name: targetEnvironment
+    type: string
+  - name: serviceUrlsApiUrl
+    type: string
+
+steps:
+  - script: |
+      set -e
+      RESPONSE=$(curl -sf "${{ parameters.serviceUrlsApiUrl }}/admin/service-urls/can-promote?serviceKey=${{ parameters.serviceKey }}&apiVersion=${{ parameters.apiVersion }}&toEnvironment=${{ parameters.targetEnvironment }}" \
+        -H "Authorization: Bearer $(SERVICE_URLS_API_TOKEN)")
+
+      ALLOWED=$(echo "$RESPONSE" | jq -r '.data.allowed')
+
+      if [ "$ALLOWED" != "true" ]; then
+        REASON=$(echo "$RESPONSE" | jq -r '.data.blockedReason')
+        echo "##vso[task.logissue type=error]Promotion gate blocked: $REASON"
+        exit 1
+      fi
+
+      echo "Promotion gate passed: ${{ parameters.serviceKey }} ${{ parameters.apiVersion }} -> ${{ parameters.targetEnvironment }}"
+    displayName: 'Check Version Promotion Gate'
