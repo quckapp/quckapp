@@ -152,6 +152,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check promotion gate
+        if: vars.SERVICE_URLS_API_URL != ''
+        run: |
+          RESPONSE=$(curl -sf "${{ vars.SERVICE_URLS_API_URL }}/admin/service-urls/can-promote?serviceKey=quckapp-api&apiVersion=v1&toEnvironment=production" \
+            -H "Authorization: Bearer ${{ secrets.SERVICE_URLS_API_TOKEN }}")
+          ALLOWED=$(echo "$RESPONSE" | jq -r '.data.allowed')
+          if [ "$ALLOWED" != "true" ]; then
+            REASON=$(echo "$RESPONSE" | jq -r '.data.blockedReason')
+            echo "::error::Promotion gate blocked: $REASON"
+            exit 1
+          fi
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:

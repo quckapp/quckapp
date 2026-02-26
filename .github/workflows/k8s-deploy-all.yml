@@ -38,6 +38,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check promotion gate
+        if: vars.SERVICE_URLS_API_URL != '' && inputs.environment != 'dev'
+        run: |
+          RESPONSE=$(curl -sf "${{ vars.SERVICE_URLS_API_URL }}/admin/service-urls/can-promote?serviceKey=quckapp-api&apiVersion=v1&toEnvironment=${{ inputs.environment }}" \
+            -H "Authorization: Bearer ${{ secrets.SERVICE_URLS_API_TOKEN }}")
+          ALLOWED=$(echo "$RESPONSE" | jq -r '.data.allowed')
+          if [ "$ALLOWED" != "true" ]; then
+            REASON=$(echo "$RESPONSE" | jq -r '.data.blockedReason')
+            echo "::error::Promotion gate blocked: $REASON"
+            exit 1
+          fi
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -107,3 +119,9 @@ jobs:
             -- curl -sf "http://${API_SVC}/health/live" || exit 1
 
           echo "Smoke tests passed!"
+
+      - name: Record version promotion
+        if: vars.SERVICE_URLS_API_URL != ''
+        run: |
+          curl -sf -X POST "${{ vars.SERVICE_URLS_API_URL }}/admin/service-urls/${{ inputs.environment }}/versions/quckapp-api/v1/promote" \
+            -H "Authorization: Bearer ${{ secrets.SERVICE_URLS_API_TOKEN }}" || echo "::warning::Promotion recording failed"
