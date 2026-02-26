@@ -5,22 +5,22 @@ _transform: true
 # SERVICES — upstream microservices Kong routes traffic to
 # =============================================================================
 #
-# URL Convention: ALL client-facing paths follow /api/v1/<service-name>/**
+# URL Convention: ALL client-facing paths follow ~/api/v\d+(\.\d+)?/<service-name>/**
 #
-# Category A (Spring Boot): strip_path: true — rewrites /api/v1/<svc> → backend /api/<svc>/v1
+# Category A (Spring Boot): strip_path: true — rewrites /api/v1/<svc> → backend /api/v1/<svc>/v1
 # Category B (Go/Elixir):   strip_path: false — backend already uses /api/v1/<resource>
-# Category C (NestJS):       strip_path: true — rewrites /api/v1/<resource> → backend /api/<resource>
+# Category C (NestJS):       strip_path: true — rewrites /api/v1/<resource> → backend /api/v1/<resource>
 # =============================================================================
 
 services:
 
   # ---------------------------------------------------------------------------
-  # Group 1: Auth & Security (Spring Boot — backend expects /api/<svc>/v1/*)
-  # strip_path: true rewrites /api/v1/auth/* → /api/auth/v1/*
+  # Group 1: Auth & Security (Spring Boot — backend expects /api/v1/<svc>/v1/*)
+  # strip_path: true rewrites /api/v1/auth/* → /api/v1/auth/*
   # ---------------------------------------------------------------------------
 
   - name: auth-service
-    url: http://auth-service:8081/api/auth/v1
+    url: http://auth-service:8081/api/v1/auth
     connect_timeout: 10000
     write_timeout: 10000
     read_timeout: 10000
@@ -28,7 +28,7 @@ services:
     routes:
       - name: auth-routes
         paths:
-          - /api/v1/auth
+          - "~/api/v\\d+(\\.\\d+)?/auth"
         strip_path: true
         preserve_host: true
     plugins:
@@ -51,7 +51,7 @@ services:
           size_unit: megabytes
 
   - name: permission-service
-    url: http://permission-service:8083/api/permissions
+    url: http://permission-service:8083/api/v1/permissions
     connect_timeout: 10000
     write_timeout: 10000
     read_timeout: 10000
@@ -59,7 +59,7 @@ services:
     routes:
       - name: permission-routes
         paths:
-          - /api/v1/permissions
+          - "~/api/v\\d+(\\.\\d+)?/permissions"
         strip_path: true
         preserve_host: true
     plugins:
@@ -77,7 +77,7 @@ services:
           max_age: 3600
 
   - name: security-service
-    url: http://security-service:8086/api/security/v1
+    url: http://security-service:8086/api/v1/security/v1
     connect_timeout: 10000
     write_timeout: 10000
     read_timeout: 10000
@@ -85,7 +85,7 @@ services:
     routes:
       - name: security-routes
         paths:
-          - /api/v1/security
+          - "~/api/v\\d+(\\.\\d+)?/security"
         strip_path: true
         preserve_host: true
     plugins:
@@ -103,11 +103,11 @@ services:
           max_age: 3600
 
   # ---------------------------------------------------------------------------
-  # Group 2: User & Admin (Spring Boot — backend expects /api/<svc>/*)
+  # Group 2: User & Admin (Spring Boot — backend expects /api/v1/<svc>/*)
   # ---------------------------------------------------------------------------
 
   - name: user-service
-    url: http://user-service:8082/api/users
+    url: http://user-service:8082/api/v1/users
     connect_timeout: 15000
     write_timeout: 15000
     read_timeout: 15000
@@ -115,7 +115,7 @@ services:
     routes:
       - name: user-routes
         paths:
-          - /api/v1/users
+          - "~/api/v\\d+(\\.\\d+)?/users"
         strip_path: true
         preserve_host: true
     plugins:
@@ -133,7 +133,7 @@ services:
           max_age: 3600
 
   - name: admin-service
-    url: http://admin-service:8085/api/admin
+    url: http://admin-service:8085/api/v1/admin
     connect_timeout: 15000
     write_timeout: 15000
     read_timeout: 15000
@@ -141,7 +141,7 @@ services:
     routes:
       - name: admin-routes
         paths:
-          - /api/v1/admin
+          - "~/api/v\\d+(\\.\\d+)?/admin"
         strip_path: true
         preserve_host: true
     plugins:
@@ -166,7 +166,7 @@ services:
             - 192.168.0.0/16
 
   - name: audit-service
-    url: http://audit-service:8084/api/audit
+    url: http://audit-service:8084/api/v1/audit
     connect_timeout: 15000
     write_timeout: 15000
     read_timeout: 15000
@@ -174,7 +174,7 @@ services:
     routes:
       - name: audit-routes
         paths:
-          - /api/v1/audit
+          - "~/api/v\\d+(\\.\\d+)?/audit"
         strip_path: true
         preserve_host: true
     plugins:
@@ -205,9 +205,9 @@ services:
     routes:
       - name: workspace-routes
         paths:
-          - /api/v1/workspaces
-          - /api/v1/invites
-          - /api/v1/join
+          - "~/api/v\\d+(\\.\\d+)?/workspaces"
+          - "~/api/v\\d+(\\.\\d+)?/invites"
+          - "~/api/v\\d+(\\.\\d+)?/join"
         strip_path: false
         preserve_host: true
     plugins:
@@ -233,7 +233,7 @@ services:
     routes:
       - name: channel-routes
         paths:
-          - /api/v1/channels
+          - "~/api/v\\d+(\\.\\d+)?/channels"
         strip_path: false
         preserve_host: true
     plugins:
@@ -259,7 +259,7 @@ services:
     routes:
       - name: channel-template-routes
         paths:
-          - /api/v1/channel-templates
+          - "~/api/v\\d+(\\.\\d+)?/channel-templates"
         strip_path: true
         preserve_host: true
     plugins:
@@ -285,7 +285,7 @@ services:
     routes:
       - name: thread-routes
         paths:
-          - /api/v1/threads
+          - "~/api/v\\d+(\\.\\d+)?/threads"
         strip_path: false
         preserve_host: true
     plugins:
@@ -315,7 +315,7 @@ services:
     routes:
       - name: message-routes
         paths:
-          - /api/v1/messages
+          - "~/api/v\\d+(\\.\\d+)?/messages"
         strip_path: false
         preserve_host: true
     plugins:
@@ -341,7 +341,7 @@ services:
     routes:
       - name: search-routes
         paths:
-          - /api/v1/search
+          - "~/api/v\\d+(\\.\\d+)?/search"
         strip_path: false
         preserve_host: true
     plugins:
@@ -359,7 +359,7 @@ services:
           max_age: 3600
 
   - name: bookmark-service-bookmarks
-    url: http://bookmark-service:5010/api/bookmarks
+    url: http://bookmark-service:5010/api/v1/bookmarks
     connect_timeout: 15000
     write_timeout: 15000
     read_timeout: 15000
@@ -367,7 +367,7 @@ services:
     routes:
       - name: bookmark-routes
         paths:
-          - /api/v1/bookmarks
+          - "~/api/v\\d+(\\.\\d+)?/bookmarks"
         strip_path: true
         preserve_host: true
     plugins:
@@ -385,7 +385,7 @@ services:
           max_age: 3600
 
   - name: bookmark-service-folders
-    url: http://bookmark-service:5010/api/bookmark-folders
+    url: http://bookmark-service:5010/api/v1/bookmark-folders
     connect_timeout: 15000
     write_timeout: 15000
     read_timeout: 15000
@@ -393,7 +393,7 @@ services:
     routes:
       - name: bookmark-folder-routes
         paths:
-          - /api/v1/bookmark-folders
+          - "~/api/v\\d+(\\.\\d+)?/bookmark-folders"
         strip_path: true
         preserve_host: true
     plugins:
@@ -439,7 +439,7 @@ services:
           max_age: 3600
 
   - name: realtime-service-rest
-    url: http://realtime-service:4000/api/realtime
+    url: http://realtime-service:4000/api/v1/realtime
     connect_timeout: 10000
     write_timeout: 3600000
     read_timeout: 3600000
@@ -447,7 +447,7 @@ services:
     routes:
       - name: realtime-rest-routes
         paths:
-          - /api/v1/realtime
+          - "~/api/v\\d+(\\.\\d+)?/realtime"
         strip_path: true
         preserve_host: true
         protocols:
@@ -471,7 +471,7 @@ services:
     routes:
       - name: presence-routes
         paths:
-          - /api/v1/presence
+          - "~/api/v\\d+(\\.\\d+)?/presence"
         strip_path: false
         preserve_host: true
         protocols:
@@ -495,7 +495,7 @@ services:
     routes:
       - name: call-routes
         paths:
-          - /api/v1/calls
+          - "~/api/v\\d+(\\.\\d+)?/calls"
         strip_path: false
         preserve_host: true
         protocols:
@@ -519,7 +519,7 @@ services:
     routes:
       - name: huddle-routes
         paths:
-          - /api/v1/huddles
+          - "~/api/v\\d+(\\.\\d+)?/huddles"
         strip_path: false
         preserve_host: true
         protocols:
@@ -547,7 +547,7 @@ services:
     routes:
       - name: file-routes
         paths:
-          - /api/v1/files
+          - "~/api/v\\d+(\\.\\d+)?/files"
         strip_path: false
         preserve_host: true
     plugins:
@@ -577,7 +577,7 @@ services:
     routes:
       - name: media-routes
         paths:
-          - /api/v1/media
+          - "~/api/v\\d+(\\.\\d+)?/media"
         strip_path: false
         preserve_host: true
     plugins:
@@ -607,7 +607,7 @@ services:
     routes:
       - name: attachment-routes
         paths:
-          - /api/v1/attachments
+          - "~/api/v\\d+(\\.\\d+)?/attachments"
         strip_path: false
         preserve_host: true
     plugins:
@@ -652,7 +652,7 @@ services:
   # ---------------------------------------------------------------------------
 
   - name: notification-service-notifications
-    url: http://notification-service:3001/api/notifications
+    url: http://notification-service:3001/api/v1/notifications
     connect_timeout: 20000
     write_timeout: 20000
     read_timeout: 20000
@@ -660,7 +660,7 @@ services:
     routes:
       - name: notification-routes
         paths:
-          - /api/v1/notifications
+          - "~/api/v\\d+(\\.\\d+)?/notifications"
         strip_path: true
         preserve_host: true
     plugins:
@@ -678,7 +678,7 @@ services:
           max_age: 3600
 
   - name: notification-service-templates
-    url: http://notification-service:3001/api/templates
+    url: http://notification-service:3001/api/v1/templates
     connect_timeout: 20000
     write_timeout: 20000
     read_timeout: 20000
@@ -686,7 +686,7 @@ services:
     routes:
       - name: notification-template-routes
         paths:
-          - /api/v1/notification-templates
+          - "~/api/v\\d+(\\.\\d+)?/notification-templates"
         strip_path: true
         preserve_host: true
     plugins:
@@ -704,7 +704,7 @@ services:
           max_age: 3600
 
   - name: notification-service-devices
-    url: http://notification-service:3001/api/devices
+    url: http://notification-service:3001/api/v1/devices
     connect_timeout: 20000
     write_timeout: 20000
     read_timeout: 20000
@@ -712,7 +712,7 @@ services:
     routes:
       - name: device-routes
         paths:
-          - /api/v1/devices
+          - "~/api/v\\d+(\\.\\d+)?/devices"
         strip_path: true
         preserve_host: true
     plugins:
@@ -730,7 +730,7 @@ services:
           max_age: 3600
 
   - name: notification-service-preferences
-    url: http://notification-service:3001/api/preferences
+    url: http://notification-service:3001/api/v1/preferences
     connect_timeout: 20000
     write_timeout: 20000
     read_timeout: 20000
@@ -738,7 +738,7 @@ services:
     routes:
       - name: preference-routes
         paths:
-          - /api/v1/preferences
+          - "~/api/v\\d+(\\.\\d+)?/preferences"
         strip_path: true
         preserve_host: true
     plugins:
@@ -764,7 +764,7 @@ services:
     routes:
       - name: notification-orchestrator-routes
         paths:
-          - /api/v1/notification-orchestrator
+          - "~/api/v\\d+(\\.\\d+)?/notification-orchestrator"
         strip_path: false
         preserve_host: true
     plugins:
@@ -783,8 +783,8 @@ services:
     routes:
       - name: event-broadcast-routes
         paths:
-          - /api/v1/broadcast
-          - /api/v1/events
+          - "~/api/v\\d+(\\.\\d+)?/broadcast"
+          - "~/api/v\\d+(\\.\\d+)?/events"
         strip_path: false
         preserve_host: true
     plugins:
@@ -810,7 +810,7 @@ services:
     routes:
       - name: reminder-routes
         paths:
-          - /api/v1/reminders
+          - "~/api/v\\d+(\\.\\d+)?/reminders"
         strip_path: false
         preserve_host: true
     plugins:
@@ -840,7 +840,7 @@ services:
     routes:
       - name: analytics-routes
         paths:
-          - /api/v1/analytics
+          - "~/api/v\\d+(\\.\\d+)?/analytics"
         strip_path: false
         preserve_host: true
     plugins:
@@ -866,8 +866,8 @@ services:
     routes:
       - name: insights-routes
         paths:
-          - /api/v1/insights
-          - /api/v1/reports
+          - "~/api/v\\d+(\\.\\d+)?/insights"
+          - "~/api/v\\d+(\\.\\d+)?/reports"
         strip_path: false
         preserve_host: true
     plugins:
@@ -897,7 +897,7 @@ services:
     routes:
       - name: ml-routes
         paths:
-          - /api/v1/ml
+          - "~/api/v\\d+(\\.\\d+)?/ml"
         strip_path: false
         preserve_host: true
     plugins:
@@ -915,7 +915,7 @@ services:
           max_age: 3600
 
   - name: moderation-service
-    url: http://moderation-service:5014/api/moderation
+    url: http://moderation-service:5014/api/v1/moderation
     connect_timeout: 10000
     write_timeout: 30000
     read_timeout: 30000
@@ -923,7 +923,7 @@ services:
     routes:
       - name: moderation-routes
         paths:
-          - /api/v1/moderation
+          - "~/api/v\\d+(\\.\\d+)?/moderation"
         strip_path: true
         preserve_host: true
     plugins:
@@ -941,7 +941,7 @@ services:
           max_age: 3600
 
   - name: sentiment-service
-    url: http://sentiment-service:5017/api/sentiment
+    url: http://sentiment-service:5017/api/v1/sentiment
     connect_timeout: 10000
     write_timeout: 30000
     read_timeout: 30000
@@ -949,7 +949,7 @@ services:
     routes:
       - name: sentiment-routes
         paths:
-          - /api/v1/sentiment
+          - "~/api/v\\d+(\\.\\d+)?/sentiment"
         strip_path: true
         preserve_host: true
     plugins:
@@ -975,7 +975,7 @@ services:
     routes:
       - name: smart-reply-routes
         paths:
-          - /api/v1/replies
+          - "~/api/v\\d+(\\.\\d+)?/replies"
         strip_path: false
         preserve_host: true
     plugins:
@@ -1005,8 +1005,8 @@ services:
     routes:
       - name: export-routes
         paths:
-          - /api/v1/exports
-          - /api/v1/jobs
+          - "~/api/v\\d+(\\.\\d+)?/exports"
+          - "~/api/v\\d+(\\.\\d+)?/jobs"
         strip_path: false
         preserve_host: true
     plugins:
@@ -1032,9 +1032,9 @@ services:
     routes:
       - name: integration-routes
         paths:
-          - /api/v1/integrations
-          - /api/v1/webhooks
-          - /api/v1/oauth
+          - "~/api/v\\d+(\\.\\d+)?/integrations"
+          - "~/api/v\\d+(\\.\\d+)?/webhooks"
+          - "~/api/v\\d+(\\.\\d+)?/oauth"
         strip_path: false
         preserve_host: true
     plugins:
@@ -1066,7 +1066,7 @@ services:
     routes:
       - name: bff-conversation-routes
         paths:
-          - /api/v1/conversations
+          - "~/api/v\\d+(\\.\\d+)?/conversations"
         strip_path: false
         preserve_host: true
     plugins:
@@ -1079,6 +1079,32 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          headers: [Authorization, Content-Type, X-Request-ID]
+          credentials: true
+          max_age: 3600
+
+  - name: version-config
+    url: http://admin-service:8085/api/v1/config
+    connect_timeout: 10000
+    write_timeout: 10000
+    read_timeout: 10000
+    retries: 2
+    routes:
+      - name: version-config-routes
+        paths:
+          - /api/v1/config
+        strip_path: false
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 60
+          policy: local
+          fault_tolerant: true
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: [GET, OPTIONS]
           headers: [Authorization, Content-Type, X-Request-ID]
           credentials: true
           max_age: 3600
