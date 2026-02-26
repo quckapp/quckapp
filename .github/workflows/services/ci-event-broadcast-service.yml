@@ -1,0 +1,35 @@
+name: "CI/CD — event-broadcast-service"
+
+on:
+  push:
+    branches: [main]
+    paths: ['services/event-broadcast-service/**']
+  pull_request:
+    paths: ['services/event-broadcast-service/**']
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: '1.15'
+          otp-version: '26'
+      - name: Install deps and test
+        working-directory: services/event-broadcast-service
+        run: |
+          mix deps.get
+          mix test
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    uses: ./.github/workflows/reusable-service-deploy.yml
+    with:
+      service_name: event-broadcast-service
+      service_path: services/event-broadcast-service
+      language: elixir
+      port: '4006'
+    secrets: inherit

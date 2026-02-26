@@ -1,0 +1,32 @@
+name: "CI/CD — bookmark-service"
+
+on:
+  push:
+    branches: [main]
+    paths: ['services/bookmark-service/**']
+  pull_request:
+    paths: ['services/bookmark-service/**']
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+      - name: Run tests
+        working-directory: services/bookmark-service
+        run: go test -v ./...
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    uses: ./.github/workflows/reusable-service-deploy.yml
+    with:
+      service_name: bookmark-service
+      service_path: services/bookmark-service
+      language: go
+      port: '5010'
+    secrets: inherit

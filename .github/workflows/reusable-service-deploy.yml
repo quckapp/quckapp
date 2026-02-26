@@ -1,0 +1,156 @@
+name: Reusable Service Deploy
+
+on:
+  workflow_call:
+    inputs:
+      service_name:
+        required: true
+        type: string
+      service_path:
+        required: true
+        type: string
+      docker_context:
+        required: false
+        type: string
+        default: ''
+      language:
+        required: true
+        type: string
+      port:
+        required: true
+        type: string
+    secrets:
+      AZURE_CREDENTIALS:
+        required: true
+      ACR_LOGIN_SERVER:
+        required: true
+      ACR_USERNAME:
+        required: true
+      ACR_PASSWORD:
+        required: true
+      SERVICE_URLS_API_TOKEN:
+        required: false
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to ACR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.ACR_LOGIN_SERVER }}/${{ inputs.service_name }}
+          tags: |
+            type=sha,prefix=
+            type=ref,event=branch
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ inputs.docker_context || inputs.service_path }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-dev:
+    needs: build-push
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Deploy to dev AKS
+        run: |
+          az aks get-credentials --resource-group quckapp-dev --name quckapp-dev-aks
+          kubectl set image deployment/${{ inputs.service_name }} \
+            ${{ inputs.service_name }}=${{ needs.build-push.outputs.image_tag }} \
+            -n quckapp
+      - name: Mark version ready
+        if: vars.SERVICE_URLS_API_URL != ''
+        run: |
+          if [ -n "$NEW_API_VERSION" ]; then
+            curl -s -X POST "${{ vars.SERVICE_URLS_API_URL }}/admin/service-urls/development/versions/${{ inputs.service_name }}/$NEW_API_VERSION/ready" \
+              -H "Authorization: Bearer ${{ secrets.SERVICE_URLS_API_TOKEN }}" || true
+          fi
+
+  deploy-qa:
+    needs: [build-push, deploy-dev]
+    runs-on: ubuntu-latest
+    environment: qa
+    steps:
+      - uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - run: |
+          az aks get-credentials --resource-group quckapp-qa --name quckapp-qa-aks
+          kubectl set image deployment/${{ inputs.service_name }} \
+            ${{ inputs.service_name }}=${{ needs.build-push.outputs.image_tag }} \
+            -n quckapp
+
+  deploy-uat:
+    needs: [build-push, deploy-qa]
+    runs-on: ubuntu-latest
+    environment: uat1
+    steps:
+      - uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - run: |
+          az aks get-credentials --resource-group quckapp-uat --name quckapp-uat-aks
+          kubectl set image deployment/${{ inputs.service_name }} \
+            ${{ inputs.service_name }}=${{ needs.build-push.outputs.image_tag }} \
+            -n quckapp
+
+  deploy-staging:
+    needs: [build-push, deploy-uat]
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - run: |
+          az aks get-credentials --resource-group quckapp-staging --name quckapp-staging-aks
+          kubectl set image deployment/${{ inputs.service_name }} \
+            ${{ inputs.service_name }}=${{ needs.build-push.outputs.image_tag }} \
+            -n quckapp
+
+  deploy-production:
+    needs: [build-push, deploy-staging]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - run: |
+          az aks get-credentials --resource-group quckapp-prod --name quckapp-prod-aks
+          kubectl set image deployment/${{ inputs.service_name }} \
+            ${{ inputs.service_name }}=${{ needs.build-push.outputs.image_tag }} \
+            -n quckapp
+
+  deploy-live:
+    needs: [build-push, deploy-production]
+    runs-on: ubuntu-latest
+    environment: live
+    steps:
+      - uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - run: |
+          az aks get-credentials --resource-group quckapp-live --name quckapp-live-aks
+          kubectl set image deployment/${{ inputs.service_name }} \
+            ${{ inputs.service_name }}=${{ needs.build-push.outputs.image_tag }} \
+            -n quckapp

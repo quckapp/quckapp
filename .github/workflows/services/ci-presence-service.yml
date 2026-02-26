@@ -1,0 +1,35 @@
+name: "CI/CD — presence-service"
+
+on:
+  push:
+    branches: [main]
+    paths: ['services/presence-service/**']
+  pull_request:
+    paths: ['services/presence-service/**']
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: '1.15'
+          otp-version: '26'
+      - name: Install deps and test
+        working-directory: services/presence-service
+        run: |
+          mix deps.get
+          mix test
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    uses: ./.github/workflows/reusable-service-deploy.yml
+    with:
+      service_name: presence-service
+      service_path: services/presence-service
+      language: elixir
+      port: '4001'
+    secrets: inherit

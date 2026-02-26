@@ -1,0 +1,32 @@
+name: "CI/CD — Admin Dashboard"
+
+on:
+  push:
+    branches: [main]
+    paths: ['admin/**']
+  pull_request:
+    paths: ['admin/**']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - working-directory: admin
+        run: npm ci && npm run build
+
+  deploy-dev:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - run: az staticwebapp deploy --app-name quckapp-admin-dev

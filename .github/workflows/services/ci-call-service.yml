@@ -1,0 +1,35 @@
+name: "CI/CD — call-service"
+
+on:
+  push:
+    branches: [main]
+    paths: ['services/call-service/**']
+  pull_request:
+    paths: ['services/call-service/**']
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: '1.15'
+          otp-version: '26'
+      - name: Install deps and test
+        working-directory: services/call-service
+        run: |
+          mix deps.get
+          mix test
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    uses: ./.github/workflows/reusable-service-deploy.yml
+    with:
+      service_name: call-service
+      service_path: services/call-service
+      language: elixir
+      port: '4002'
+    secrets: inherit

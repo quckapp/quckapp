@@ -1,0 +1,35 @@
+name: "CI/CD — realtime-service"
+
+on:
+  push:
+    branches: [main]
+    paths: ['services/realtime-service/**']
+  pull_request:
+    paths: ['services/realtime-service/**']
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: '1.15'
+          otp-version: '26'
+      - name: Install deps and test
+        working-directory: services/realtime-service
+        run: |
+          mix deps.get
+          mix test
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    uses: ./.github/workflows/reusable-service-deploy.yml
+    with:
+      service_name: realtime-service
+      service_path: services/realtime-service
+      language: elixir
+      port: '4000'
+    secrets: inherit

@@ -1,0 +1,38 @@
+name: "CI/CD — Mobile"
+
+on:
+  push:
+    branches: [main]
+    paths: ['mobile/**']
+  pull_request:
+    paths: ['mobile/**']
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - working-directory: mobile
+        run: npm ci
+      - working-directory: mobile/android
+        run: ./gradlew assembleRelease
+
+  deploy-dev:
+    needs: build-android
+    if: github.ref == 'refs/heads/main'
+    environment: development
+    runs-on: ubuntu-latest
+    steps:
+      - uses: wzieba/Firebase-Distribution-Github-Action@v1
+        with:
+          appId: ${{ secrets.FIREBASE_APP_ID_ANDROID }}
+          serviceCredentialsFileContent: ${{ secrets.FIREBASE_CREDENTIALS }}
+          file: mobile/android/app/build/outputs/apk/release/app-release.apk

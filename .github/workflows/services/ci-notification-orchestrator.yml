@@ -1,0 +1,35 @@
+name: "CI/CD — notification-orchestrator"
+
+on:
+  push:
+    branches: [main]
+    paths: ['services/notification-orchestrator/**']
+  pull_request:
+    paths: ['services/notification-orchestrator/**']
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: '1.15'
+          otp-version: '26'
+      - name: Install deps and test
+        working-directory: services/notification-orchestrator
+        run: |
+          mix deps.get
+          mix test
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    uses: ./.github/workflows/reusable-service-deploy.yml
+    with:
+      service_name: notification-orchestrator
+      service_path: services/notification-orchestrator
+      language: elixir
+      port: '4004'
+    secrets: inherit
