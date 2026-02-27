@@ -139,3 +139,15 @@
 [submodule "scripts"]
 	path = scripts
 	url = https://github.com/quckapp/scripts.git
+[submodule "database/quckapp-mysql"]
+	path = database/quckapp-mysql
+	url = https://github.com/quckapp/quckapp-mysql.git
+[submodule "database/quckapp-mongodb"]
+	path = database/quckapp-mongodb
+	url = https://github.com/quckapp/quckapp-mongodb.git
+[submodule "database/quckapp-postgresql"]
+	path = database/quckapp-postgresql
+	url = https://github.com/quckapp/quckapp-postgresql.git
+[submodule "database/quckapp-clickhouse"]
+	path = database/quckapp-clickhouse
+	url = https://github.com/quckapp/quckapp-clickhouse.git
