@@ -5,18 +5,31 @@ _transform: true
 # SERVICES — upstream microservices Kong routes traffic to
 # =============================================================================
 #
-# URL Convention: ALL client-facing paths follow /api/v1/<service-name>/**
+# VERSIONING STRATEGY (Semantic Versioning)
+# ─────────────────────────────────────────
+# All client-facing paths follow: /api/{version}/{resource}
+# Supported version formats: v1, v1.1, v2, v2.0.1
 #
-# Category A (Spring Boot): strip_path: true — rewrites /api/v1/<svc> → backend /api/<svc>/v1
-# Category B (Go/Elixir):   strip_path: false — backend already uses /api/v1/<resource>
-# Category C (NestJS):       strip_path: true — rewrites /api/v1/<resource> → backend /api/<resource>
+# Routes use regex to accept ANY version:  ~/api/v\d+(?:\.\d+)*/resource
+# Kong injects X-Api-Version header so backends know which version was requested.
+#
+# Clients call the version configured in @quckapp/service-urls.
+# To upgrade an API: bump the version in service-urls per environment,
+# then deploy the new version handler in the backend service.
+#
+# Category A (Spring Boot): strip_path: true — rewrites /api/vX/<svc> → backend /api/<svc>/vX
+# Category B (Go/Elixir):   strip_path: false — path passes through unchanged
+# Category C (NestJS):       strip_path: true — rewrites /api/vX/<resource> → backend /api/<resource>
+#
+# The X-Api-Version header is injected by the global request-transformer plugin.
 # =============================================================================
 
 services:
 
   # ---------------------------------------------------------------------------
   # Group 1: Auth & Security (Spring Boot — backend expects /api/<svc>/v1/*)
-  # strip_path: true rewrites /api/v1/auth/* → /api/auth/v1/*
+  # strip_path: true rewrites /api/vX/auth/* → /api/auth/v1/*
+  # When a v2 backend is deployed, add a separate auth-service-v2 entry.
   # ---------------------------------------------------------------------------
 
   - name: auth-service
@@ -28,7 +41,7 @@ services:
     routes:
       - name: auth-routes
         paths:
-          - /api/v1/auth
+          - ~/api/v\d+(?:\.\d+)*/auth
         strip_path: true
         preserve_host: true
     plugins:
@@ -42,7 +55,7 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID, X-Correlation-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Correlation-ID, X-Api-Version]
           credentials: true
           max_age: 3600
       - name: request-size-limiting
@@ -59,7 +72,7 @@ services:
     routes:
       - name: permission-routes
         paths:
-          - /api/v1/permissions
+          - ~/api/v\d+(?:\.\d+)*/permissions
         strip_path: true
         preserve_host: true
     plugins:
@@ -72,7 +85,7 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
 
@@ -85,7 +98,7 @@ services:
     routes:
       - name: security-routes
         paths:
-          - /api/v1/security
+          - ~/api/v\d+(?:\.\d+)*/security
         strip_path: true
         preserve_host: true
     plugins:
@@ -98,7 +111,7 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
 
@@ -115,7 +128,7 @@ services:
     routes:
       - name: user-routes
         paths:
-          - /api/v1/users
+          - ~/api/v\d+(?:\.\d+)*/users
         strip_path: true
         preserve_host: true
     plugins:
@@ -128,7 +141,7 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
 
@@ -141,7 +154,7 @@ services:
     routes:
       - name: admin-routes
         paths:
-          - /api/v1/admin
+          - ~/api/v\d+(?:\.\d+)*/admin
         strip_path: true
         preserve_host: true
     plugins:
@@ -154,7 +167,7 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
       - name: ip-restriction
@@ -174,7 +187,7 @@ services:
     routes:
       - name: audit-routes
         paths:
-          - /api/v1/audit
+          - ~/api/v\d+(?:\.\d+)*/audit
         strip_path: true
         preserve_host: true
     plugins:
@@ -187,13 +200,13 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
 
   # ---------------------------------------------------------------------------
-  # Group 3: Workspace & Channels (Go — backend already uses /api/v1/<resource>)
-  # strip_path: false — path passes through unchanged
+  # Group 3: Workspace & Channels (Go — backend uses /api/vX/<resource>)
+  # strip_path: false — versioned path passes through unchanged
   # ---------------------------------------------------------------------------
 
   - name: workspace-service
@@ -205,9 +218,9 @@ services:
     routes:
       - name: workspace-routes
         paths:
-          - /api/v1/workspaces
-          - /api/v1/invites
-          - /api/v1/join
+          - ~/api/v\d+(?:\.\d+)*/workspaces
+          - ~/api/v\d+(?:\.\d+)*/invites
+          - ~/api/v\d+(?:\.\d+)*/join
         strip_path: false
         preserve_host: true
     plugins:
@@ -220,7 +233,7 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
 
@@ -233,7 +246,7 @@ services:
     routes:
       - name: channel-routes
         paths:
-          - /api/v1/channels
+          - ~/api/v\d+(?:\.\d+)*/channels
         strip_path: false
         preserve_host: true
     plugins:
@@ -246,7 +259,7 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
 
@@ -259,7 +272,7 @@ services:
     routes:
       - name: channel-template-routes
         paths:
-          - /api/v1/channel-templates
+          - ~/api/v\d+(?:\.\d+)*/channel-templates
         strip_path: true
         preserve_host: true
     plugins:
@@ -272,7 +285,7 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
 
@@ -285,7 +298,7 @@ services:
     routes:
       - name: thread-routes
         paths:
-          - /api/v1/threads
+          - ~/api/v\d+(?:\.\d+)*/threads
         strip_path: false
         preserve_host: true
     plugins:
@@ -298,12 +311,12 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
 
   # ---------------------------------------------------------------------------
-  # Group 4: Messaging (Elixir/Go — backend already uses /api/v1/<resource>)
+  # Group 4: Messaging (Elixir/Go — backend uses /api/vX/<resource>)
   # ---------------------------------------------------------------------------
 
   - name: message-service
@@ -315,7 +328,7 @@ services:
     routes:
       - name: message-routes
         paths:
-          - /api/v1/messages
+          - ~/api/v\d+(?:\.\d+)*/messages
         strip_path: false
         preserve_host: true
     plugins:
@@ -328,7 +341,7 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
 
@@ -341,7 +354,7 @@ services:
     routes:
       - name: search-routes
         paths:
-          - /api/v1/search
+          - ~/api/v\d+(?:\.\d+)*/search
         strip_path: false
         preserve_host: true
     plugins:
@@ -354,7 +367,7 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
 
@@ -367,7 +380,7 @@ services:
     routes:
       - name: bookmark-routes
         paths:
-          - /api/v1/bookmarks
+          - ~/api/v\d+(?:\.\d+)*/bookmarks
         strip_path: true
         preserve_host: true
     plugins:
@@ -380,7 +393,7 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
 
@@ -393,7 +406,7 @@ services:
     routes:
       - name: bookmark-folder-routes
         paths:
-          - /api/v1/bookmark-folders
+          - ~/api/v\d+(?:\.\d+)*/bookmark-folders
         strip_path: true
         preserve_host: true
     plugins:
@@ -406,12 +419,12 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
 
   # ---------------------------------------------------------------------------
-  # Group 5: Real-time (Elixir — backend uses /api/v1/<resource>)
+  # Group 5: Real-time (Elixir — backend uses /api/vX/<resource>)
   # ---------------------------------------------------------------------------
 
   - name: realtime-service-socket
@@ -434,7 +447,7 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID, Upgrade, Connection]
+          headers: [Authorization, Content-Type, X-Request-ID, Upgrade, Connection, X-Api-Version]
           credentials: true
           max_age: 3600
 
@@ -447,7 +460,7 @@ services:
     routes:
       - name: realtime-rest-routes
         paths:
-          - /api/v1/realtime
+          - ~/api/v\d+(?:\.\d+)*/realtime
         strip_path: true
         preserve_host: true
         protocols:
@@ -458,7 +471,7 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID, Upgrade, Connection]
+          headers: [Authorization, Content-Type, X-Request-ID, Upgrade, Connection, X-Api-Version]
           credentials: true
           max_age: 3600
 
@@ -471,7 +484,7 @@ services:
     routes:
       - name: presence-routes
         paths:
-          - /api/v1/presence
+          - ~/api/v\d+(?:\.\d+)*/presence
         strip_path: false
         preserve_host: true
         protocols:
@@ -482,7 +495,7 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID, Upgrade, Connection]
+          headers: [Authorization, Content-Type, X-Request-ID, Upgrade, Connection, X-Api-Version]
           credentials: true
           max_age: 3600
 
@@ -495,7 +508,7 @@ services:
     routes:
       - name: call-routes
         paths:
-          - /api/v1/calls
+          - ~/api/v\d+(?:\.\d+)*/calls
         strip_path: false
         preserve_host: true
         protocols:
@@ -506,7 +519,7 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, DELETE, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID, Upgrade, Connection]
+          headers: [Authorization, Content-Type, X-Request-ID, Upgrade, Connection, X-Api-Version]
           credentials: true
           max_age: 3600
 
@@ -519,7 +532,7 @@ services:
     routes:
       - name: huddle-routes
         paths:
-          - /api/v1/huddles
+          - ~/api/v\d+(?:\.\d+)*/huddles
         strip_path: false
         preserve_host: true
         protocols:
@@ -530,12 +543,12 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, DELETE, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID, Upgrade, Connection]
+          headers: [Authorization, Content-Type, X-Request-ID, Upgrade, Connection, X-Api-Version]
           credentials: true
           max_age: 3600
 
   # ---------------------------------------------------------------------------
-  # Group 6: File & Media (Go — backend uses /api/v1/<resource>)
+  # Group 6: File & Media (Go — backend uses /api/vX/<resource>)
   # ---------------------------------------------------------------------------
 
   - name: file-service
@@ -547,7 +560,7 @@ services:
     routes:
       - name: file-routes
         paths:
-          - /api/v1/files
+          - ~/api/v\d+(?:\.\d+)*/files
         strip_path: false
         preserve_host: true
     plugins:
@@ -560,7 +573,7 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
       - name: request-size-limiting
@@ -577,7 +590,7 @@ services:
     routes:
       - name: media-routes
         paths:
-          - /api/v1/media
+          - ~/api/v\d+(?:\.\d+)*/media
         strip_path: false
         preserve_host: true
     plugins:
@@ -590,7 +603,7 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
       - name: request-size-limiting
@@ -607,7 +620,7 @@ services:
     routes:
       - name: attachment-routes
         paths:
-          - /api/v1/attachments
+          - ~/api/v\d+(?:\.\d+)*/attachments
         strip_path: false
         preserve_host: true
     plugins:
@@ -620,7 +633,7 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
       - name: request-size-limiting
@@ -660,7 +673,7 @@ services:
     routes:
       - name: notification-routes
         paths:
-          - /api/v1/notifications
+          - ~/api/v\d+(?:\.\d+)*/notifications
         strip_path: true
         preserve_host: true
     plugins:
@@ -673,7 +686,7 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
 
@@ -686,7 +699,7 @@ services:
     routes:
       - name: notification-template-routes
         paths:
-          - /api/v1/notification-templates
+          - ~/api/v\d+(?:\.\d+)*/notification-templates
         strip_path: true
         preserve_host: true
     plugins:
@@ -699,7 +712,7 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
 
@@ -712,7 +725,7 @@ services:
     routes:
       - name: device-routes
         paths:
-          - /api/v1/devices
+          - ~/api/v\d+(?:\.\d+)*/devices
         strip_path: true
         preserve_host: true
     plugins:
@@ -725,7 +738,7 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
 
@@ -738,7 +751,7 @@ services:
     routes:
       - name: preference-routes
         paths:
-          - /api/v1/preferences
+          - ~/api/v\d+(?:\.\d+)*/preferences
         strip_path: true
         preserve_host: true
     plugins:
@@ -751,7 +764,7 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
 
@@ -764,7 +777,7 @@ services:
     routes:
       - name: notification-orchestrator-routes
         paths:
-          - /api/v1/notification-orchestrator
+          - ~/api/v\d+(?:\.\d+)*/notification-orchestrator
         strip_path: false
         preserve_host: true
     plugins:
@@ -783,8 +796,8 @@ services:
     routes:
       - name: event-broadcast-routes
         paths:
-          - /api/v1/broadcast
-          - /api/v1/events
+          - ~/api/v\d+(?:\.\d+)*/broadcast
+          - ~/api/v\d+(?:\.\d+)*/events
         strip_path: false
         preserve_host: true
     plugins:
@@ -797,7 +810,7 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
 
@@ -810,7 +823,7 @@ services:
     routes:
       - name: reminder-routes
         paths:
-          - /api/v1/reminders
+          - ~/api/v\d+(?:\.\d+)*/reminders
         strip_path: false
         preserve_host: true
     plugins:
@@ -823,12 +836,12 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
 
   # ---------------------------------------------------------------------------
-  # Group 8: Analytics & Insights (Go — backend uses /api/v1/<resource>)
+  # Group 8: Analytics & Insights (Python — backend uses /api/vX/<resource>)
   # ---------------------------------------------------------------------------
 
   - name: analytics-service
@@ -840,7 +853,7 @@ services:
     routes:
       - name: analytics-routes
         paths:
-          - /api/v1/analytics
+          - ~/api/v\d+(?:\.\d+)*/analytics
         strip_path: false
         preserve_host: true
     plugins:
@@ -853,7 +866,7 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
 
@@ -866,8 +879,8 @@ services:
     routes:
       - name: insights-routes
         paths:
-          - /api/v1/insights
-          - /api/v1/reports
+          - ~/api/v\d+(?:\.\d+)*/insights
+          - ~/api/v\d+(?:\.\d+)*/reports
         strip_path: false
         preserve_host: true
     plugins:
@@ -880,7 +893,7 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
 
@@ -897,7 +910,7 @@ services:
     routes:
       - name: ml-routes
         paths:
-          - /api/v1/ml
+          - ~/api/v\d+(?:\.\d+)*/ml
         strip_path: false
         preserve_host: true
     plugins:
@@ -910,7 +923,7 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
 
@@ -923,7 +936,7 @@ services:
     routes:
       - name: moderation-routes
         paths:
-          - /api/v1/moderation
+          - ~/api/v\d+(?:\.\d+)*/moderation
         strip_path: true
         preserve_host: true
     plugins:
@@ -936,7 +949,7 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
 
@@ -949,7 +962,7 @@ services:
     routes:
       - name: sentiment-routes
         paths:
-          - /api/v1/sentiment
+          - ~/api/v\d+(?:\.\d+)*/sentiment
         strip_path: true
         preserve_host: true
     plugins:
@@ -962,7 +975,7 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
 
@@ -975,7 +988,7 @@ services:
     routes:
       - name: smart-reply-routes
         paths:
-          - /api/v1/replies
+          - ~/api/v\d+(?:\.\d+)*/replies
         strip_path: false
         preserve_host: true
     plugins:
@@ -988,12 +1001,12 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
 
   # ---------------------------------------------------------------------------
-  # Group 10: Data Export & Integration (Go — backend uses /api/v1/<resource>)
+  # Group 10: Data Export & Integration (Python/Go — backend uses /api/vX/<resource>)
   # ---------------------------------------------------------------------------
 
   - name: export-service
@@ -1005,8 +1018,8 @@ services:
     routes:
       - name: export-routes
         paths:
-          - /api/v1/exports
-          - /api/v1/jobs
+          - ~/api/v\d+(?:\.\d+)*/exports
+          - ~/api/v\d+(?:\.\d+)*/jobs
         strip_path: false
         preserve_host: true
     plugins:
@@ -1019,7 +1032,7 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
 
@@ -1032,9 +1045,9 @@ services:
     routes:
       - name: integration-routes
         paths:
-          - /api/v1/integrations
-          - /api/v1/webhooks
-          - /api/v1/oauth
+          - ~/api/v\d+(?:\.\d+)*/integrations
+          - ~/api/v\d+(?:\.\d+)*/webhooks
+          - ~/api/v\d+(?:\.\d+)*/oauth
         strip_path: false
         preserve_host: true
     plugins:
@@ -1047,12 +1060,12 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
 
   # ---------------------------------------------------------------------------
-  # Group 11: BFF / Aggregation (Go BFF — handles /api/v1/conversations)
+  # Group 11: BFF / Aggregation (Go BFF — handles /api/vX/conversations)
   # ---------------------------------------------------------------------------
   # WebSocket traffic handled by Envoy (port 8090), NOT Kong.
   # BFF handles REST API aggregation for conversations.
@@ -1066,7 +1079,7 @@ services:
     routes:
       - name: bff-conversation-routes
         paths:
-          - /api/v1/conversations
+          - ~/api/v\d+(?:\.\d+)*/conversations
         strip_path: false
         preserve_host: true
     plugins:
@@ -1079,9 +1092,35 @@ services:
         config:
           origins: ["*"]
           methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-          headers: [Authorization, Content-Type, X-Request-ID]
+          headers: [Authorization, Content-Type, X-Request-ID, X-Api-Version]
           credentials: true
           max_age: 3600
+
+  # ---------------------------------------------------------------------------
+  # Version Discovery Endpoint
+  # ---------------------------------------------------------------------------
+  # Serves the current API version manifest for the environment.
+  # Clients can GET /api/version to discover available versions.
+  # This is handled by the go-bff service.
+
+  - name: api-version-discovery
+    url: http://go-bff:3000/api/version
+    connect_timeout: 5000
+    write_timeout: 5000
+    read_timeout: 5000
+    retries: 2
+    routes:
+      - name: version-discovery-routes
+        paths:
+          - /api/version
+        strip_path: true
+        preserve_host: true
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 100
+          policy: local
+          fault_tolerant: true
 
 # =============================================================================
 # GLOBAL PLUGINS — applied to all services
