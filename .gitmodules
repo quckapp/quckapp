@@ -151,3 +151,15 @@
 [submodule "database/quckapp-clickhouse"]
 	path = database/quckapp-clickhouse
 	url = https://github.com/quckapp/quckapp-clickhouse.git
+[submodule "database/quckapp-scylladb"]
+	path = database/quckapp-scylladb
+	url = https://github.com/quckapp/quckapp-scylladb.git
+[submodule "database/quckapp-kafka"]
+	path = database/quckapp-kafka
+	url = https://github.com/quckapp/quckapp-kafka.git
+[submodule "database/quckapp-elasticsearch"]
+	path = database/quckapp-elasticsearch
+	url = https://github.com/quckapp/quckapp-elasticsearch.git
+[submodule "database/quckapp-dynamodb"]
+	path = database/quckapp-dynamodb
+	url = https://github.com/quckapp/quckapp-dynamodb.git
