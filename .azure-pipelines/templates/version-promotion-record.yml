@@ -1,15 +1,17 @@
 # =============================================================================
 # Version Promotion Record — Azure Pipelines Template
 # =============================================================================
-# Records a successful promotion after deployment.
+# Records a successful promotion after deployment by calling the service's
+# own promotion endpoint.
 #
 # Usage:
 #   - template: templates/version-promotion-record.yml
 #     parameters:
 #       serviceKey: 'user-service'
 #       apiVersion: 'v1'
+#       fromEnvironment: 'staging'
 #       targetEnvironment: 'production'
-#       serviceUrlsApiUrl: '$(SERVICE_URLS_API_URL)'
+#       namespace: 'quckapp'
 # =============================================================================
 
 parameters:
@@ -18,17 +20,29 @@ parameters:
   - name: apiVersion
     type: string
     default: 'v1'
+  - name: fromEnvironment
+    type: string
+    default: ''
   - name: targetEnvironment
     type: string
-  - name: serviceUrlsApiUrl
+  - name: namespace
     type: string
+    default: 'quckapp'
 
 steps:
   - script: |
-      curl -sf -X POST "${{ parameters.serviceUrlsApiUrl }}/admin/service-urls/${{ parameters.targetEnvironment }}/versions/${{ parameters.serviceKey }}/${{ parameters.apiVersion }}/promote" \
-        -H "Authorization: Bearer $(SERVICE_URLS_API_TOKEN)" \
-        || echo "##vso[task.logissue type=warning]Version promotion recording failed (non-fatal)"
+      SVC="${{ parameters.serviceKey }}"
+      VER="${{ parameters.apiVersion }}"
+      FROM="${{ parameters.fromEnvironment }}"
+      TARGET="${{ parameters.targetEnvironment }}"
+      NS="${{ parameters.namespace }}"
+      kubectl run promo-record-$(Build.BuildId) --rm -i --restart=Never \
+        --image=curlimages/curl:8.5.0 -n ${NS} --timeout=30s \
+        -- curl -sf -X POST "http://${SVC}.${NS}.svc.cluster.local/api/v1/promotion/promote" \
+        -H "Content-Type: application/json" \
+        -d "{\"serviceKey\":\"${SVC}\",\"apiVersion\":\"${VER}\",\"fromEnvironment\":\"${FROM}\",\"toEnvironment\":\"${TARGET}\",\"promotedBy\":\"azure-pipelines\"}" \
+        || echo "##vso[task.logissue type=warning]Promotion recording failed (non-fatal)"
 
-      echo "Promotion recorded: ${{ parameters.serviceKey }} ${{ parameters.apiVersion }} -> ${{ parameters.targetEnvironment }}"
+      echo "Promotion recorded: ${SVC} ${VER} -> ${TARGET}"
     displayName: 'Record Version Promotion'
     condition: succeeded()

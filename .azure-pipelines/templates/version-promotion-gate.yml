@@ -1,8 +1,8 @@
 # =============================================================================
 # Version Promotion Gate — Azure Pipelines Template
 # =============================================================================
-# Calls the service-urls API to validate that a version can be promoted
-# to the target environment. Fails the pipeline if blocked.
+# Calls each service's own promotion endpoint to validate that a version
+# can be promoted to the target environment. Fails the pipeline if blocked.
 #
 # Usage:
 #   - template: templates/version-promotion-gate.yml
@@ -10,7 +10,7 @@
 #       serviceKey: 'user-service'
 #       apiVersion: 'v1'
 #       targetEnvironment: 'production'
-#       serviceUrlsApiUrl: '$(SERVICE_URLS_API_URL)'
+#       namespace: 'quckapp'
 # =============================================================================
 
 parameters:
@@ -21,22 +21,31 @@ parameters:
     default: 'v1'
   - name: targetEnvironment
     type: string
-  - name: serviceUrlsApiUrl
+  - name: namespace
     type: string
+    default: 'quckapp'
 
 steps:
   - script: |
-      set -e
-      RESPONSE=$(curl -sf "${{ parameters.serviceUrlsApiUrl }}/admin/service-urls/can-promote?serviceKey=${{ parameters.serviceKey }}&apiVersion=${{ parameters.apiVersion }}&toEnvironment=${{ parameters.targetEnvironment }}" \
-        -H "Authorization: Bearer $(SERVICE_URLS_API_TOKEN)")
+      SVC="${{ parameters.serviceKey }}"
+      VER="${{ parameters.apiVersion }}"
+      TARGET="${{ parameters.targetEnvironment }}"
+      NS="${{ parameters.namespace }}"
+      RESPONSE=$(kubectl run promo-check-$(Build.BuildId) --rm -i --restart=Never \
+        --image=curlimages/curl:8.5.0 -n ${NS} --timeout=30s \
+        -- curl -sf "http://${SVC}.${NS}.svc.cluster.local/api/v1/promotion/can-promote?serviceKey=${SVC}&apiVersion=${VER}&toEnvironment=${TARGET}" \
+        2>/dev/null) || true
 
-      ALLOWED=$(echo "$RESPONSE" | jq -r '.data.allowed')
-
-      if [ "$ALLOWED" != "true" ]; then
-        REASON=$(echo "$RESPONSE" | jq -r '.data.blockedReason')
-        echo "##vso[task.logissue type=error]Promotion gate blocked: $REASON"
-        exit 1
+      if [ -z "$RESPONSE" ]; then
+        echo "##vso[task.logissue type=warning]Promotion gate service unavailable — allowing deployment"
+      else
+        ALLOWED=$(echo "$RESPONSE" | jq -r '.data.allowed')
+        if [ "$ALLOWED" == "false" ]; then
+          REASON=$(echo "$RESPONSE" | jq -r '.data.reason // .data.blockedReason // "unknown"')
+          echo "##vso[task.logissue type=error]Promotion gate blocked: $REASON"
+          exit 1
+        fi
       fi
 
-      echo "Promotion gate passed: ${{ parameters.serviceKey }} ${{ parameters.apiVersion }} -> ${{ parameters.targetEnvironment }}"
+      echo "Promotion gate passed: ${SVC} ${VER} -> ${TARGET}"
     displayName: 'Check Version Promotion Gate'

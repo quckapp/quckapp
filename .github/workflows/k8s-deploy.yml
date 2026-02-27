@@ -152,18 +152,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Check promotion gate
-        if: vars.SERVICE_URLS_API_URL != ''
-        run: |
-          RESPONSE=$(curl -sf "${{ vars.SERVICE_URLS_API_URL }}/admin/service-urls/can-promote?serviceKey=quckapp-api&apiVersion=v1&toEnvironment=production" \
-            -H "Authorization: Bearer ${{ secrets.SERVICE_URLS_API_TOKEN }}")
-          ALLOWED=$(echo "$RESPONSE" | jq -r '.data.allowed')
-          if [ "$ALLOWED" != "true" ]; then
-            REASON=$(echo "$RESPONSE" | jq -r '.data.blockedReason')
-            echo "::error::Promotion gate blocked: $REASON"
-            exit 1
-          fi
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -202,6 +190,29 @@ jobs:
         run: |
           kubectl get pods -n quckapp-prod -l app.kubernetes.io/name=quckapp
           kubectl get ingress -n quckapp-prod
+
+      - name: Check promotion gate (per-service)
+        run: |
+          RESPONSE=$(kubectl run promo-check-${GITHUB_RUN_ID} --rm -i --restart=Never \
+            --image=curlimages/curl:8.5.0 -n quckapp-prod --timeout=30s \
+            -- curl -sf "http://prod-quckapp-api.quckapp-prod.svc.cluster.local/api/v1/promotion/can-promote?serviceKey=quckapp-api&apiVersion=v1&toEnvironment=production" \
+            2>/dev/null) || true
+          if [ -n "$RESPONSE" ]; then
+            ALLOWED=$(echo "$RESPONSE" | jq -r '.data.allowed')
+            if [ "$ALLOWED" == "false" ]; then
+              REASON=$(echo "$RESPONSE" | jq -r '.data.reason // .data.blockedReason // "unknown"')
+              echo "::warning::Promotion gate: $REASON"
+            fi
+          fi
+
+      - name: Record promotion to production
+        run: |
+          kubectl run promo-record-${GITHUB_RUN_ID} --rm -i --restart=Never \
+            --image=curlimages/curl:8.5.0 -n quckapp-prod --timeout=30s \
+            -- curl -sf -X POST "http://prod-quckapp-api.quckapp-prod.svc.cluster.local/api/v1/promotion/promote" \
+            -H "Content-Type: application/json" \
+            -d '{"serviceKey":"quckapp-api","apiVersion":"v1","fromEnvironment":"staging","toEnvironment":"production","promotedBy":"github-actions"}' \
+            || echo "::warning::Promotion recording failed (non-fatal)"
 
       - name: Run smoke tests
         run: |

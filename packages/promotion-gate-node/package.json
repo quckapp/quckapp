@@ -1,0 +1,13 @@
+{
+  "name": "@quckapp/promotion-gate",
+  "version": "0.1.0",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@nestjs/common": "^10.3.0",
+    "@nestjs/typeorm": "^10.0.1",
+    "typeorm": "^0.3.17",
+    "class-validator": "^0.14.0",
+    "class-transformer": "^0.5.1",
+    "uuid": "^9.0.0"
+  }
+}

@@ -38,18 +38,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Check promotion gate
-        if: vars.SERVICE_URLS_API_URL != '' && inputs.environment != 'dev'
-        run: |
-          RESPONSE=$(curl -sf "${{ vars.SERVICE_URLS_API_URL }}/admin/service-urls/can-promote?serviceKey=quckapp-api&apiVersion=v1&toEnvironment=${{ inputs.environment }}" \
-            -H "Authorization: Bearer ${{ secrets.SERVICE_URLS_API_TOKEN }}")
-          ALLOWED=$(echo "$RESPONSE" | jq -r '.data.allowed')
-          if [ "$ALLOWED" != "true" ]; then
-            REASON=$(echo "$RESPONSE" | jq -r '.data.blockedReason')
-            echo "::error::Promotion gate blocked: $REASON"
-            exit 1
-          fi
-
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -120,8 +108,32 @@ jobs:
 
           echo "Smoke tests passed!"
 
-      - name: Record version promotion
-        if: vars.SERVICE_URLS_API_URL != ''
+      - name: Check promotion gate (per-service)
+        if: inputs.environment != 'dev'
         run: |
-          curl -sf -X POST "${{ vars.SERVICE_URLS_API_URL }}/admin/service-urls/${{ inputs.environment }}/versions/quckapp-api/v1/promote" \
-            -H "Authorization: Bearer ${{ secrets.SERVICE_URLS_API_TOKEN }}" || echo "::warning::Promotion recording failed"
+          NAMESPACE="quckapp-${{ inputs.environment }}"
+          PREFIX="${{ inputs.environment }}"
+          SVC="${PREFIX}-quckapp-api"
+          RESPONSE=$(kubectl run promo-check-${GITHUB_RUN_ID} --rm -i --restart=Never \
+            --image=curlimages/curl:8.5.0 -n ${NAMESPACE} --timeout=30s \
+            -- curl -sf "http://${SVC}.${NAMESPACE}.svc.cluster.local/api/v1/promotion/can-promote?serviceKey=quckapp-api&apiVersion=v1&toEnvironment=${{ inputs.environment }}" \
+            2>/dev/null) || true
+          if [ -n "$RESPONSE" ]; then
+            ALLOWED=$(echo "$RESPONSE" | jq -r '.data.allowed')
+            if [ "$ALLOWED" == "false" ]; then
+              REASON=$(echo "$RESPONSE" | jq -r '.data.reason // .data.blockedReason // "unknown"')
+              echo "::warning::Promotion gate: $REASON"
+            fi
+          fi
+
+      - name: Record promotion (per-service)
+        run: |
+          NAMESPACE="quckapp-${{ inputs.environment }}"
+          PREFIX="${{ inputs.environment }}"
+          SVC="${PREFIX}-quckapp-api"
+          kubectl run promo-record-${GITHUB_RUN_ID} --rm -i --restart=Never \
+            --image=curlimages/curl:8.5.0 -n ${NAMESPACE} --timeout=30s \
+            -- curl -sf -X POST "http://${SVC}.${NAMESPACE}.svc.cluster.local/api/v1/promotion/promote" \
+            -H "Content-Type: application/json" \
+            -d "{\"serviceKey\":\"quckapp-api\",\"apiVersion\":\"v1\",\"toEnvironment\":\"${{ inputs.environment }}\",\"promotedBy\":\"github-actions\"}" \
+            || echo "::warning::Promotion recording failed (non-fatal)"

@@ -1,7 +1,9 @@
 # =============================================================================
-# Example: Service deployment pipeline with version promotion gates
+# Example: Service deployment pipeline with per-service promotion gates
 # =============================================================================
 # Copy and adapt this for each service.
+# Each service self-manages its own promotion records via its own
+# /api/v1/promotion/* endpoints (no centralized admin-service dependency).
 # =============================================================================
 
 trigger:
@@ -15,7 +17,7 @@ trigger:
 variables:
   serviceKey: 'user-service'
   apiVersion: 'v1'
-  serviceUrlsApiUrl: '$(SERVICE_URLS_API_URL)'
+  namespace: 'quckapp'
 
 stages:
   - stage: Build
@@ -44,15 +46,16 @@ stages:
                     serviceKey: '$(serviceKey)'
                     apiVersion: '$(apiVersion)'
                     targetEnvironment: 'dev'
-                    serviceUrlsApiUrl: '$(serviceUrlsApiUrl)'
+                    namespace: '$(namespace)'
                 - script: echo "Deploy to dev AKS..."
                   displayName: 'Deploy to dev'
                 - template: templates/version-promotion-record.yml
                   parameters:
                     serviceKey: '$(serviceKey)'
                     apiVersion: '$(apiVersion)'
+                    fromEnvironment: 'local'
                     targetEnvironment: 'dev'
-                    serviceUrlsApiUrl: '$(serviceUrlsApiUrl)'
+                    namespace: '$(namespace)'
 
   - stage: DeployQA
     dependsOn: DeployDev
@@ -68,15 +71,16 @@ stages:
                     serviceKey: '$(serviceKey)'
                     apiVersion: '$(apiVersion)'
                     targetEnvironment: 'qa'
-                    serviceUrlsApiUrl: '$(serviceUrlsApiUrl)'
+                    namespace: '$(namespace)'
                 - script: echo "Deploy to qa AKS..."
                   displayName: 'Deploy to QA'
                 - template: templates/version-promotion-record.yml
                   parameters:
                     serviceKey: '$(serviceKey)'
                     apiVersion: '$(apiVersion)'
+                    fromEnvironment: 'dev'
                     targetEnvironment: 'qa'
-                    serviceUrlsApiUrl: '$(serviceUrlsApiUrl)'
+                    namespace: '$(namespace)'
 
   - stage: DeployProduction
     dependsOn: DeployQA
@@ -92,12 +96,13 @@ stages:
                     serviceKey: '$(serviceKey)'
                     apiVersion: '$(apiVersion)'
                     targetEnvironment: 'production'
-                    serviceUrlsApiUrl: '$(serviceUrlsApiUrl)'
+                    namespace: '$(namespace)'
                 - script: echo "Deploy to production AKS..."
                   displayName: 'Deploy to Production'
                 - template: templates/version-promotion-record.yml
                   parameters:
                     serviceKey: '$(serviceKey)'
                     apiVersion: '$(apiVersion)'
+                    fromEnvironment: 'qa'
                     targetEnvironment: 'production'
-                    serviceUrlsApiUrl: '$(serviceUrlsApiUrl)'
+                    namespace: '$(namespace)'
