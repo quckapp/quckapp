@@ -105,6 +105,9 @@ uploads/
 # Claude settings (keep local)
 .claude/settings.local.json
 
+# Separate database migration repos (independent GitHub repos)
+database/
+
 # Debug/test output files
 *_output.txt
 *_output_full.txt
