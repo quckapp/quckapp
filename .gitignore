@@ -105,6 +105,9 @@ uploads/
 # Claude settings (keep local)
 .claude/settings.local.json
 
+# Local database backups
+.db-backups/
+
 # Debug/test output files
 *_output.txt
 *_output_full.txt

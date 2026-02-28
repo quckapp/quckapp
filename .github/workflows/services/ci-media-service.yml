@@ -1,0 +1,32 @@
+name: "CI/CD — media-service"
+
+on:
+  push:
+    branches: [main]
+    paths: ['services/media-service/**']
+  pull_request:
+    paths: ['services/media-service/**']
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+      - name: Run tests
+        working-directory: services/media-service
+        run: go test -v ./...
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    uses: ./.github/workflows/reusable-service-deploy.yml
+    with:
+      service_name: media-service
+      service_path: services/media-service
+      language: go
+      port: '5001'
+    secrets: inherit

@@ -1,0 +1,314 @@
+name: Reusable Service Deploy
+
+on:
+  workflow_call:
+    inputs:
+      service_name:
+        required: true
+        type: string
+      service_path:
+        required: true
+        type: string
+      docker_context:
+        required: false
+        type: string
+        default: ''
+      language:
+        required: true
+        type: string
+      port:
+        required: true
+        type: string
+      api_version:
+        required: false
+        type: string
+        default: 'v1'
+        description: 'API version being deployed (e.g., v1, v2)'
+    secrets:
+      AZURE_CREDENTIALS:
+        required: true
+      ACR_LOGIN_SERVER:
+        required: true
+      ACR_USERNAME:
+        required: true
+      ACR_PASSWORD:
+        required: true
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to ACR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.ACR_LOGIN_SERVER }}/${{ inputs.service_name }}
+          tags: |
+            type=sha,prefix=
+            type=ref,event=branch
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ inputs.docker_context || inputs.service_path }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-dev:
+    needs: build-push
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Deploy to dev AKS
+        run: |
+          az aks get-credentials --resource-group quckapp-dev --name quckapp-dev-aks
+          kubectl set image deployment/${{ inputs.service_name }} \
+            ${{ inputs.service_name }}=${{ needs.build-push.outputs.image_tag }} \
+            -n quckapp
+          kubectl rollout status deployment/${{ inputs.service_name }} -n quckapp --timeout=300s
+      - name: Record promotion to dev
+        run: |
+          SVC="${{ inputs.service_name }}"
+          VER="${{ inputs.api_version }}"
+          kubectl run promo-record-${GITHUB_RUN_ID} --rm -i --restart=Never \
+            --image=curlimages/curl:8.5.0 -n quckapp --timeout=30s \
+            -- curl -sf -X POST "http://${SVC}.quckapp.svc.cluster.local/api/v1/promotion/promote" \
+            -H "Content-Type: application/json" \
+            -d "{\"serviceKey\":\"${SVC}\",\"apiVersion\":\"${VER}\",\"fromEnvironment\":\"local\",\"toEnvironment\":\"dev\",\"promotedBy\":\"github-actions\"}" \
+            || echo "::warning::Promotion recording failed (non-fatal)"
+
+  deploy-qa:
+    needs: [build-push, deploy-dev]
+    runs-on: ubuntu-latest
+    environment: qa
+    steps:
+      - uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Check promotion gate (service must be active in dev)
+        run: |
+          SVC="${{ inputs.service_name }}"
+          VER="${{ inputs.api_version }}"
+          # Query the service in the target environment for promotion eligibility
+          az aks get-credentials --resource-group quckapp-qa --name quckapp-qa-aks
+          RESPONSE=$(kubectl run promo-check-${GITHUB_RUN_ID} --rm -i --restart=Never \
+            --image=curlimages/curl:8.5.0 -n quckapp --timeout=30s \
+            -- curl -sf "http://${SVC}.quckapp.svc.cluster.local/api/v1/promotion/can-promote?serviceKey=${SVC}&apiVersion=${VER}&toEnvironment=qa" \
+            2>/dev/null) || true
+          if [ -z "$RESPONSE" ]; then
+            echo "::warning::Promotion gate service unavailable — allowing deployment"
+          else
+            ALLOWED=$(echo "$RESPONSE" | jq -r '.data.allowed')
+            if [ "$ALLOWED" == "false" ]; then
+              REASON=$(echo "$RESPONSE" | jq -r '.data.reason // .data.blockedReason // "unknown"')
+              echo "::error::Promotion gate blocked: $REASON"
+              exit 1
+            fi
+          fi
+      - name: Deploy to qa AKS
+        run: |
+          kubectl set image deployment/${{ inputs.service_name }} \
+            ${{ inputs.service_name }}=${{ needs.build-push.outputs.image_tag }} \
+            -n quckapp
+          kubectl rollout status deployment/${{ inputs.service_name }} -n quckapp --timeout=300s
+      - name: Record promotion to qa
+        run: |
+          SVC="${{ inputs.service_name }}"
+          VER="${{ inputs.api_version }}"
+          kubectl run promo-record-${GITHUB_RUN_ID} --rm -i --restart=Never \
+            --image=curlimages/curl:8.5.0 -n quckapp --timeout=30s \
+            -- curl -sf -X POST "http://${SVC}.quckapp.svc.cluster.local/api/v1/promotion/promote" \
+            -H "Content-Type: application/json" \
+            -d "{\"serviceKey\":\"${SVC}\",\"apiVersion\":\"${VER}\",\"fromEnvironment\":\"dev\",\"toEnvironment\":\"qa\",\"promotedBy\":\"github-actions\"}" \
+            || echo "::warning::Promotion recording failed (non-fatal)"
+
+  deploy-uat:
+    needs: [build-push, deploy-qa]
+    runs-on: ubuntu-latest
+    environment: uat1
+    steps:
+      - uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Check promotion gate (service must be active in qa)
+        run: |
+          SVC="${{ inputs.service_name }}"
+          VER="${{ inputs.api_version }}"
+          az aks get-credentials --resource-group quckapp-uat --name quckapp-uat-aks
+          RESPONSE=$(kubectl run promo-check-${GITHUB_RUN_ID} --rm -i --restart=Never \
+            --image=curlimages/curl:8.5.0 -n quckapp --timeout=30s \
+            -- curl -sf "http://${SVC}.quckapp.svc.cluster.local/api/v1/promotion/can-promote?serviceKey=${SVC}&apiVersion=${VER}&toEnvironment=uat1" \
+            2>/dev/null) || true
+          if [ -z "$RESPONSE" ]; then
+            echo "::warning::Promotion gate service unavailable — allowing deployment"
+          else
+            ALLOWED=$(echo "$RESPONSE" | jq -r '.data.allowed')
+            if [ "$ALLOWED" == "false" ]; then
+              REASON=$(echo "$RESPONSE" | jq -r '.data.reason // .data.blockedReason // "unknown"')
+              echo "::error::Promotion gate blocked: $REASON"
+              exit 1
+            fi
+          fi
+      - name: Deploy to uat AKS
+        run: |
+          kubectl set image deployment/${{ inputs.service_name }} \
+            ${{ inputs.service_name }}=${{ needs.build-push.outputs.image_tag }} \
+            -n quckapp
+          kubectl rollout status deployment/${{ inputs.service_name }} -n quckapp --timeout=300s
+      - name: Record promotion to uat
+        run: |
+          SVC="${{ inputs.service_name }}"
+          VER="${{ inputs.api_version }}"
+          kubectl run promo-record-${GITHUB_RUN_ID} --rm -i --restart=Never \
+            --image=curlimages/curl:8.5.0 -n quckapp --timeout=30s \
+            -- curl -sf -X POST "http://${SVC}.quckapp.svc.cluster.local/api/v1/promotion/promote" \
+            -H "Content-Type: application/json" \
+            -d "{\"serviceKey\":\"${SVC}\",\"apiVersion\":\"${VER}\",\"fromEnvironment\":\"qa\",\"toEnvironment\":\"uat1\",\"promotedBy\":\"github-actions\"}" \
+            || echo "::warning::Promotion recording failed (non-fatal)"
+
+  deploy-staging:
+    needs: [build-push, deploy-uat]
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Check promotion gate (service must be active in uat)
+        run: |
+          SVC="${{ inputs.service_name }}"
+          VER="${{ inputs.api_version }}"
+          az aks get-credentials --resource-group quckapp-staging --name quckapp-staging-aks
+          RESPONSE=$(kubectl run promo-check-${GITHUB_RUN_ID} --rm -i --restart=Never \
+            --image=curlimages/curl:8.5.0 -n quckapp --timeout=30s \
+            -- curl -sf "http://${SVC}.quckapp.svc.cluster.local/api/v1/promotion/can-promote?serviceKey=${SVC}&apiVersion=${VER}&toEnvironment=staging" \
+            2>/dev/null) || true
+          if [ -z "$RESPONSE" ]; then
+            echo "::warning::Promotion gate service unavailable — allowing deployment"
+          else
+            ALLOWED=$(echo "$RESPONSE" | jq -r '.data.allowed')
+            if [ "$ALLOWED" == "false" ]; then
+              REASON=$(echo "$RESPONSE" | jq -r '.data.reason // .data.blockedReason // "unknown"')
+              echo "::error::Promotion gate blocked: $REASON"
+              exit 1
+            fi
+          fi
+      - name: Deploy to staging AKS
+        run: |
+          kubectl set image deployment/${{ inputs.service_name }} \
+            ${{ inputs.service_name }}=${{ needs.build-push.outputs.image_tag }} \
+            -n quckapp
+          kubectl rollout status deployment/${{ inputs.service_name }} -n quckapp --timeout=300s
+      - name: Record promotion to staging
+        run: |
+          SVC="${{ inputs.service_name }}"
+          VER="${{ inputs.api_version }}"
+          kubectl run promo-record-${GITHUB_RUN_ID} --rm -i --restart=Never \
+            --image=curlimages/curl:8.5.0 -n quckapp --timeout=30s \
+            -- curl -sf -X POST "http://${SVC}.quckapp.svc.cluster.local/api/v1/promotion/promote" \
+            -H "Content-Type: application/json" \
+            -d "{\"serviceKey\":\"${SVC}\",\"apiVersion\":\"${VER}\",\"fromEnvironment\":\"uat\",\"toEnvironment\":\"staging\",\"promotedBy\":\"github-actions\"}" \
+            || echo "::warning::Promotion recording failed (non-fatal)"
+
+  deploy-production:
+    needs: [build-push, deploy-staging]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Check promotion gate (service must be active in staging)
+        run: |
+          SVC="${{ inputs.service_name }}"
+          VER="${{ inputs.api_version }}"
+          az aks get-credentials --resource-group quckapp-prod --name quckapp-prod-aks
+          RESPONSE=$(kubectl run promo-check-${GITHUB_RUN_ID} --rm -i --restart=Never \
+            --image=curlimages/curl:8.5.0 -n quckapp --timeout=30s \
+            -- curl -sf "http://${SVC}.quckapp.svc.cluster.local/api/v1/promotion/can-promote?serviceKey=${SVC}&apiVersion=${VER}&toEnvironment=production" \
+            2>/dev/null) || true
+          if [ -z "$RESPONSE" ]; then
+            echo "::warning::Promotion gate service unavailable — allowing deployment"
+          else
+            ALLOWED=$(echo "$RESPONSE" | jq -r '.data.allowed')
+            if [ "$ALLOWED" == "false" ]; then
+              REASON=$(echo "$RESPONSE" | jq -r '.data.reason // .data.blockedReason // "unknown"')
+              echo "::error::Promotion gate blocked: $REASON"
+              exit 1
+            fi
+          fi
+      - name: Deploy to production AKS
+        run: |
+          kubectl set image deployment/${{ inputs.service_name }} \
+            ${{ inputs.service_name }}=${{ needs.build-push.outputs.image_tag }} \
+            -n quckapp
+          kubectl rollout status deployment/${{ inputs.service_name }} -n quckapp --timeout=600s
+      - name: Record promotion to production
+        run: |
+          SVC="${{ inputs.service_name }}"
+          VER="${{ inputs.api_version }}"
+          kubectl run promo-record-${GITHUB_RUN_ID} --rm -i --restart=Never \
+            --image=curlimages/curl:8.5.0 -n quckapp --timeout=30s \
+            -- curl -sf -X POST "http://${SVC}.quckapp.svc.cluster.local/api/v1/promotion/promote" \
+            -H "Content-Type: application/json" \
+            -d "{\"serviceKey\":\"${SVC}\",\"apiVersion\":\"${VER}\",\"fromEnvironment\":\"staging\",\"toEnvironment\":\"production\",\"promotedBy\":\"github-actions\"}" \
+            || echo "::warning::Promotion recording failed (non-fatal)"
+
+  deploy-live:
+    needs: [build-push, deploy-production]
+    runs-on: ubuntu-latest
+    environment: live
+    steps:
+      - uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Check promotion gate (service must be active in production)
+        run: |
+          SVC="${{ inputs.service_name }}"
+          VER="${{ inputs.api_version }}"
+          az aks get-credentials --resource-group quckapp-live --name quckapp-live-aks
+          RESPONSE=$(kubectl run promo-check-${GITHUB_RUN_ID} --rm -i --restart=Never \
+            --image=curlimages/curl:8.5.0 -n quckapp --timeout=30s \
+            -- curl -sf "http://${SVC}.quckapp.svc.cluster.local/api/v1/promotion/can-promote?serviceKey=${SVC}&apiVersion=${VER}&toEnvironment=live" \
+            2>/dev/null) || true
+          if [ -z "$RESPONSE" ]; then
+            echo "::warning::Promotion gate service unavailable — allowing deployment"
+          else
+            ALLOWED=$(echo "$RESPONSE" | jq -r '.data.allowed')
+            if [ "$ALLOWED" == "false" ]; then
+              REASON=$(echo "$RESPONSE" | jq -r '.data.reason // .data.blockedReason // "unknown"')
+              echo "::error::Promotion gate blocked: $REASON"
+              exit 1
+            fi
+          fi
+      - name: Deploy to live AKS
+        run: |
+          kubectl set image deployment/${{ inputs.service_name }} \
+            ${{ inputs.service_name }}=${{ needs.build-push.outputs.image_tag }} \
+            -n quckapp
+          kubectl rollout status deployment/${{ inputs.service_name }} -n quckapp --timeout=600s
+      - name: Record promotion to live
+        run: |
+          SVC="${{ inputs.service_name }}"
+          VER="${{ inputs.api_version }}"
+          kubectl run promo-record-${GITHUB_RUN_ID} --rm -i --restart=Never \
+            --image=curlimages/curl:8.5.0 -n quckapp --timeout=30s \
+            -- curl -sf -X POST "http://${SVC}.quckapp.svc.cluster.local/api/v1/promotion/promote" \
+            -H "Content-Type: application/json" \
+            -d "{\"serviceKey\":\"${SVC}\",\"apiVersion\":\"${VER}\",\"fromEnvironment\":\"production\",\"toEnvironment\":\"live\",\"promotedBy\":\"github-actions\"}" \
+            || echo "::warning::Promotion recording failed (non-fatal)"

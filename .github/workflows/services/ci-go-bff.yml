@@ -1,0 +1,32 @@
+name: "CI/CD — go-bff"
+
+on:
+  push:
+    branches: [main]
+    paths: ['services/go-bff/**']
+  pull_request:
+    paths: ['services/go-bff/**']
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+      - name: Run tests
+        working-directory: services/go-bff
+        run: go test -v ./...
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    uses: ./.github/workflows/reusable-service-deploy.yml
+    with:
+      service_name: go-bff
+      service_path: services/go-bff
+      language: go
+      port: '3000'
+    secrets: inherit

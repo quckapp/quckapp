@@ -94,7 +94,7 @@ PORT=3000
 MONGODB_URI=mongodb://localhost:27017/quckapp
 JWT_SECRET=your-dev-secret-key
 USE_SPRING_AUTH=true
-SPRING_AUTH_SERVICE_URL=http://localhost:8081/api/auth
+SPRING_AUTH_SERVICE_URL=http://localhost:8081/api/v1/auth
 KAFKA_BROKERS=localhost:29092
 REDIS_HOST=localhost
 ```
@@ -153,7 +153,7 @@ npx expo start
 ```bash
 # Check all services are healthy
 curl http://localhost:3000/health        # Backend
-curl http://localhost:8081/api/auth/actuator/health  # Auth
+curl http://localhost:8081/api/v1/auth/actuator/health  # Auth
 curl http://localhost:4000/health        # Realtime
 
 # Check Spring Auth integration
@@ -372,7 +372,7 @@ fields @timestamp, @message
 | Service | Health Endpoint |
 |---------|-----------------|
 | Backend | `/health` |
-| Auth Service | `/api/auth/actuator/health` |
+| Auth Service | `/api/v1/auth/actuator/health` |
 | Realtime | `/health` |
 
 ---

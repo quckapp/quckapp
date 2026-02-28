@@ -1,0 +1,34 @@
+name: "CI/CD — analytics-service"
+
+on:
+  push:
+    branches: [main]
+    paths: ['services/analytics-service/**']
+  pull_request:
+    paths: ['services/analytics-service/**']
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps and test
+        working-directory: services/analytics-service
+        run: |
+          pip install -r requirements.txt
+          pytest -v
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    uses: ./.github/workflows/reusable-service-deploy.yml
+    with:
+      service_name: analytics-service
+      service_path: services/analytics-service
+      language: python
+      port: '5007'
+    secrets: inherit

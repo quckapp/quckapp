@@ -1,0 +1,108 @@
+# =============================================================================
+# Example: Service deployment pipeline with per-service promotion gates
+# =============================================================================
+# Copy and adapt this for each service.
+# Each service self-manages its own promotion records via its own
+# /api/v1/promotion/* endpoints (no centralized admin-service dependency).
+# =============================================================================
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - 'services/user-service/**'
+
+variables:
+  serviceKey: 'user-service'
+  apiVersion: 'v1'
+  namespace: 'quckapp'
+
+stages:
+  - stage: Build
+    jobs:
+      - job: BuildPush
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: Docker@2
+            inputs:
+              command: buildAndPush
+              repository: '$(serviceKey)'
+              dockerfile: 'services/$(serviceKey)/Dockerfile'
+
+  - stage: DeployDev
+    dependsOn: Build
+    jobs:
+      - deployment: DeployDev
+        environment: 'development'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - template: templates/version-promotion-gate.yml
+                  parameters:
+                    serviceKey: '$(serviceKey)'
+                    apiVersion: '$(apiVersion)'
+                    targetEnvironment: 'dev'
+                    namespace: '$(namespace)'
+                - script: echo "Deploy to dev AKS..."
+                  displayName: 'Deploy to dev'
+                - template: templates/version-promotion-record.yml
+                  parameters:
+                    serviceKey: '$(serviceKey)'
+                    apiVersion: '$(apiVersion)'
+                    fromEnvironment: 'local'
+                    targetEnvironment: 'dev'
+                    namespace: '$(namespace)'
+
+  - stage: DeployQA
+    dependsOn: DeployDev
+    jobs:
+      - deployment: DeployQA
+        environment: 'qa'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - template: templates/version-promotion-gate.yml
+                  parameters:
+                    serviceKey: '$(serviceKey)'
+                    apiVersion: '$(apiVersion)'
+                    targetEnvironment: 'qa'
+                    namespace: '$(namespace)'
+                - script: echo "Deploy to qa AKS..."
+                  displayName: 'Deploy to QA'
+                - template: templates/version-promotion-record.yml
+                  parameters:
+                    serviceKey: '$(serviceKey)'
+                    apiVersion: '$(apiVersion)'
+                    fromEnvironment: 'dev'
+                    targetEnvironment: 'qa'
+                    namespace: '$(namespace)'
+
+  - stage: DeployProduction
+    dependsOn: DeployQA
+    jobs:
+      - deployment: DeployProd
+        environment: 'production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - template: templates/version-promotion-gate.yml
+                  parameters:
+                    serviceKey: '$(serviceKey)'
+                    apiVersion: '$(apiVersion)'
+                    targetEnvironment: 'production'
+                    namespace: '$(namespace)'
+                - script: echo "Deploy to production AKS..."
+                  displayName: 'Deploy to Production'
+                - template: templates/version-promotion-record.yml
+                  parameters:
+                    serviceKey: '$(serviceKey)'
+                    apiVersion: '$(apiVersion)'
+                    fromEnvironment: 'qa'
+                    targetEnvironment: 'production'
+                    namespace: '$(namespace)'

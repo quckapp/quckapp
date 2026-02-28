@@ -64,7 +64,7 @@ jobs:
         run: |
           cd infrastructure/k8s/overlays/${{ inputs.environment }}
           kustomize edit set image \
-            quckapp/api=${{ env.ECR_REGISTRY }}/quckapp/api:${{ inputs.image_tag }} \
+            quckapp/api/v1=${{ env.ECR_REGISTRY }}/quckapp/api/v1:${{ inputs.image_tag }} \
             quckapp/worker=${{ env.ECR_REGISTRY }}/quckapp/worker:${{ inputs.image_tag }}
 
       - name: Deploy
@@ -107,3 +107,33 @@ jobs:
             -- curl -sf "http://${API_SVC}/health/live" || exit 1
 
           echo "Smoke tests passed!"
+
+      - name: Check promotion gate (per-service)
+        if: inputs.environment != 'dev'
+        run: |
+          NAMESPACE="quckapp-${{ inputs.environment }}"
+          PREFIX="${{ inputs.environment }}"
+          SVC="${PREFIX}-quckapp-api"
+          RESPONSE=$(kubectl run promo-check-${GITHUB_RUN_ID} --rm -i --restart=Never \
+            --image=curlimages/curl:8.5.0 -n ${NAMESPACE} --timeout=30s \
+            -- curl -sf "http://${SVC}.${NAMESPACE}.svc.cluster.local/api/v1/promotion/can-promote?serviceKey=quckapp-api&apiVersion=v1&toEnvironment=${{ inputs.environment }}" \
+            2>/dev/null) || true
+          if [ -n "$RESPONSE" ]; then
+            ALLOWED=$(echo "$RESPONSE" | jq -r '.data.allowed')
+            if [ "$ALLOWED" == "false" ]; then
+              REASON=$(echo "$RESPONSE" | jq -r '.data.reason // .data.blockedReason // "unknown"')
+              echo "::warning::Promotion gate: $REASON"
+            fi
+          fi
+
+      - name: Record promotion (per-service)
+        run: |
+          NAMESPACE="quckapp-${{ inputs.environment }}"
+          PREFIX="${{ inputs.environment }}"
+          SVC="${PREFIX}-quckapp-api"
+          kubectl run promo-record-${GITHUB_RUN_ID} --rm -i --restart=Never \
+            --image=curlimages/curl:8.5.0 -n ${NAMESPACE} --timeout=30s \
+            -- curl -sf -X POST "http://${SVC}.${NAMESPACE}.svc.cluster.local/api/v1/promotion/promote" \
+            -H "Content-Type: application/json" \
+            -d "{\"serviceKey\":\"quckapp-api\",\"apiVersion\":\"v1\",\"toEnvironment\":\"${{ inputs.environment }}\",\"promotedBy\":\"github-actions\"}" \
+            || echo "::warning::Promotion recording failed (non-fatal)"

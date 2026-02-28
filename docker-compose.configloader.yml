@@ -19,8 +19,8 @@ services:
   # ─── Service URLs API (added to the main network) ─────────────────────────
   local-service-urls-api:
     build:
-      context: ./service-urls/api
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: packages/service-urls/api/v1/Dockerfile
     container_name: quckapp-local-service-urls-api
     restart: unless-stopped
     environment:
@@ -51,11 +51,12 @@ services:
       MYSQL_PASSWORD: quckapp_secret
     volumes:
       - service_urls_data:/var/lib/mysql
-      - ./service-urls/docker/init:/docker-entrypoint-initdb.d
+      - ./packages/service-urls/docker/init:/docker-entrypoint-initdb.d
     command: >
       --character-set-server=utf8mb4
       --collation-server=utf8mb4_unicode_ci
       --default-authentication-plugin=mysql_native_password
+      --innodb-use-native-aio=0
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_secret"]
       interval: 10s
@@ -67,37 +68,37 @@ services:
 
   # ─── Go Services (use go-configloader natively) ───────────────────────────
 
-  local-workspace-service:
+  workspace-service:
     environment:
       SERVICE_URLS_API: http://local-service-urls-api:8085
       CONFIG_ENV: development
       CONFIG_API_KEY: ${CONFIG_API_KEY:-qk_dev_masterkey_2024}
 
-  local-channel-service:
+  channel-service:
     environment:
       SERVICE_URLS_API: http://local-service-urls-api:8085
       CONFIG_ENV: development
       CONFIG_API_KEY: ${CONFIG_API_KEY:-qk_dev_masterkey_2024}
 
-  local-search-service:
+  search-service:
     environment:
       SERVICE_URLS_API: http://local-service-urls-api:8085
       CONFIG_ENV: development
       CONFIG_API_KEY: ${CONFIG_API_KEY:-qk_dev_masterkey_2024}
 
-  local-media-service:
+  media-service:
     environment:
       SERVICE_URLS_API: http://local-service-urls-api:8085
       CONFIG_ENV: development
       CONFIG_API_KEY: ${CONFIG_API_KEY:-qk_dev_masterkey_2024}
 
-  local-bookmark-service:
+  bookmark-service:
     environment:
       SERVICE_URLS_API: http://local-service-urls-api:8085
       CONFIG_ENV: development
       CONFIG_API_KEY: ${CONFIG_API_KEY:-qk_dev_masterkey_2024}
 
-  local-reminder-service:
+  reminder-service:
     environment:
       SERVICE_URLS_API: http://local-service-urls-api:8085
       CONFIG_ENV: development
@@ -110,35 +111,35 @@ services:
   #   ENTRYPOINT ["fetch-config.sh"]
   #   CMD ["node", "dist/main.js"]  (or whatever the original CMD was)
 
-  local-notification-service:
+  notification-service:
     environment:
       SERVICE_URLS_API: http://local-service-urls-api:8085
       CONFIG_ENV: development
       CONFIG_API_KEY: ${CONFIG_API_KEY:-qk_dev_masterkey_2024}
       CONFIG_OPTIONAL: "true"
 
-  local-security-service:
+  security-service:
     environment:
       SERVICE_URLS_API: http://local-service-urls-api:8085
       CONFIG_ENV: development
       CONFIG_API_KEY: ${CONFIG_API_KEY:-qk_dev_masterkey_2024}
       CONFIG_OPTIONAL: "true"
 
-  local-presence-service:
+  presence-service:
     environment:
       SERVICE_URLS_API: http://local-service-urls-api:8085
       CONFIG_ENV: development
       CONFIG_API_KEY: ${CONFIG_API_KEY:-qk_dev_masterkey_2024}
       CONFIG_OPTIONAL: "true"
 
-  local-message-service:
+  message-service:
     environment:
       SERVICE_URLS_API: http://local-service-urls-api:8085
       CONFIG_ENV: development
       CONFIG_API_KEY: ${CONFIG_API_KEY:-qk_dev_masterkey_2024}
       CONFIG_OPTIONAL: "true"
 
-  local-backend-gateway:
+  go-bff:
     environment:
       SERVICE_URLS_API: http://local-service-urls-api:8085
       CONFIG_ENV: development

@@ -1,0 +1,32 @@
+name: "CI/CD — workspace-service"
+
+on:
+  push:
+    branches: [main]
+    paths: ['services/workspace-service/**']
+  pull_request:
+    paths: ['services/workspace-service/**']
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+      - name: Run tests
+        working-directory: services/workspace-service
+        run: go test -v ./...
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    uses: ./.github/workflows/reusable-service-deploy.yml
+    with:
+      service_name: workspace-service
+      service_path: services/workspace-service
+      language: go
+      port: '5004'
+    secrets: inherit

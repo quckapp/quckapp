@@ -1,0 +1,10 @@
+setup.py
+tests/__init__.py
+tests/test_middleware.py
+version_middleware/__init__.py
+version_middleware/middleware.py
+version_middleware.egg-info/PKG-INFO
+version_middleware.egg-info/SOURCES.txt
+version_middleware.egg-info/dependency_links.txt
+version_middleware.egg-info/requires.txt
+version_middleware.egg-info/top_level.txt

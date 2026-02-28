@@ -1,0 +1,35 @@
+name: "CI/CD — Kong Config"
+
+on:
+  push:
+    branches: [main]
+    paths: ['kong/**']
+  pull_request:
+    paths: ['kong/**']
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Kong config
+        run: |
+          docker run --rm -v ${{ github.workspace }}/kong:/kong \
+            kong/deck:latest validate /kong/kong.yml
+
+  deploy-dev:
+    needs: validate
+    if: github.ref == 'refs/heads/main'
+    environment: development
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - run: |
+          az aks get-credentials --resource-group quckapp-dev --name quckapp-dev-aks
+          kubectl create configmap kong-config --from-file=kong.yml=kong/kong.yml \
+            -n quckapp --dry-run=client -o yaml | kubectl apply -f -
+          kubectl rollout restart deployment/kong -n quckapp

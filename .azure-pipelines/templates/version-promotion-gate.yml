@@ -1,0 +1,51 @@
+# =============================================================================
+# Version Promotion Gate — Azure Pipelines Template
+# =============================================================================
+# Calls each service's own promotion endpoint to validate that a version
+# can be promoted to the target environment. Fails the pipeline if blocked.
+#
+# Usage:
+#   - template: templates/version-promotion-gate.yml
+#     parameters:
+#       serviceKey: 'user-service'
+#       apiVersion: 'v1'
+#       targetEnvironment: 'production'
+#       namespace: 'quckapp'
+# =============================================================================
+
+parameters:
+  - name: serviceKey
+    type: string
+  - name: apiVersion
+    type: string
+    default: 'v1'
+  - name: targetEnvironment
+    type: string
+  - name: namespace
+    type: string
+    default: 'quckapp'
+
+steps:
+  - script: |
+      SVC="${{ parameters.serviceKey }}"
+      VER="${{ parameters.apiVersion }}"
+      TARGET="${{ parameters.targetEnvironment }}"
+      NS="${{ parameters.namespace }}"
+      RESPONSE=$(kubectl run promo-check-$(Build.BuildId) --rm -i --restart=Never \
+        --image=curlimages/curl:8.5.0 -n ${NS} --timeout=30s \
+        -- curl -sf "http://${SVC}.${NS}.svc.cluster.local/api/v1/promotion/can-promote?serviceKey=${SVC}&apiVersion=${VER}&toEnvironment=${TARGET}" \
+        2>/dev/null) || true
+
+      if [ -z "$RESPONSE" ]; then
+        echo "##vso[task.logissue type=warning]Promotion gate service unavailable — allowing deployment"
+      else
+        ALLOWED=$(echo "$RESPONSE" | jq -r '.data.allowed')
+        if [ "$ALLOWED" == "false" ]; then
+          REASON=$(echo "$RESPONSE" | jq -r '.data.reason // .data.blockedReason // "unknown"')
+          echo "##vso[task.logissue type=error]Promotion gate blocked: $REASON"
+          exit 1
+        fi
+      fi
+
+      echo "Promotion gate passed: ${SVC} ${VER} -> ${TARGET}"
+    displayName: 'Check Version Promotion Gate'

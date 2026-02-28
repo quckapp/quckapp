@@ -30,7 +30,7 @@ permissions:
 
 env:
   AWS_REGION: us-east-1
-  ECR_REPOSITORY_API: quckapp/api
+  ECR_REPOSITORY_API: quckapp/api/v1
   ECR_REPOSITORY_WORKER: quckapp/worker
   EKS_CLUSTER_DEV: quckapp
   EKS_CLUSTER_PROD: quckapp-prod
@@ -125,7 +125,7 @@ jobs:
         run: |
           cd infrastructure/k8s/overlays/dev
           kustomize edit set image \
-            quckapp/api=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_API }}:${{ needs.build.outputs.image_tag }} \
+            quckapp/api/v1=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_API }}:${{ needs.build.outputs.image_tag }} \
             quckapp/worker=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_WORKER }}:${{ needs.build.outputs.image_tag }}
 
       - name: Deploy to dev
@@ -174,7 +174,7 @@ jobs:
         run: |
           cd infrastructure/k8s/overlays/prod
           kustomize edit set image \
-            quckapp/api=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_API }}:${{ needs.build.outputs.image_tag }} \
+            quckapp/api/v1=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_API }}:${{ needs.build.outputs.image_tag }} \
             quckapp/worker=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY_WORKER }}:${{ needs.build.outputs.image_tag }}
 
       - name: Deploy to prod
@@ -190,6 +190,29 @@ jobs:
         run: |
           kubectl get pods -n quckapp-prod -l app.kubernetes.io/name=quckapp
           kubectl get ingress -n quckapp-prod
+
+      - name: Check promotion gate (per-service)
+        run: |
+          RESPONSE=$(kubectl run promo-check-${GITHUB_RUN_ID} --rm -i --restart=Never \
+            --image=curlimages/curl:8.5.0 -n quckapp-prod --timeout=30s \
+            -- curl -sf "http://prod-quckapp-api.quckapp-prod.svc.cluster.local/api/v1/promotion/can-promote?serviceKey=quckapp-api&apiVersion=v1&toEnvironment=production" \
+            2>/dev/null) || true
+          if [ -n "$RESPONSE" ]; then
+            ALLOWED=$(echo "$RESPONSE" | jq -r '.data.allowed')
+            if [ "$ALLOWED" == "false" ]; then
+              REASON=$(echo "$RESPONSE" | jq -r '.data.reason // .data.blockedReason // "unknown"')
+              echo "::warning::Promotion gate: $REASON"
+            fi
+          fi
+
+      - name: Record promotion to production
+        run: |
+          kubectl run promo-record-${GITHUB_RUN_ID} --rm -i --restart=Never \
+            --image=curlimages/curl:8.5.0 -n quckapp-prod --timeout=30s \
+            -- curl -sf -X POST "http://prod-quckapp-api.quckapp-prod.svc.cluster.local/api/v1/promotion/promote" \
+            -H "Content-Type: application/json" \
+            -d '{"serviceKey":"quckapp-api","apiVersion":"v1","fromEnvironment":"staging","toEnvironment":"production","promotedBy":"github-actions"}' \
+            || echo "::warning::Promotion recording failed (non-fatal)"
 
       - name: Run smoke tests
         run: |
