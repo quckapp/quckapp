@@ -248,3 +248,18 @@ jobs:
           echo "- **Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.name }}:${{ needs.prepare.outputs.image-tag }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Digest:** \`${{ steps.build.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Stack:** ${{ matrix.stack }}" >> $GITHUB_STEP_SUMMARY
+
+  # ==========================================================================
+  # Trigger Azure Pipelines CD
+  # ==========================================================================
+  trigger-cd:
+    name: Trigger Azure CD
+    needs: [build, prepare]
+    if: inputs.push && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/trigger-azure-cd.yml
+    with:
+      service_name: ${{ inputs.service }}
+      image_tag: ${{ needs.prepare.outputs.image-tag }}
+    secrets:
+      AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+      AZURE_DEVOPS_ORG: ${{ secrets.AZURE_DEVOPS_ORG }}

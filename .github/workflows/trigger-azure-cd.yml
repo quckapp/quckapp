@@ -1,0 +1,71 @@
+# .github/workflows/trigger-azure-cd.yml
+# Trigger Azure Pipelines CD after successful CI build
+name: Trigger Azure CD
+
+on:
+  workflow_call:
+    inputs:
+      service_name:
+        required: true
+        type: string
+      image_tag:
+        required: true
+        type: string
+    secrets:
+      AZURE_DEVOPS_PAT:
+        required: true
+      AZURE_DEVOPS_ORG:
+        required: true
+
+jobs:
+  trigger-cd:
+    name: Trigger Azure Pipelines CD
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Azure Pipeline
+        env:
+          SERVICE: ${{ inputs.service_name }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          ORG: ${{ secrets.AZURE_DEVOPS_ORG }}
+          PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+          PROJECT: QuckApp
+        run: |
+          # Pipeline name convention: cd-{service-name}
+          PIPELINE_NAME="cd-${SERVICE}"
+
+          echo "Triggering Azure Pipeline: $PIPELINE_NAME"
+          echo "  Service: $SERVICE"
+          echo "  Image Tag: $IMAGE_TAG"
+
+          # Get pipeline ID by name
+          PIPELINE_ID=$(curl -sf \
+            -u ":$PAT" \
+            "https://dev.azure.com/$ORG/$PROJECT/_apis/pipelines?api-version=7.0" \
+            | jq -r ".value[] | select(.name == \"$PIPELINE_NAME\") | .id")
+
+          if [ -z "$PIPELINE_ID" ] || [ "$PIPELINE_ID" = "null" ]; then
+            echo "::warning::Pipeline '$PIPELINE_NAME' not found in Azure DevOps. Skipping CD trigger."
+            exit 0
+          fi
+
+          echo "Found pipeline ID: $PIPELINE_ID"
+
+          # Trigger the pipeline
+          curl -sf -X POST \
+            -u ":$PAT" \
+            -H "Content-Type: application/json" \
+            "https://dev.azure.com/$ORG/$PROJECT/_apis/pipelines/$PIPELINE_ID/runs?api-version=7.0" \
+            -d "{
+              \"templateParameters\": {
+                \"imageTag\": \"$IMAGE_TAG\"
+              },
+              \"resources\": {
+                \"repositories\": {
+                  \"self\": {
+                    \"refName\": \"refs/heads/main\"
+                  }
+                }
+              }
+            }"
+
+          echo "Azure Pipeline triggered successfully"
