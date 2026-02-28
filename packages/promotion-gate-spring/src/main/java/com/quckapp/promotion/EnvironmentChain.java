@@ -87,6 +87,23 @@ public final class EnvironmentChain {
     }
 
     /**
+     * Returns the environment immediately after {@code env} in the chain,
+     * or {@code null} if {@code env} is the last entry ("live") or is
+     * not found in the chain.
+     *
+     * @param env the target environment (will be normalised)
+     * @return the next environment, or {@code null}
+     */
+    public static String nextOf(String env) {
+        String normalised = normalize(env);
+        int index = CHAIN.indexOf(normalised);
+        if (index < 0 || index >= CHAIN.size() - 1) {
+            return null;
+        }
+        return CHAIN.get(index + 1);
+    }
+
+    /**
      * Returns {@code true} if the given environment is unrestricted —
      * i.e. promotions into it do not require approval.
      *
