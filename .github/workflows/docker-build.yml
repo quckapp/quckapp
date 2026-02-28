@@ -255,7 +255,7 @@ jobs:
   trigger-cd:
     name: Trigger Azure CD
     needs: [build, prepare]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: inputs.push && github.ref == 'refs/heads/main'
     uses: ./.github/workflows/trigger-azure-cd.yml
     with:
       service_name: ${{ inputs.service }}
