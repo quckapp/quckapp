@@ -331,3 +331,49 @@ jobs:
           echo "| Database | Build | Migration |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|-------|-----------|" >> $GITHUB_STEP_SUMMARY
           echo "| All | ${{ needs.build.result }} | ${{ needs.run-migrations.result }} |" >> $GITHUB_STEP_SUMMARY
+
+  # ===========================================================================
+  # Trigger Azure Pipelines CD (full environment promotion)
+  # ===========================================================================
+  trigger-azure-cd:
+    name: Trigger Azure CD (${{ matrix.name }})
+    needs: [prepare, build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
+    steps:
+      - name: Trigger Azure Pipeline
+        env:
+          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+          AZURE_DEVOPS_ORG: ${{ secrets.AZURE_DEVOPS_ORG }}
+          DATABASE: ${{ matrix.name }}
+          IMAGE_TAG: ${{ needs.prepare.outputs.image_tag }}
+        run: |
+          PIPELINE_NAME="cd-${DATABASE}-migrations"
+
+          echo "Triggering Azure Pipeline: $PIPELINE_NAME (tag: $IMAGE_TAG)"
+
+          PIPELINE_ID=$(curl -sf \
+            -u ":$AZURE_DEVOPS_PAT" \
+            "https://dev.azure.com/$AZURE_DEVOPS_ORG/QuckApp/_apis/pipelines?api-version=7.0" \
+            | jq -r ".value[] | select(.name == \"$PIPELINE_NAME\") | .id")
+
+          if [ -z "$PIPELINE_ID" ] || [ "$PIPELINE_ID" = "null" ]; then
+            echo "::warning::Pipeline '$PIPELINE_NAME' not found in Azure DevOps. Skipping."
+            exit 0
+          fi
+
+          curl -sf -X POST \
+            -u ":$AZURE_DEVOPS_PAT" \
+            -H "Content-Type: application/json" \
+            "https://dev.azure.com/$AZURE_DEVOPS_ORG/QuckApp/_apis/pipelines/$PIPELINE_ID/runs?api-version=7.0" \
+            -d "{
+              \"templateParameters\": {
+                \"imageTag\": \"$IMAGE_TAG\",
+                \"service\": \"all\"
+              }
+            }"
+
+          echo "Triggered $PIPELINE_NAME successfully"
