@@ -1,0 +1,33 @@
+# ============================================================================
+# Elasticsearch Development Configuration for QuckApp
+# Single-node setup with security disabled for local development.
+# ============================================================================
+
+cluster.name: quckapp-dev
+node.name: quckapp-es-01
+
+# Network
+network.host: 0.0.0.0
+http.port: 9200
+transport.port: 9300
+
+# Single-node discovery
+discovery.type: single-node
+
+# Disable security for development
+xpack.security.enabled: false
+xpack.security.enrollment.enabled: false
+
+# ILM
+xpack.ilm.enabled: true
+
+# Memory
+indices.memory.index_buffer_size: 20%
+
+# Path
+path.data: /usr/share/elasticsearch/data
+path.logs: /usr/share/elasticsearch/logs
+
+# Logging
+logger.level: INFO
+logger.org.elasticsearch.discovery: DEBUG

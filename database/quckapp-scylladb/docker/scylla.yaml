@@ -1,0 +1,48 @@
+# ============================================================================
+# ScyllaDB Development Configuration for QuckApp
+# Single-node setup for local development and testing.
+# ============================================================================
+
+cluster_name: 'quckapp-dev'
+num_tokens: 256
+
+listen_address: 0.0.0.0
+rpc_address: 0.0.0.0
+broadcast_rpc_address: 127.0.0.1
+
+seed_provider:
+  - class_name: org.apache.cassandra.locator.SimpleSeedProvider
+    parameters:
+      - seeds: "127.0.0.1"
+
+native_transport_port: 9042
+rpc_port: 9160
+
+data_file_directories:
+  - /var/lib/scylla/data
+
+commitlog_directory: /var/lib/scylla/commitlog
+
+# Development-friendly resource limits
+developer_mode: true
+experimental: false
+
+# Compaction
+compaction_throughput_mb_per_sec: 64
+
+# Memory
+commitlog_total_space_in_mb: 256
+
+# Networking
+batch_size_warn_threshold_in_kb: 128
+batch_size_fail_threshold_in_kb: 1024
+
+# Timeouts
+read_request_timeout_in_ms: 5000
+write_request_timeout_in_ms: 2000
+counter_write_request_timeout_in_ms: 5000
+request_timeout_in_ms: 10000
+
+# Auth (disabled for development)
+authenticator: AllowAllAuthenticator
+authorizer: AllowAllAuthorizer

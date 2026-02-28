@@ -1,0 +1,63 @@
+{
+  "TableName": "user_sessions",
+  "KeySchema": [
+    {
+      "AttributeName": "user_id",
+      "KeyType": "HASH"
+    },
+    {
+      "AttributeName": "session_id",
+      "KeyType": "RANGE"
+    }
+  ],
+  "AttributeDefinitions": [
+    {
+      "AttributeName": "user_id",
+      "AttributeType": "S"
+    },
+    {
+      "AttributeName": "session_id",
+      "AttributeType": "S"
+    },
+    {
+      "AttributeName": "token",
+      "AttributeType": "S"
+    }
+  ],
+  "GlobalSecondaryIndexes": [
+    {
+      "IndexName": "token-index",
+      "KeySchema": [
+        {
+          "AttributeName": "token",
+          "KeyType": "HASH"
+        }
+      ],
+      "Projection": {
+        "ProjectionType": "ALL"
+      },
+      "ProvisionedThroughput": {
+        "ReadCapacityUnits": 10,
+        "WriteCapacityUnits": 10
+      }
+    }
+  ],
+  "ProvisionedThroughput": {
+    "ReadCapacityUnits": 10,
+    "WriteCapacityUnits": 10
+  },
+  "TimeToLiveSpecification": {
+    "AttributeName": "expires_at",
+    "Enabled": true
+  },
+  "Tags": [
+    {
+      "Key": "Project",
+      "Value": "quckapp"
+    },
+    {
+      "Key": "Service",
+      "Value": "auth-service"
+    }
+  ]
+}

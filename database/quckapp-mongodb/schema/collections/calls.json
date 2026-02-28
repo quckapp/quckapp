@@ -1,0 +1,164 @@
+{
+  "$jsonSchema": {
+    "bsonType": "object",
+    "title": "calls",
+    "description": "Schema for the calls collection used by call-service (Elixir/Phoenix)",
+    "required": [
+      "workspace_id",
+      "channel_id",
+      "initiator_id",
+      "call_type",
+      "status",
+      "participants",
+      "started_at",
+      "created_at"
+    ],
+    "properties": {
+      "_id": {
+        "bsonType": "objectId",
+        "description": "Unique call identifier"
+      },
+      "workspace_id": {
+        "bsonType": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "description": "Workspace this call belongs to"
+      },
+      "channel_id": {
+        "bsonType": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "description": "Channel the call is associated with"
+      },
+      "initiator_id": {
+        "bsonType": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "description": "User ID of the person who started the call"
+      },
+      "call_type": {
+        "bsonType": "string",
+        "enum": ["audio", "video", "screen_share"],
+        "description": "Type of call"
+      },
+      "status": {
+        "bsonType": "string",
+        "enum": ["ringing", "active", "on_hold", "ended", "missed", "declined"],
+        "description": "Current call status"
+      },
+      "participants": {
+        "bsonType": "array",
+        "description": "List of call participants",
+        "items": {
+          "bsonType": "object",
+          "required": ["user_id", "role", "joined_at"],
+          "properties": {
+            "user_id": {
+              "bsonType": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "Participant user ID"
+            },
+            "role": {
+              "bsonType": "string",
+              "enum": ["initiator", "participant", "observer"],
+              "description": "Role in the call"
+            },
+            "joined_at": {
+              "bsonType": "date",
+              "description": "When the participant joined"
+            },
+            "left_at": {
+              "bsonType": "date",
+              "description": "When the participant left (null if still active)"
+            },
+            "muted": {
+              "bsonType": "bool",
+              "description": "Whether the participant is muted"
+            },
+            "video_enabled": {
+              "bsonType": "bool",
+              "description": "Whether video is enabled"
+            },
+            "screen_sharing": {
+              "bsonType": "bool",
+              "description": "Whether participant is sharing screen"
+            }
+          }
+        }
+      },
+      "settings": {
+        "bsonType": "object",
+        "description": "Call settings and configuration",
+        "properties": {
+          "max_participants": {
+            "bsonType": "int",
+            "minimum": 2,
+            "maximum": 50,
+            "description": "Maximum number of participants"
+          },
+          "recording_enabled": {
+            "bsonType": "bool",
+            "description": "Whether recording is enabled"
+          },
+          "recording_url": {
+            "bsonType": "string",
+            "maxLength": 2048,
+            "description": "URL of the call recording if available"
+          },
+          "noise_cancellation": {
+            "bsonType": "bool",
+            "description": "Whether noise cancellation is active"
+          }
+        }
+      },
+      "quality_metrics": {
+        "bsonType": "object",
+        "description": "Call quality telemetry",
+        "properties": {
+          "avg_latency_ms": {
+            "bsonType": "double",
+            "description": "Average latency in milliseconds"
+          },
+          "packet_loss_pct": {
+            "bsonType": "double",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Packet loss percentage"
+          },
+          "avg_bitrate_kbps": {
+            "bsonType": "double",
+            "description": "Average bitrate in kbps"
+          }
+        }
+      },
+      "started_at": {
+        "bsonType": "date",
+        "description": "When the call started (ringing)"
+      },
+      "connected_at": {
+        "bsonType": "date",
+        "description": "When the call was answered/connected"
+      },
+      "ended_at": {
+        "bsonType": "date",
+        "description": "When the call ended"
+      },
+      "duration_seconds": {
+        "bsonType": "int",
+        "minimum": 0,
+        "description": "Total call duration in seconds"
+      },
+      "end_reason": {
+        "bsonType": "string",
+        "enum": ["normal", "timeout", "error", "cancelled", "network_failure"],
+        "description": "Why the call ended"
+      },
+      "created_at": {
+        "bsonType": "date",
+        "description": "Document creation timestamp"
+      }
+    },
+    "additionalProperties": false
+  }
+}

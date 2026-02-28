@@ -1,0 +1,74 @@
+# ============================================================================
+# QuckApp Kafka Topics Configuration
+# ============================================================================
+
+topics:
+  - name: user.events
+    partitions: 6
+    replication_factor: 3
+    retention_ms: 604800000        # 7 days
+    cleanup_policy: delete
+    description: User registration, profile updates, account changes
+
+  - name: message.events
+    partitions: 12
+    replication_factor: 3
+    retention_ms: 2592000000       # 30 days
+    cleanup_policy: delete
+    description: Message sent, edited, deleted, reactions
+
+  - name: notification.events
+    partitions: 6
+    replication_factor: 3
+    retention_ms: 604800000        # 7 days
+    cleanup_policy: delete
+    description: Push notifications, email triggers, in-app alerts
+
+  - name: channel.events
+    partitions: 6
+    replication_factor: 3
+    retention_ms: 604800000        # 7 days
+    cleanup_policy: delete
+    description: Channel created, updated, archived, member changes
+
+  - name: audit.events
+    partitions: 6
+    replication_factor: 3
+    retention_ms: 7776000000       # 90 days
+    cleanup_policy: delete
+    description: Security and compliance audit trail
+
+  - name: presence.events
+    partitions: 6
+    replication_factor: 3
+    retention_ms: 86400000         # 1 day
+    cleanup_policy: delete
+    description: User online/offline/away status changes
+
+  - name: call.events
+    partitions: 6
+    replication_factor: 3
+    retention_ms: 604800000        # 7 days
+    cleanup_policy: delete
+    description: Voice/video call started, ended, participant changes
+
+  - name: file.events
+    partitions: 6
+    replication_factor: 3
+    retention_ms: 2592000000       # 30 days
+    cleanup_policy: delete
+    description: File uploads, downloads, deletions
+
+  - name: analytics.events
+    partitions: 12
+    replication_factor: 3
+    retention_ms: 7776000000       # 90 days
+    cleanup_policy: delete
+    description: Feature usage, performance metrics, error tracking
+
+  - name: moderation.events
+    partitions: 6
+    replication_factor: 3
+    retention_ms: 2592000000       # 30 days
+    cleanup_policy: delete
+    description: Content flagging, user reports, auto-moderation actions

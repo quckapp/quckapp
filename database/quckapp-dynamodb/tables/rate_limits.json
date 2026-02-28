@@ -1,0 +1,33 @@
+{
+  "TableName": "rate_limits",
+  "KeySchema": [
+    {
+      "AttributeName": "resource_key",
+      "KeyType": "HASH"
+    }
+  ],
+  "AttributeDefinitions": [
+    {
+      "AttributeName": "resource_key",
+      "AttributeType": "S"
+    }
+  ],
+  "ProvisionedThroughput": {
+    "ReadCapacityUnits": 25,
+    "WriteCapacityUnits": 25
+  },
+  "TimeToLiveSpecification": {
+    "AttributeName": "expires_at",
+    "Enabled": true
+  },
+  "Tags": [
+    {
+      "Key": "Project",
+      "Value": "quckapp"
+    },
+    {
+      "Key": "Service",
+      "Value": "gateway-service"
+    }
+  ]
+}

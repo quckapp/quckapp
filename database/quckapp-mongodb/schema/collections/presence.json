@@ -1,0 +1,70 @@
+{
+  "$jsonSchema": {
+    "bsonType": "object",
+    "title": "presence",
+    "description": "Schema for the presence collection used by presence-service (Elixir/Phoenix)",
+    "required": [
+      "user_id",
+      "workspace_id",
+      "status",
+      "last_seen"
+    ],
+    "properties": {
+      "_id": {
+        "bsonType": "objectId",
+        "description": "Unique presence record identifier"
+      },
+      "user_id": {
+        "bsonType": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "description": "User this presence record belongs to"
+      },
+      "workspace_id": {
+        "bsonType": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "description": "Workspace scope for this presence"
+      },
+      "status": {
+        "bsonType": "string",
+        "enum": ["online", "away", "dnd", "offline"],
+        "description": "Current presence status"
+      },
+      "status_text": {
+        "bsonType": "string",
+        "maxLength": 256,
+        "description": "Custom status text set by the user"
+      },
+      "status_emoji": {
+        "bsonType": ["string", "null"],
+        "maxLength": 64,
+        "description": "Custom status emoji code"
+      },
+      "device": {
+        "bsonType": "string",
+        "enum": ["desktop", "mobile", "web", "api"],
+        "description": "Client device type"
+      },
+      "client_version": {
+        "bsonType": "string",
+        "maxLength": 32,
+        "description": "Client application version"
+      },
+      "ip_address": {
+        "bsonType": "string",
+        "maxLength": 45,
+        "description": "Client IP address (IPv4 or IPv6)"
+      },
+      "last_seen": {
+        "bsonType": "date",
+        "description": "Last heartbeat timestamp; TTL index expires after 5 minutes"
+      },
+      "connected_at": {
+        "bsonType": "date",
+        "description": "When the user initially connected in this session"
+      }
+    },
+    "additionalProperties": false
+  }
+}

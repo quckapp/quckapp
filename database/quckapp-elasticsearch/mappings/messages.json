@@ -1,0 +1,89 @@
+{
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "message_id": {
+        "type": "keyword"
+      },
+      "content": {
+        "type": "text",
+        "analyzer": "content_analyzer",
+        "search_analyzer": "standard",
+        "fields": {
+          "exact": {
+            "type": "keyword",
+            "ignore_above": 8191
+          }
+        }
+      },
+      "sender_id": {
+        "type": "keyword"
+      },
+      "channel_id": {
+        "type": "keyword"
+      },
+      "workspace_id": {
+        "type": "keyword"
+      },
+      "thread_id": {
+        "type": "keyword"
+      },
+      "message_type": {
+        "type": "keyword"
+      },
+      "created_at": {
+        "type": "date",
+        "format": "strict_date_optional_time||epoch_millis"
+      },
+      "updated_at": {
+        "type": "date",
+        "format": "strict_date_optional_time||epoch_millis"
+      },
+      "is_edited": {
+        "type": "boolean"
+      },
+      "is_deleted": {
+        "type": "boolean"
+      },
+      "attachments": {
+        "type": "nested",
+        "properties": {
+          "file_id": {
+            "type": "keyword"
+          },
+          "filename": {
+            "type": "text",
+            "fields": {
+              "keyword": {
+                "type": "keyword"
+              }
+            }
+          },
+          "mime_type": {
+            "type": "keyword"
+          },
+          "size_bytes": {
+            "type": "long"
+          }
+        }
+      },
+      "mentions": {
+        "type": "keyword"
+      },
+      "reactions": {
+        "type": "nested",
+        "properties": {
+          "emoji": {
+            "type": "keyword"
+          },
+          "user_ids": {
+            "type": "keyword"
+          },
+          "count": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  }
+}

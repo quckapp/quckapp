@@ -1,0 +1,49 @@
+{
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "user_id": {
+        "type": "keyword"
+      },
+      "display_name": {
+        "type": "text",
+        "analyzer": "autocomplete_analyzer",
+        "search_analyzer": "standard",
+        "fields": {
+          "keyword": {
+            "type": "keyword"
+          }
+        }
+      },
+      "email": {
+        "type": "keyword"
+      },
+      "username": {
+        "type": "keyword"
+      },
+      "bio": {
+        "type": "text",
+        "analyzer": "content_analyzer",
+        "search_analyzer": "standard"
+      },
+      "avatar_url": {
+        "type": "keyword",
+        "index": false
+      },
+      "status": {
+        "type": "keyword"
+      },
+      "workspace_ids": {
+        "type": "keyword"
+      },
+      "created_at": {
+        "type": "date",
+        "format": "strict_date_optional_time||epoch_millis"
+      },
+      "updated_at": {
+        "type": "date",
+        "format": "strict_date_optional_time||epoch_millis"
+      }
+    }
+  }
+}

@@ -1,0 +1,165 @@
+{
+  "$jsonSchema": {
+    "bsonType": "object",
+    "title": "messages",
+    "description": "Schema for the messages collection used by message-service (Elixir/Phoenix)",
+    "required": [
+      "workspace_id",
+      "channel_id",
+      "sender_id",
+      "sender_name",
+      "content",
+      "message_type",
+      "created_at",
+      "updated_at"
+    ],
+    "properties": {
+      "_id": {
+        "bsonType": "objectId",
+        "description": "Unique message identifier"
+      },
+      "workspace_id": {
+        "bsonType": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "description": "Workspace this message belongs to"
+      },
+      "channel_id": {
+        "bsonType": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "description": "Channel this message was sent in"
+      },
+      "thread_id": {
+        "bsonType": ["string", "null"],
+        "description": "Parent thread ID if this is a threaded reply"
+      },
+      "sender_id": {
+        "bsonType": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "description": "User ID of the message sender"
+      },
+      "sender_name": {
+        "bsonType": "string",
+        "minLength": 1,
+        "maxLength": 256,
+        "description": "Display name of the sender at time of sending"
+      },
+      "content": {
+        "bsonType": "string",
+        "maxLength": 40000,
+        "description": "Message body text (plain text or markdown)"
+      },
+      "message_type": {
+        "bsonType": "string",
+        "enum": ["text", "system", "bot", "ephemeral", "slash_command"],
+        "description": "Type of message"
+      },
+      "reactions": {
+        "bsonType": "array",
+        "description": "Emoji reactions on this message",
+        "items": {
+          "bsonType": "object",
+          "required": ["emoji", "user_id", "created_at"],
+          "properties": {
+            "emoji": {
+              "bsonType": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "user_id": {
+              "bsonType": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "created_at": {
+              "bsonType": "date"
+            }
+          }
+        }
+      },
+      "attachments": {
+        "bsonType": "array",
+        "description": "File attachments",
+        "items": {
+          "bsonType": "object",
+          "required": ["file_id", "filename", "mime_type", "file_size"],
+          "properties": {
+            "file_id": {
+              "bsonType": "string"
+            },
+            "filename": {
+              "bsonType": "string",
+              "maxLength": 512
+            },
+            "mime_type": {
+              "bsonType": "string",
+              "maxLength": 128
+            },
+            "file_size": {
+              "bsonType": "long",
+              "minimum": 0,
+              "description": "File size in bytes"
+            },
+            "url": {
+              "bsonType": "string",
+              "maxLength": 2048
+            }
+          }
+        }
+      },
+      "mentions": {
+        "bsonType": "array",
+        "description": "Users mentioned in this message",
+        "items": {
+          "bsonType": "object",
+          "required": ["user_id"],
+          "properties": {
+            "user_id": {
+              "bsonType": "string",
+              "maxLength": 64
+            },
+            "offset": {
+              "bsonType": "int",
+              "minimum": 0
+            },
+            "length": {
+              "bsonType": "int",
+              "minimum": 0
+            }
+          }
+        }
+      },
+      "edited": {
+        "bsonType": "bool",
+        "description": "Whether this message has been edited"
+      },
+      "edited_at": {
+        "bsonType": "date",
+        "description": "Timestamp of the last edit"
+      },
+      "pinned": {
+        "bsonType": "bool",
+        "description": "Whether this message is pinned in the channel"
+      },
+      "metadata": {
+        "bsonType": "object",
+        "description": "Arbitrary metadata (system events, bot payloads, etc.)"
+      },
+      "deleted_at": {
+        "bsonType": "date",
+        "description": "Soft-delete timestamp; TTL index will auto-purge after 30 days"
+      },
+      "created_at": {
+        "bsonType": "date",
+        "description": "Message creation timestamp"
+      },
+      "updated_at": {
+        "bsonType": "date",
+        "description": "Last update timestamp"
+      }
+    },
+    "additionalProperties": false
+  }
+}

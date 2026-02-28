@@ -1,0 +1,66 @@
+{
+  "type": "record",
+  "name": "UserEvent",
+  "namespace": "com.quckapp.events.user",
+  "doc": "Event emitted when a user account action occurs.",
+  "fields": [
+    {
+      "name": "event_id",
+      "type": "string",
+      "doc": "Unique event identifier (UUID v4)."
+    },
+    {
+      "name": "event_type",
+      "type": {
+        "type": "enum",
+        "name": "UserEventType",
+        "symbols": [
+          "USER_REGISTERED",
+          "USER_UPDATED",
+          "USER_DELETED",
+          "USER_SUSPENDED",
+          "USER_REACTIVATED",
+          "PASSWORD_CHANGED",
+          "EMAIL_VERIFIED",
+          "AVATAR_UPDATED"
+        ]
+      },
+      "doc": "Type of user event."
+    },
+    {
+      "name": "user_id",
+      "type": "string",
+      "doc": "ID of the affected user."
+    },
+    {
+      "name": "workspace_id",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Workspace context, if applicable."
+    },
+    {
+      "name": "actor_id",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "ID of the user or system that triggered the event."
+    },
+    {
+      "name": "data",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "JSON-encoded payload with event-specific details."
+    },
+    {
+      "name": "ip_address",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Originating IP address."
+    },
+    {
+      "name": "timestamp",
+      "type": "long",
+      "logicalType": "timestamp-millis",
+      "doc": "Event timestamp in epoch milliseconds."
+    }
+  ]
+}

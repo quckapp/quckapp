@@ -1,0 +1,161 @@
+{
+  "$jsonSchema": {
+    "bsonType": "object",
+    "title": "media_files",
+    "description": "Schema for the media_files collection used by media-service (Go)",
+    "required": [
+      "workspace_id",
+      "channel_id",
+      "uploaded_by",
+      "filename",
+      "original_filename",
+      "mime_type",
+      "file_size",
+      "file_hash",
+      "storage_path",
+      "status",
+      "created_at"
+    ],
+    "properties": {
+      "_id": {
+        "bsonType": "objectId",
+        "description": "Unique file record identifier"
+      },
+      "workspace_id": {
+        "bsonType": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "description": "Workspace this file belongs to"
+      },
+      "channel_id": {
+        "bsonType": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "description": "Channel where the file was shared"
+      },
+      "message_id": {
+        "bsonType": ["string", "null"],
+        "maxLength": 64,
+        "description": "Message this file is attached to (if any)"
+      },
+      "uploaded_by": {
+        "bsonType": "string",
+        "minLength": 1,
+        "maxLength": 64,
+        "description": "User ID of the uploader"
+      },
+      "filename": {
+        "bsonType": "string",
+        "minLength": 1,
+        "maxLength": 512,
+        "description": "Stored filename (may be sanitized/renamed)"
+      },
+      "original_filename": {
+        "bsonType": "string",
+        "minLength": 1,
+        "maxLength": 512,
+        "description": "Original filename as uploaded by the user"
+      },
+      "mime_type": {
+        "bsonType": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "description": "MIME type of the file (e.g., image/png, application/pdf)"
+      },
+      "file_size": {
+        "bsonType": "long",
+        "minimum": 0,
+        "description": "File size in bytes"
+      },
+      "file_hash": {
+        "bsonType": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "description": "SHA-256 hash of the file contents for deduplication"
+      },
+      "storage_path": {
+        "bsonType": "string",
+        "minLength": 1,
+        "maxLength": 1024,
+        "description": "Path in object storage (S3/GCS/Azure Blob)"
+      },
+      "storage_bucket": {
+        "bsonType": "string",
+        "maxLength": 256,
+        "description": "Object storage bucket name"
+      },
+      "cdn_url": {
+        "bsonType": "string",
+        "maxLength": 2048,
+        "description": "CDN URL for serving the file"
+      },
+      "thumbnail_url": {
+        "bsonType": "string",
+        "maxLength": 2048,
+        "description": "URL of the generated thumbnail (for images/videos)"
+      },
+      "status": {
+        "bsonType": "string",
+        "enum": ["uploading", "processing", "ready", "failed", "quarantined"],
+        "description": "File processing status"
+      },
+      "dimensions": {
+        "bsonType": "object",
+        "description": "Image/video dimensions",
+        "properties": {
+          "width": {
+            "bsonType": "int",
+            "minimum": 0,
+            "description": "Width in pixels"
+          },
+          "height": {
+            "bsonType": "int",
+            "minimum": 0,
+            "description": "Height in pixels"
+          },
+          "duration_seconds": {
+            "bsonType": "double",
+            "minimum": 0,
+            "description": "Duration for audio/video files"
+          }
+        }
+      },
+      "virus_scan": {
+        "bsonType": "object",
+        "description": "Virus/malware scan result",
+        "properties": {
+          "scanned": {
+            "bsonType": "bool"
+          },
+          "clean": {
+            "bsonType": "bool"
+          },
+          "scanner_version": {
+            "bsonType": "string",
+            "maxLength": 64
+          },
+          "scanned_at": {
+            "bsonType": "date"
+          }
+        }
+      },
+      "metadata": {
+        "bsonType": "object",
+        "description": "Additional file metadata (EXIF, etc.)"
+      },
+      "deleted_at": {
+        "bsonType": "date",
+        "description": "Soft-delete timestamp; TTL auto-purges metadata after 30 days"
+      },
+      "created_at": {
+        "bsonType": "date",
+        "description": "Upload timestamp"
+      },
+      "updated_at": {
+        "bsonType": "date",
+        "description": "Last update timestamp"
+      }
+    },
+    "additionalProperties": false
+  }
+}

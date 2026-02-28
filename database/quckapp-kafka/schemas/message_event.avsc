@@ -1,0 +1,87 @@
+{
+  "type": "record",
+  "name": "MessageEvent",
+  "namespace": "com.quckapp.events.message",
+  "doc": "Event emitted when a messaging action occurs.",
+  "fields": [
+    {
+      "name": "event_id",
+      "type": "string",
+      "doc": "Unique event identifier (UUID v4)."
+    },
+    {
+      "name": "event_type",
+      "type": {
+        "type": "enum",
+        "name": "MessageEventType",
+        "symbols": [
+          "MESSAGE_SENT",
+          "MESSAGE_EDITED",
+          "MESSAGE_DELETED",
+          "REACTION_ADDED",
+          "REACTION_REMOVED",
+          "THREAD_CREATED",
+          "MESSAGE_PINNED",
+          "MESSAGE_UNPINNED"
+        ]
+      },
+      "doc": "Type of message event."
+    },
+    {
+      "name": "message_id",
+      "type": "string",
+      "doc": "ID of the affected message."
+    },
+    {
+      "name": "channel_id",
+      "type": "string",
+      "doc": "Channel where the message resides."
+    },
+    {
+      "name": "workspace_id",
+      "type": "string",
+      "doc": "Workspace that owns the channel."
+    },
+    {
+      "name": "sender_id",
+      "type": "string",
+      "doc": "User who authored or triggered the event."
+    },
+    {
+      "name": "thread_id",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Parent message ID if this is a threaded reply."
+    },
+    {
+      "name": "content",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Message body text (null for reactions/deletions)."
+    },
+    {
+      "name": "attachments",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "record",
+          "name": "Attachment",
+          "fields": [
+            { "name": "file_id", "type": "string" },
+            { "name": "filename", "type": "string" },
+            { "name": "mime_type", "type": "string" },
+            { "name": "size_bytes", "type": "long" }
+          ]
+        }
+      },
+      "default": [],
+      "doc": "Files attached to the message."
+    },
+    {
+      "name": "timestamp",
+      "type": "long",
+      "logicalType": "timestamp-millis",
+      "doc": "Event timestamp in epoch milliseconds."
+    }
+  ]
+}
