@@ -29,7 +29,7 @@
 export type {
   Environment,
   ApiVersion,
-  ServiceCategory,
+  NpmServiceCategory as ServiceCategory,
   ServiceName,
   ServiceDefinition,
   EnvironmentVersionConfig,

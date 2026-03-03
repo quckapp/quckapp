@@ -16,10 +16,13 @@ var validEnvironments = map[string]bool{
 }
 
 type AdminHandler struct {
-	serviceUrlSvc *service.ServiceUrlService
-	infraSvc      *service.InfrastructureService
-	firebaseSvc   *service.FirebaseService
-	configSvc     *service.ConfigService
+	serviceUrlSvc     *service.ServiceUrlService
+	infraSvc          *service.InfrastructureService
+	firebaseSvc       *service.FirebaseService
+	configSvc         *service.ConfigService
+	configEntrySvc    *service.ConfigEntryService
+	versionSvc        *service.VersionService
+	versionProfileSvc *service.VersionProfileService
 }
 
 func NewAdminHandler(
@@ -27,21 +30,28 @@ func NewAdminHandler(
 	infraSvc *service.InfrastructureService,
 	firebaseSvc *service.FirebaseService,
 	configSvc *service.ConfigService,
+	configEntrySvc *service.ConfigEntryService,
+	versionSvc *service.VersionService,
+	versionProfileSvc *service.VersionProfileService,
 ) *AdminHandler {
 	return &AdminHandler{
-		serviceUrlSvc: serviceUrlSvc,
-		infraSvc:      infraSvc,
-		firebaseSvc:   firebaseSvc,
-		configSvc:     configSvc,
+		serviceUrlSvc:     serviceUrlSvc,
+		infraSvc:          infraSvc,
+		firebaseSvc:       firebaseSvc,
+		configSvc:         configSvc,
+		configEntrySvc:    configEntrySvc,
+		versionSvc:        versionSvc,
+		versionProfileSvc: versionProfileSvc,
 	}
 }
 
 type EnvironmentSummary struct {
-	Environment  string  `json:"environment"`
-	ServiceCount int64   `json:"serviceCount"`
-	InfraCount   int64   `json:"infraCount"`
-	HasFirebase  bool    `json:"hasFirebase"`
-	LastUpdated  *string `json:"lastUpdated"`
+	Environment      string  `json:"environment"`
+	ServiceCount     int64   `json:"serviceCount"`
+	InfraCount       int64   `json:"infraCount"`
+	ConfigEntryCount int64   `json:"configEntryCount"`
+	HasFirebase      bool    `json:"hasFirebase"`
+	LastUpdated      *string `json:"lastUpdated"`
 }
 
 func (h *AdminHandler) GetSummaries(c *gin.Context) {
@@ -51,12 +61,14 @@ func (h *AdminHandler) GetSummaries(c *gin.Context) {
 	for _, env := range envs {
 		svcCount, _ := h.serviceUrlSvc.CountByEnv(env)
 		infraCount, _ := h.infraSvc.CountByEnv(env)
+		configEntryCount, _ := h.configEntrySvc.CountByEnv(env)
 		hasFB, _ := h.firebaseSvc.Exists(env)
 		summaries = append(summaries, EnvironmentSummary{
-			Environment:  env,
-			ServiceCount: svcCount,
-			InfraCount:   infraCount,
-			HasFirebase:  hasFB,
+			Environment:      env,
+			ServiceCount:     svcCount,
+			InfraCount:       infraCount,
+			ConfigEntryCount: configEntryCount,
+			HasFirebase:      hasFB,
 		})
 	}
 
@@ -189,11 +201,65 @@ func (h *AdminHandler) UpsertFirebase(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": fb})
 }
 
+func (h *AdminHandler) ListConfigEntries(c *gin.Context) {
+	env := c.Param("env")
+	category := c.Query("category")
+	entries, err := h.configEntrySvc.List(env, category)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": entries})
+}
+
+func (h *AdminHandler) CreateConfigEntry(c *gin.Context) {
+	env := c.Param("env")
+	var entry model.ConfigEntry
+	if err := c.ShouldBindJSON(&entry); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	entry.Environment = env
+	if err := h.configEntrySvc.Create(&entry); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"data": entry})
+}
+
+func (h *AdminHandler) UpdateConfigEntry(c *gin.Context) {
+	env := c.Param("env")
+	key := c.Param("configKey")
+	var entry model.ConfigEntry
+	if err := c.ShouldBindJSON(&entry); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	updated, err := h.configEntrySvc.Update(env, key, &entry)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	updated.MaskValue()
+	c.JSON(http.StatusOK, gin.H{"data": updated})
+}
+
+func (h *AdminHandler) DeleteConfigEntry(c *gin.Context) {
+	env := c.Param("env")
+	key := c.Param("configKey")
+	if err := h.configEntrySvc.Delete(env, key); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
+}
+
 type BulkExportResponse struct {
 	Environment    string                      `json:"environment"`
 	Services       []model.ServiceUrl          `json:"services"`
 	Infrastructure []model.InfrastructureConfig `json:"infrastructure"`
 	Firebase       *model.FirebaseConfig       `json:"firebase"`
+	ConfigEntries  []model.ConfigEntry         `json:"configEntries"`
 }
 
 func (h *AdminHandler) Export(c *gin.Context) {
@@ -201,18 +267,21 @@ func (h *AdminHandler) Export(c *gin.Context) {
 	services, _ := h.serviceUrlSvc.List(env, "")
 	infra, _ := h.infraSvc.List(env)
 	fb, _ := h.firebaseSvc.Get(env)
+	configEntries, _ := h.configEntrySvc.List(env, "")
 
 	c.JSON(http.StatusOK, gin.H{"data": BulkExportResponse{
 		Environment:    env,
 		Services:       services,
 		Infrastructure: infra,
 		Firebase:       fb,
+		ConfigEntries:  configEntries,
 	}})
 }
 
 type BulkImportRequest struct {
 	Services       []model.ServiceUrl          `json:"services"`
 	Infrastructure []model.InfrastructureConfig `json:"infrastructure"`
+	ConfigEntries  []model.ConfigEntry         `json:"configEntries"`
 }
 
 func (h *AdminHandler) Import(c *gin.Context) {
@@ -233,6 +302,12 @@ func (h *AdminHandler) Import(c *gin.Context) {
 	for i := range req.Infrastructure {
 		req.Infrastructure[i].Environment = env
 		if err := h.infraSvc.Create(&req.Infrastructure[i]); err == nil {
+			created++
+		}
+	}
+	for i := range req.ConfigEntries {
+		req.ConfigEntries[i].Environment = env
+		if err := h.configEntrySvc.Create(&req.ConfigEntries[i]); err == nil {
 			created++
 		}
 	}
@@ -260,6 +335,7 @@ func (h *AdminHandler) Clone(c *gin.Context) {
 
 	services, _ := h.serviceUrlSvc.List(req.SourceEnv, "")
 	infra, _ := h.infraSvc.List(req.SourceEnv)
+	configEntries, _ := h.configEntrySvc.ListUnmasked(req.SourceEnv, "")
 
 	cloned := 0
 	for _, svc := range services {
@@ -284,6 +360,237 @@ func (h *AdminHandler) Clone(c *gin.Context) {
 			cloned++
 		}
 	}
+	for _, entry := range configEntries {
+		clone := entry
+		clone.ID = uuid.Nil
+		clone.Environment = req.TargetEnv
+		if req.Overwrite {
+			_ = h.configEntrySvc.Delete(req.TargetEnv, entry.ConfigKey)
+		}
+		if err := h.configEntrySvc.Create(&clone); err == nil {
+			cloned++
+		}
+	}
 
 	c.JSON(http.StatusOK, gin.H{"data": gin.H{"cloned": cloned}})
+}
+
+// ── Version Management ──
+
+func (h *AdminHandler) ListVersions(c *gin.Context) {
+	env := c.Param("env")
+	versions, err := h.versionSvc.List(env)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": versions})
+}
+
+func (h *AdminHandler) CreateVersion(c *gin.Context) {
+	env := c.Param("env")
+	var vc model.VersionConfig
+	if err := c.ShouldBindJSON(&vc); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.versionSvc.Create(env, &vc); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"data": vc})
+}
+
+func (h *AdminHandler) DeleteVersion(c *gin.Context) {
+	env := c.Param("env")
+	serviceKey := c.Param("serviceKey")
+	ver := c.Param("ver")
+	if err := h.versionSvc.Delete(env, serviceKey, ver); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
+}
+
+func (h *AdminHandler) MarkVersionReady(c *gin.Context) {
+	env := c.Param("env")
+	serviceKey := c.Param("serviceKey")
+	ver := c.Param("ver")
+	vc, err := h.versionSvc.MarkReady(env, serviceKey, ver)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": vc})
+}
+
+func (h *AdminHandler) ActivateVersion(c *gin.Context) {
+	env := c.Param("env")
+	serviceKey := c.Param("serviceKey")
+	ver := c.Param("ver")
+	vc, err := h.versionSvc.Activate(env, serviceKey, ver)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": vc})
+}
+
+func (h *AdminHandler) DeprecateVersion(c *gin.Context) {
+	env := c.Param("env")
+	serviceKey := c.Param("serviceKey")
+	ver := c.Param("ver")
+	vc, err := h.versionSvc.Deprecate(env, serviceKey, ver)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": vc})
+}
+
+func (h *AdminHandler) DisableVersion(c *gin.Context) {
+	env := c.Param("env")
+	serviceKey := c.Param("serviceKey")
+	ver := c.Param("ver")
+	vc, err := h.versionSvc.Disable(env, serviceKey, ver)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": vc})
+}
+
+type BulkPlanRequest struct {
+	ApiVersion  string   `json:"apiVersion" binding:"required"`
+	ServiceKeys []string `json:"serviceKeys" binding:"required"`
+	Changelog   string   `json:"changelog"`
+}
+
+func (h *AdminHandler) BulkPlanVersions(c *gin.Context) {
+	env := c.Param("env")
+	var req BulkPlanRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.versionSvc.BulkPlan(env, req.ApiVersion, req.ServiceKeys, req.Changelog); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"planned": len(req.ServiceKeys)}})
+}
+
+type BulkActivateRequest struct {
+	ApiVersion string `json:"apiVersion" binding:"required"`
+}
+
+func (h *AdminHandler) BulkActivateVersions(c *gin.Context) {
+	env := c.Param("env")
+	var req BulkActivateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.versionSvc.BulkActivate(env, req.ApiVersion); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"activated": true}})
+}
+
+func (h *AdminHandler) GetGlobalConfig(c *gin.Context) {
+	env := c.Param("env")
+	gc, err := h.versionSvc.GetGlobalConfig(env)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"data": nil})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": gc})
+}
+
+func (h *AdminHandler) UpdateGlobalConfig(c *gin.Context) {
+	env := c.Param("env")
+	var gc model.GlobalVersionConfig
+	if err := c.ShouldBindJSON(&gc); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.versionSvc.UpdateGlobalConfig(env, &gc); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": gc})
+}
+
+func (h *AdminHandler) ExportEnvFile(c *gin.Context) {
+	env := c.Param("env")
+	content, err := h.versionSvc.ExportEnvFile(env)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": content})
+}
+
+// ── Version Profiles ──
+
+func (h *AdminHandler) ListProfiles(c *gin.Context) {
+	profiles, err := h.versionProfileSvc.ListProfiles()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": profiles})
+}
+
+type CreateProfileRequest struct {
+	Name        string                  `json:"name" binding:"required"`
+	Description string                  `json:"description"`
+	Entries     []ProfileEntryRequest   `json:"entries" binding:"required"`
+}
+
+type ProfileEntryRequest struct {
+	ServiceKey     string `json:"serviceKey" binding:"required"`
+	ApiVersion     string `json:"apiVersion" binding:"required"`
+	ReleaseVersion string `json:"releaseVersion" binding:"required"`
+}
+
+func (h *AdminHandler) CreateProfile(c *gin.Context) {
+	var req CreateProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	entries := make([]model.VersionProfileEntry, 0, len(req.Entries))
+	for _, e := range req.Entries {
+		entries = append(entries, model.VersionProfileEntry{
+			ServiceKey:     e.ServiceKey,
+			ApiVersion:     e.ApiVersion,
+			ReleaseVersion: e.ReleaseVersion,
+		})
+	}
+
+	profile := model.VersionProfile{
+		Name:        req.Name,
+		Description: req.Description,
+		Entries:     entries,
+	}
+
+	if err := h.versionProfileSvc.CreateProfile(&profile); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"data": profile})
+}
+
+func (h *AdminHandler) ApplyProfile(c *gin.Context) {
+	profileID := c.Param("profileId")
+	env := c.Param("env")
+	count, err := h.versionProfileSvc.ApplyProfile(profileID, env)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"applied": count}})
 }

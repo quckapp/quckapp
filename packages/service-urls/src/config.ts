@@ -2,7 +2,7 @@ import {
   Environment,
   ApiVersion,
   ServiceName,
-  ServiceCategory,
+  NpmServiceCategory as ServiceCategory,
   ResolvedServiceUrl,
   EnvironmentHosts,
 } from './types';

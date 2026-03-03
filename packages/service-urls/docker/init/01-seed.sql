@@ -75,9 +75,9 @@ VALUES (
 -- =============================================================================
 -- SERVICE URLS
 -- =============================================================================
--- 31 services × 9 environments = 279 rows
+-- 32 services × 9 environments = 288 rows
 -- Categories: auth, user, workspace, messaging, realtime, media,
---             notification, analytics, ai, data, bff
+--             notification, analytics, ai, data, bff, gateway
 --
 -- Port mapping (from infrastructure/docker/.env.local):
 --   Spring Boot: auth=8081, workspace=8082, channel=8083, permission=8084,
@@ -137,7 +137,9 @@ INSERT IGNORE INTO service_urls (id, environment, service_key, category, url, de
 (UUID(), 'local', 'EXPORT_SERVICE_URL',     'data',         'http://localhost:8000',  'Data export'),
 (UUID(), 'local', 'INTEGRATION_SERVICE_URL','data',         'http://localhost:8000',  'Third-party integrations'),
 -- BFF
-(UUID(), 'local', 'GO_BFF_URL',            'bff',          'http://localhost:5010',  'Go BFF aggregation');
+(UUID(), 'local', 'GO_BFF_URL',            'bff',          'http://localhost:5010',  'Go BFF aggregation'),
+-- Gateway
+(UUID(), 'local', 'KONG_GATEWAY_URL',      'gateway',      'http://localhost:8800',  'Kong API Gateway proxy');
 
 -- ── DEVELOPMENT ─────────────────────────────────────────────────────────────
 
@@ -174,7 +176,8 @@ INSERT IGNORE INTO service_urls (id, environment, service_key, category, url, de
 (UUID(), 'development', 'SMART_REPLY_SERVICE_URL','ai',           'http://smart-reply-service:8003',        'Smart reply suggestions'),
 (UUID(), 'development', 'EXPORT_SERVICE_URL',     'data',         'http://export-service:8000',             'Data export'),
 (UUID(), 'development', 'INTEGRATION_SERVICE_URL','data',         'http://integration-service:8000',        'Third-party integrations'),
-(UUID(), 'development', 'GO_BFF_URL',            'bff',          'http://go-bff:5010',                     'Go BFF aggregation');
+(UUID(), 'development', 'GO_BFF_URL',            'bff',          'http://go-bff:5010',                     'Go BFF aggregation'),
+(UUID(), 'development', 'KONG_GATEWAY_URL',      'gateway',      'http://kong:8000',                       'Kong API Gateway proxy');
 
 -- ── QA ──────────────────────────────────────────────────────────────────────
 
@@ -211,7 +214,8 @@ INSERT IGNORE INTO service_urls (id, environment, service_key, category, url, de
 (UUID(), 'qa', 'SMART_REPLY_SERVICE_URL','ai',           'http://smart-reply-service:8003',        'Smart reply suggestions'),
 (UUID(), 'qa', 'EXPORT_SERVICE_URL',     'data',         'http://export-service:8000',             'Data export'),
 (UUID(), 'qa', 'INTEGRATION_SERVICE_URL','data',         'http://integration-service:8000',        'Third-party integrations'),
-(UUID(), 'qa', 'GO_BFF_URL',            'bff',          'http://go-bff:5010',                     'Go BFF aggregation');
+(UUID(), 'qa', 'GO_BFF_URL',            'bff',          'http://go-bff:5010',                     'Go BFF aggregation'),
+(UUID(), 'qa', 'KONG_GATEWAY_URL',      'gateway',      'http://kong:8000',                       'Kong API Gateway proxy');
 
 -- ── UAT1 ────────────────────────────────────────────────────────────────────
 
@@ -248,7 +252,8 @@ INSERT IGNORE INTO service_urls (id, environment, service_key, category, url, de
 (UUID(), 'uat1', 'SMART_REPLY_SERVICE_URL','ai',           'http://smart-reply-service:8003',        'Smart reply suggestions'),
 (UUID(), 'uat1', 'EXPORT_SERVICE_URL',     'data',         'http://export-service:8000',             'Data export'),
 (UUID(), 'uat1', 'INTEGRATION_SERVICE_URL','data',         'http://integration-service:8000',        'Third-party integrations'),
-(UUID(), 'uat1', 'GO_BFF_URL',            'bff',          'http://go-bff:5010',                     'Go BFF aggregation');
+(UUID(), 'uat1', 'GO_BFF_URL',            'bff',          'http://go-bff:5010',                     'Go BFF aggregation'),
+(UUID(), 'uat1', 'KONG_GATEWAY_URL',      'gateway',      'http://kong:8000',                       'Kong API Gateway proxy');
 
 -- ── UAT2 ────────────────────────────────────────────────────────────────────
 
@@ -285,7 +290,8 @@ INSERT IGNORE INTO service_urls (id, environment, service_key, category, url, de
 (UUID(), 'uat2', 'SMART_REPLY_SERVICE_URL','ai',           'http://smart-reply-service:8003',        'Smart reply suggestions'),
 (UUID(), 'uat2', 'EXPORT_SERVICE_URL',     'data',         'http://export-service:8000',             'Data export'),
 (UUID(), 'uat2', 'INTEGRATION_SERVICE_URL','data',         'http://integration-service:8000',        'Third-party integrations'),
-(UUID(), 'uat2', 'GO_BFF_URL',            'bff',          'http://go-bff:5010',                     'Go BFF aggregation');
+(UUID(), 'uat2', 'GO_BFF_URL',            'bff',          'http://go-bff:5010',                     'Go BFF aggregation'),
+(UUID(), 'uat2', 'KONG_GATEWAY_URL',      'gateway',      'http://kong:8000',                       'Kong API Gateway proxy');
 
 -- ── UAT3 ────────────────────────────────────────────────────────────────────
 
@@ -322,7 +328,8 @@ INSERT IGNORE INTO service_urls (id, environment, service_key, category, url, de
 (UUID(), 'uat3', 'SMART_REPLY_SERVICE_URL','ai',           'http://smart-reply-service:8003',        'Smart reply suggestions'),
 (UUID(), 'uat3', 'EXPORT_SERVICE_URL',     'data',         'http://export-service:8000',             'Data export'),
 (UUID(), 'uat3', 'INTEGRATION_SERVICE_URL','data',         'http://integration-service:8000',        'Third-party integrations'),
-(UUID(), 'uat3', 'GO_BFF_URL',            'bff',          'http://go-bff:5010',                     'Go BFF aggregation');
+(UUID(), 'uat3', 'GO_BFF_URL',            'bff',          'http://go-bff:5010',                     'Go BFF aggregation'),
+(UUID(), 'uat3', 'KONG_GATEWAY_URL',      'gateway',      'http://kong:8000',                       'Kong API Gateway proxy');
 
 -- ── STAGING ─────────────────────────────────────────────────────────────────
 
@@ -359,7 +366,8 @@ INSERT IGNORE INTO service_urls (id, environment, service_key, category, url, de
 (UUID(), 'staging', 'SMART_REPLY_SERVICE_URL','ai',           'http://smart-reply-service:8003',        'Smart reply suggestions'),
 (UUID(), 'staging', 'EXPORT_SERVICE_URL',     'data',         'http://export-service:8000',             'Data export'),
 (UUID(), 'staging', 'INTEGRATION_SERVICE_URL','data',         'http://integration-service:8000',        'Third-party integrations'),
-(UUID(), 'staging', 'GO_BFF_URL',            'bff',          'http://go-bff:5010',                     'Go BFF aggregation');
+(UUID(), 'staging', 'GO_BFF_URL',            'bff',          'http://go-bff:5010',                     'Go BFF aggregation'),
+(UUID(), 'staging', 'KONG_GATEWAY_URL',      'gateway',      'http://kong:8000',                       'Kong API Gateway proxy');
 
 -- ── PRODUCTION ──────────────────────────────────────────────────────────────
 
@@ -396,7 +404,8 @@ INSERT IGNORE INTO service_urls (id, environment, service_key, category, url, de
 (UUID(), 'production', 'SMART_REPLY_SERVICE_URL','ai',           'http://smart-reply-service:8003',        'Smart reply suggestions'),
 (UUID(), 'production', 'EXPORT_SERVICE_URL',     'data',         'http://export-service:8000',             'Data export'),
 (UUID(), 'production', 'INTEGRATION_SERVICE_URL','data',         'http://integration-service:8000',        'Third-party integrations'),
-(UUID(), 'production', 'GO_BFF_URL',            'bff',          'http://go-bff:5010',                     'Go BFF aggregation');
+(UUID(), 'production', 'GO_BFF_URL',            'bff',          'http://go-bff:5010',                     'Go BFF aggregation'),
+(UUID(), 'production', 'KONG_GATEWAY_URL',      'gateway',      'http://kong:8000',                       'Kong API Gateway proxy');
 
 -- ── LIVE (mirrors production) ───────────────────────────────────────────────
 
@@ -433,7 +442,8 @@ INSERT IGNORE INTO service_urls (id, environment, service_key, category, url, de
 (UUID(), 'live', 'SMART_REPLY_SERVICE_URL','ai',           'http://smart-reply-service:8003',        'Smart reply suggestions'),
 (UUID(), 'live', 'EXPORT_SERVICE_URL',     'data',         'http://export-service:8000',             'Data export'),
 (UUID(), 'live', 'INTEGRATION_SERVICE_URL','data',         'http://integration-service:8000',        'Third-party integrations'),
-(UUID(), 'live', 'GO_BFF_URL',            'bff',          'http://go-bff:5010',                     'Go BFF aggregation');
+(UUID(), 'live', 'GO_BFF_URL',            'bff',          'http://go-bff:5010',                     'Go BFF aggregation'),
+(UUID(), 'live', 'KONG_GATEWAY_URL',      'gateway',      'http://kong:8000',                       'Kong API Gateway proxy');
 
 
 -- =============================================================================

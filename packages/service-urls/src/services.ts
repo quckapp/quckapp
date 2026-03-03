@@ -227,4 +227,12 @@ export const SERVICE_REGISTRY: readonly ServiceDefinition[] = [
     paths: ['/conversations'],
     defaultVersion: 'v1',
   },
+
+  // ── API Gateway ─────────────────────────────────────────────────────
+  {
+    name: 'kong-gateway',
+    category: 'gateway',
+    paths: ['/'],
+    defaultVersion: 'v1',
+  },
 ] as const;

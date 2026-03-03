@@ -21,6 +21,10 @@ import {
   XCircle,
   FileDown,
   Settings,
+  Shield,
+  Eye,
+  EyeOff,
+  Layers,
 } from 'lucide-react';
 import { Header } from '../components/Layout';
 import { Button, Badge, Modal } from '../components/UI';
@@ -39,6 +43,10 @@ import {
   bulkImport,
   cloneEnvironment,
   clearEnvironmentData,
+  fetchConfigEntries,
+  createConfigEntry,
+  updateConfigEntry,
+  deleteConfigEntry,
 } from '../store/slices/serviceUrlsSlice';
 import {
   fetchVersions,
@@ -52,47 +60,52 @@ import {
   fetchGlobalConfig,
   updateGlobalConfig,
   exportEnvFile,
+  fetchProfiles,
+  createProfile,
+  applyProfile,
   clearVersionData,
 } from '../store/slices/versionSlice';
 import { showSuccessToast, showErrorToast } from '../store/slices/toastSlice';
 import {
   ENVIRONMENTS,
   ENVIRONMENT_LABELS,
-  CATEGORY_LABELS,
-  CATEGORY_COLORS,
   SERVICE_REGISTRY,
+  SERVICE_STACK_MAP,
+  TECH_STACK_LABELS,
+  TECH_STACK_COLORS,
   VERSION_STATUS_COLORS,
   VERSION_STATUS_LABELS,
+  CONFIG_CATEGORIES,
+  CONFIG_CATEGORY_LABELS,
+  CONFIG_CATEGORY_COLORS,
+  CONFIG_CATEGORY_GROUPS,
+  SERVICE_FUNC_CATEGORIES,
+  SERVICE_FUNC_LABELS,
+  SERVICE_FUNC_COLORS,
+  SERVICE_FUNC_GROUPS,
   type Environment,
-  type ServiceCategory,
+  type NpmServiceCategory,
+  type ConfigCategory,
   type ServiceUrlConfig,
   type InfrastructureConfig,
+  type ConfigEntry,
 } from '../types';
 import type { RootState, AppDispatch } from '../store';
 
-type ActiveSection = 'overview' | ServiceCategory | 'infrastructure' | 'firebase' | 'versions';
+type ActiveSection = 'overview' | NpmServiceCategory | 'infrastructure' | 'firebase' | 'config-entries' | ConfigCategory | 'versions';
 
-const SECTIONS: { key: ActiveSection; label: string }[] = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'SPRING', label: 'Spring Boot' },
-  { key: 'NESTJS', label: 'NestJS' },
-  { key: 'ELIXIR', label: 'Elixir' },
-  { key: 'GO', label: 'Go' },
-  { key: 'PYTHON', label: 'Python' },
-  { key: 'infrastructure', label: 'Infrastructure' },
-  { key: 'firebase', label: 'Firebase' },
-  { key: 'versions', label: 'Versions' },
-];
+const CONFIG_SIDEBAR_GROUPS = CONFIG_CATEGORY_GROUPS;
 
 export default function EnvironmentDetail() {
   const { envName } = useParams<{ envName: string }>();
   const dispatch = useDispatch<AppDispatch>();
-  const { services, infrastructure, firebase, loading, saveLoading } = useSelector(
+  const { services, infrastructure, firebase, configEntries, loading, saveLoading } = useSelector(
     (state: RootState) => state.serviceUrls
   );
   const {
     versions,
     globalConfig,
+    profiles,
     loading: _versionLoading,
     saveLoading: versionSaveLoading,
   } = useSelector((state: RootState) => state.versions);
@@ -110,11 +123,14 @@ export default function EnvironmentDetail() {
   const [showGlobalConfigModal, setShowGlobalConfigModal] = useState(false);
   const [editingService, setEditingService] = useState<ServiceUrlConfig | null>(null);
   const [editingInfra, setEditingInfra] = useState<InfrastructureConfig | null>(null);
+  const [showConfigEntryModal, setShowConfigEntryModal] = useState(false);
+  const [editingConfigEntry, setEditingConfigEntry] = useState<ConfigEntry | null>(null);
+  // configCategoryFilter is now driven by activeSection in the sidebar
 
   // Form states
   const [serviceForm, setServiceForm] = useState({
     serviceKey: '',
-    category: 'SPRING' as ServiceCategory,
+    category: 'auth' as NpmServiceCategory,
     url: '',
     description: '',
   });
@@ -135,6 +151,13 @@ export default function EnvironmentDetail() {
   const [importData, setImportData] = useState('');
   const [cloneTarget, setCloneTarget] = useState<Environment>('qa');
   const [cloneOverwrite, setCloneOverwrite] = useState(false);
+  const [configEntryForm, setConfigEntryForm] = useState({
+    configKey: '',
+    category: 'INFRA' as ConfigCategory,
+    configValue: '',
+    isSecret: false,
+    description: '',
+  });
 
   // Version form states
   const [bulkPlanForm, setBulkPlanForm] = useState({
@@ -145,6 +168,15 @@ export default function EnvironmentDetail() {
   const [globalConfigForm, setGlobalConfigForm] = useState({
     defaultApiVersion: '',
     defaultSunsetDays: 90,
+  });
+
+  // Profile states
+  const [showProfilesPanel, setShowProfilesPanel] = useState(false);
+  const [showCreateProfileModal, setShowCreateProfileModal] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    name: '',
+    description: '',
+    entries: [{ serviceKey: '', apiVersion: '', releaseVersion: '' }] as { serviceKey: string; apiVersion: string; releaseVersion: string }[],
   });
 
   const env = envName as Environment;
@@ -159,14 +191,17 @@ export default function EnvironmentDetail() {
     dispatch(fetchServices({ env }));
     dispatch(fetchInfrastructure(env));
     dispatch(fetchFirebase(env));
+    dispatch(fetchConfigEntries({ env }));
     dispatch(fetchVersions(env));
     dispatch(fetchGlobalConfig(env));
+    dispatch(fetchProfiles());
   }, [dispatch, env]);
 
   const handleRefresh = () => {
     dispatch(fetchServices({ env }));
     dispatch(fetchInfrastructure(env));
     dispatch(fetchFirebase(env));
+    dispatch(fetchConfigEntries({ env }));
     dispatch(fetchVersions(env));
     dispatch(fetchGlobalConfig(env));
   };
@@ -180,17 +215,13 @@ export default function EnvironmentDetail() {
 
   // ── Service CRUD ──
 
-  const openAddService = (category?: ServiceCategory) => {
+  const openAddService = (category?: NpmServiceCategory) => {
     setEditingService(null);
-    const filtered = category
-      ? availableServices.filter((s) => s.category === category)
-      : availableServices;
-    const first = filtered[0] || availableServices[0];
     setServiceForm({
-      serviceKey: first?.key || '',
-      category: first?.category || category || 'SPRING',
+      serviceKey: '',
+      category: category || 'auth',
       url: '',
-      description: first?.label || '',
+      description: '',
     });
     setShowServiceModal(true);
   };
@@ -298,6 +329,52 @@ export default function EnvironmentDetail() {
       setShowFirebaseModal(false);
     } catch {
       dispatch(showErrorToast('Failed to save Firebase config'));
+    }
+  };
+
+  // ── Config Entries CRUD ──
+
+  const openAddConfigEntry = () => {
+    setEditingConfigEntry(null);
+    setConfigEntryForm({ configKey: '', category: activeConfigCategory || 'INFRA', configValue: '', isSecret: false, description: '' });
+    setShowConfigEntryModal(true);
+  };
+
+  const openEditConfigEntry = (entry: ConfigEntry) => {
+    setEditingConfigEntry(entry);
+    setConfigEntryForm({
+      configKey: entry.configKey,
+      category: entry.category,
+      configValue: '',
+      isSecret: entry.isSecret,
+      description: entry.description,
+    });
+    setShowConfigEntryModal(true);
+  };
+
+  const handleSaveConfigEntry = async () => {
+    try {
+      if (editingConfigEntry) {
+        await dispatch(updateConfigEntry({ env, configKey: editingConfigEntry.configKey, data: configEntryForm })).unwrap();
+        dispatch(showSuccessToast('Config entry updated'));
+      } else {
+        await dispatch(createConfigEntry({ env, data: configEntryForm })).unwrap();
+        dispatch(showSuccessToast('Config entry created'));
+      }
+      setShowConfigEntryModal(false);
+      dispatch(fetchConfigEntries({ env }));
+    } catch {
+      dispatch(showErrorToast('Failed to save config entry'));
+    }
+  };
+
+  const handleDeleteConfigEntry = async (configKey: string) => {
+    if (!confirm(`Delete config entry "${configKey}"?`)) return;
+    try {
+      await dispatch(deleteConfigEntry({ env, configKey })).unwrap();
+      dispatch(showSuccessToast('Config entry deleted'));
+    } catch {
+      dispatch(showErrorToast('Failed to delete config entry'));
     }
   };
 
@@ -436,12 +513,66 @@ export default function EnvironmentDetail() {
     dispatch(exportEnvFile(env));
   };
 
+  // ── Profiles ──
+
+  const handleCreateProfile = async () => {
+    const validEntries = profileForm.entries.filter((e) => e.serviceKey && e.apiVersion && e.releaseVersion);
+    if (!profileForm.name || validEntries.length === 0) {
+      dispatch(showErrorToast('Profile needs a name and at least one complete entry'));
+      return;
+    }
+    try {
+      await dispatch(createProfile({ name: profileForm.name, description: profileForm.description, entries: validEntries })).unwrap();
+      dispatch(showSuccessToast('Profile created'));
+      setShowCreateProfileModal(false);
+      setProfileForm({ name: '', description: '', entries: [{ serviceKey: '', apiVersion: '', releaseVersion: '' }] });
+    } catch {
+      dispatch(showErrorToast('Failed to create profile'));
+    }
+  };
+
+  const handleApplyProfile = async (profileId: string) => {
+    try {
+      await dispatch(applyProfile({ profileId, env })).unwrap();
+      dispatch(showSuccessToast('Profile applied — versions created as PLANNED'));
+      dispatch(fetchVersions(env));
+      setShowProfilesPanel(false);
+    } catch {
+      dispatch(showErrorToast('Failed to apply profile'));
+    }
+  };
+
+  const addProfileEntry = () => {
+    setProfileForm((prev) => ({
+      ...prev,
+      entries: [...prev.entries, { serviceKey: '', apiVersion: '', releaseVersion: '' }],
+    }));
+  };
+
+  const removeProfileEntry = (idx: number) => {
+    setProfileForm((prev) => ({
+      ...prev,
+      entries: prev.entries.filter((_, i) => i !== idx),
+    }));
+  };
+
+  const updateProfileEntry = (idx: number, field: string, value: string) => {
+    setProfileForm((prev) => ({
+      ...prev,
+      entries: prev.entries.map((e, i) => (i === idx ? { ...e, [field]: value } : e)),
+    }));
+  };
+
   // ── Filtering ──
+
+  const activeServiceCategory = SERVICE_FUNC_CATEGORIES.includes(activeSection as NpmServiceCategory)
+    ? (activeSection as NpmServiceCategory)
+    : null;
 
   const filteredServices = useMemo(() => {
     let filtered = services;
-    if (activeSection !== 'overview' && activeSection !== 'infrastructure' && activeSection !== 'firebase' && activeSection !== 'versions') {
-      filtered = filtered.filter((s) => s.category === activeSection);
+    if (activeServiceCategory) {
+      filtered = filtered.filter((s) => s.category === activeServiceCategory);
     }
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -453,15 +584,23 @@ export default function EnvironmentDetail() {
       );
     }
     return filtered;
-  }, [services, activeSection, searchQuery]);
+  }, [services, activeServiceCategory, searchQuery]);
 
-  const categoryCounts = useMemo(() => {
+  const serviceCategoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const s of services) {
       counts[s.category] = (counts[s.category] || 0) + 1;
     }
     return counts;
   }, [services]);
+
+  const configCategoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const e of configEntries) {
+      counts[e.category] = (counts[e.category] || 0) + 1;
+    }
+    return counts;
+  }, [configEntries]);
 
   // ── Render Sections ──
 
@@ -481,12 +620,12 @@ export default function EnvironmentDetail() {
           <p className="text-2xl font-bold text-gray-900">{firebase ? 'Configured' : 'Not Set'}</p>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <p className="text-sm text-gray-500">Categories</p>
-          <p className="text-2xl font-bold text-gray-900">{Object.keys(categoryCounts).length}</p>
+          <p className="text-sm text-gray-500">Config Entries</p>
+          <p className="text-2xl font-bold text-gray-900">{configEntries.length}</p>
         </div>
       </div>
 
-      {Object.entries(CATEGORY_LABELS).map(([cat, label]) => {
+      {SERVICE_FUNC_CATEGORIES.map((cat) => {
         const catServices = services.filter((s) => s.category === cat);
         if (catServices.length === 0) return null;
         return (
@@ -494,12 +633,12 @@ export default function EnvironmentDetail() {
             <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Badge variant="default" size="sm">
-                  <span className={CATEGORY_COLORS[cat as ServiceCategory]?.split(' ')[1]}>{label}</span>
+                  <span className={SERVICE_FUNC_COLORS[cat]?.split(' ')[1]}>{SERVICE_FUNC_LABELS[cat]}</span>
                 </Badge>
                 <span className="text-sm text-gray-400">{catServices.length} services</span>
               </div>
               <button
-                onClick={() => setActiveSection(cat as ServiceCategory)}
+                onClick={() => setActiveSection(cat)}
                 className="text-sm text-primary-600 hover:text-primary-700"
               >
                 View all
@@ -531,12 +670,12 @@ export default function EnvironmentDetail() {
     <div className="bg-white rounded-lg border border-gray-200">
       <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
         <h3 className="font-medium text-gray-900">
-          {activeSection !== 'overview' && activeSection !== 'infrastructure' && activeSection !== 'firebase'
-            ? CATEGORY_LABELS[activeSection as ServiceCategory]
+          {activeServiceCategory
+            ? SERVICE_FUNC_LABELS[activeServiceCategory]
             : 'All'}{' '}
           Services ({filteredServices.length})
         </h3>
-        <Button size="sm" onClick={() => openAddService(activeSection as ServiceCategory)}>
+        <Button size="sm" onClick={() => openAddService(activeServiceCategory || undefined)}>
           <Plus className="w-4 h-4 mr-1" /> Add
         </Button>
       </div>
@@ -552,6 +691,7 @@ export default function EnvironmentDetail() {
               <tr className="border-b border-gray-100">
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Key</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">URL</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stack</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -584,17 +724,18 @@ export default function EnvironmentDetail() {
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <Badge
-                      variant={
-                        svc.category === 'SPRING' ? 'success' :
-                        svc.category === 'NESTJS' ? 'danger' :
-                        svc.category === 'ELIXIR' ? 'purple' :
-                        svc.category === 'GO' ? 'info' : 'warning'
-                      }
-                      size="sm"
-                    >
-                      {CATEGORY_LABELS[svc.category]}
-                    </Badge>
+                    {SERVICE_STACK_MAP[svc.serviceKey] ? (
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${TECH_STACK_COLORS[SERVICE_STACK_MAP[svc.serviceKey]]}`}>
+                        {TECH_STACK_LABELS[SERVICE_STACK_MAP[svc.serviceKey]]}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-400">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${SERVICE_FUNC_COLORS[svc.category] || 'bg-gray-100 text-gray-700'}`}>
+                      {SERVICE_FUNC_LABELS[svc.category] || svc.category}
+                    </span>
                   </td>
                   <td className="px-4 py-3">
                     <Badge variant={svc.isActive ? 'success' : 'default'} size="sm">
@@ -742,6 +883,95 @@ export default function EnvironmentDetail() {
     </div>
   );
 
+  const activeConfigCategory = CONFIG_CATEGORIES.includes(activeSection as ConfigCategory) ? (activeSection as ConfigCategory) : null;
+
+  const filteredConfigEntries = useMemo(() => {
+    if (!activeConfigCategory) return configEntries;
+    return configEntries.filter((e) => e.category === activeConfigCategory);
+  }, [configEntries, activeConfigCategory]);
+
+  const renderConfigEntries = () => (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="font-medium text-gray-900">
+          {activeConfigCategory ? CONFIG_CATEGORY_LABELS[activeConfigCategory] : 'All Configuration'} ({filteredConfigEntries.length})
+        </h3>
+        <Button size="sm" onClick={openAddConfigEntry}>
+          <Plus className="w-4 h-4 mr-1" /> Add
+        </Button>
+      </div>
+
+      {filteredConfigEntries.length === 0 ? (
+        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
+          No config entries found. Click "Add" to create one.
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg border border-gray-200">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Key</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Secret</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {filteredConfigEntries.map((entry) => (
+                  <tr key={entry.configKey} className="hover:bg-gray-50">
+                    <td className="px-4 py-3">
+                      <div>
+                        <span className="font-medium text-gray-900">{entry.configKey}</span>
+                        {entry.description && (
+                          <p className="text-xs text-gray-400 mt-0.5">{entry.description}</p>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <code className="text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded max-w-xs truncate block">
+                        {entry.configValue}
+                      </code>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full ${CONFIG_CATEGORY_COLORS[entry.category]}`}>
+                        {CONFIG_CATEGORY_LABELS[entry.category]}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {entry.isSecret ? (
+                        <Shield className="w-4 h-4 text-red-500" />
+                      ) : (
+                        <span className="text-gray-300">-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => openEditConfigEntry(entry)}
+                          className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteConfigEntry(entry.configKey)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   const renderVersions = () => (
     <div className="space-y-6">
       {/* Bulk actions bar */}
@@ -754,11 +984,62 @@ export default function EnvironmentDetail() {
           <Button size="sm" variant="secondary" onClick={() => setShowBulkPlanModal(true)}>
             <Plus className="w-4 h-4 mr-1" /> Plan Version
           </Button>
+          <Button size="sm" variant="secondary" onClick={() => setShowProfilesPanel(!showProfilesPanel)}>
+            <Layers className="w-4 h-4 mr-1" /> Profiles
+          </Button>
           <Button size="sm" variant="success" onClick={handleBulkActivate}>
             <Play className="w-4 h-4 mr-1" /> Activate All Ready
           </Button>
         </div>
       </div>
+
+      {/* Profiles Panel */}
+      {showProfilesPanel && (
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Layers className="w-4 h-4 text-purple-500" />
+              <span className="font-medium text-gray-900">Version Profiles</span>
+            </div>
+            <Button size="sm" variant="primary" onClick={() => setShowCreateProfileModal(true)}>
+              <Plus className="w-4 h-4 mr-1" /> Create Profile
+            </Button>
+          </div>
+          {profiles.length === 0 ? (
+            <p className="text-sm text-gray-400">No profiles yet. Create one to save a reusable version template.</p>
+          ) : (
+            <div className="space-y-3">
+              {profiles.map((profile) => (
+                <div key={profile.id} className="border border-gray-100 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <span className="font-medium text-gray-900 text-sm">{profile.name}</span>
+                      {profile.description && (
+                        <p className="text-xs text-gray-500 mt-0.5">{profile.description}</p>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="success"
+                      onClick={() => handleApplyProfile(profile.id)}
+                      loading={versionSaveLoading}
+                    >
+                      <Play className="w-3.5 h-3.5 mr-1" /> Apply to {env}
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {profile.entries.map((entry) => (
+                      <span key={entry.id} className="inline-flex items-center px-2 py-0.5 text-xs bg-gray-50 text-gray-600 rounded">
+                        {entry.serviceKey} <code className="ml-1 text-purple-600">{entry.apiVersion}</code>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Global Config Section */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
@@ -890,6 +1171,12 @@ export default function EnvironmentDetail() {
   );
 
   const renderContent = () => {
+    if (activeServiceCategory) {
+      return renderServicesTable();
+    }
+    if (activeConfigCategory || activeSection === 'config-entries') {
+      return renderConfigEntries();
+    }
     switch (activeSection) {
       case 'overview':
         return renderOverview();
@@ -900,7 +1187,7 @@ export default function EnvironmentDetail() {
       case 'versions':
         return renderVersions();
       default:
-        return renderServicesTable();
+        return renderOverview();
     }
   };
 
@@ -942,39 +1229,60 @@ export default function EnvironmentDetail() {
           </div>
 
           <ul className="space-y-0.5">
-            {SECTIONS.map(({ key, label }) => (
-              <li key={key}>
-                <button
-                  onClick={() => setActiveSection(key)}
-                  className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg transition-colors ${
-                    activeSection === key
-                      ? 'bg-primary-50 text-primary-700 font-medium'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    {key === 'overview' && <LayoutGrid className="w-4 h-4" />}
-                    {key === 'infrastructure' && <Server className="w-4 h-4" />}
-                    {key === 'firebase' && <FlameIcon className="w-4 h-4" />}
-                    {key === 'versions' && <GitBranch className="w-4 h-4" />}
-                    {key !== 'overview' && key !== 'infrastructure' && key !== 'firebase' && key !== 'versions' && (
-                      <span
-                        className={`w-2 h-2 rounded-full ${
-                          CATEGORY_COLORS[key as ServiceCategory]?.split(' ')[0] || 'bg-gray-300'
-                        }`}
-                      />
-                    )}
-                    <span>{label}</span>
-                  </div>
-                  {key === 'versions' && (
-                    <span className="text-xs text-gray-400">{versions.length}</span>
-                  )}
-                  {key !== 'overview' && key !== 'infrastructure' && key !== 'firebase' && key !== 'versions' && (
-                    <span className="text-xs text-gray-400">{categoryCounts[key] || 0}</span>
-                  )}
-                </button>
+            {/* Overview */}
+            <li>
+              <button onClick={() => setActiveSection('overview')} className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg transition-colors ${activeSection === 'overview' ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
+                <div className="flex items-center gap-2"><LayoutGrid className="w-4 h-4" /><span>Overview</span></div>
+              </button>
+            </li>
+
+            {/* Services — grouped by functional category */}
+            {SERVICE_FUNC_GROUPS.map((group) => (
+              <li key={group.label}>
+                <p className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">{group.label}</p>
+                <ul className="space-y-0.5">
+                  {group.categories.map((cat) => (
+                    <li key={cat}>
+                      <button onClick={() => setActiveSection(cat)} className={`w-full flex items-center justify-between px-3 py-1.5 text-sm rounded-lg transition-colors ${activeSection === cat ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full ${SERVICE_FUNC_COLORS[cat]?.split(' ')[0] || 'bg-gray-300'}`} />
+                          <span>{SERVICE_FUNC_LABELS[cat]}</span>
+                        </div>
+                        <span className="text-xs text-gray-400">{serviceCategoryCounts[cat] || 0}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               </li>
             ))}
+
+            {/* Configuration — grouped categories */}
+            {CONFIG_SIDEBAR_GROUPS.map((group) => (
+              <li key={group.label}>
+                <p className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">{group.label}</p>
+                <ul className="space-y-0.5">
+                  {group.categories.map((cat) => (
+                    <li key={cat}>
+                      <button onClick={() => setActiveSection(cat)} className={`w-full flex items-center justify-between px-3 py-1.5 text-sm rounded-lg transition-colors ${activeSection === cat ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full ${CONFIG_CATEGORY_COLORS[cat]?.split(' ')[0] || 'bg-gray-300'}`} />
+                          <span>{CONFIG_CATEGORY_LABELS[cat]}</span>
+                        </div>
+                        <span className="text-xs text-gray-400">{configCategoryCounts[cat] || 0}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+
+            {/* Versions */}
+            <li>
+              <button onClick={() => setActiveSection('versions')} className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg transition-colors ${activeSection === 'versions' ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
+                <div className="flex items-center gap-2"><GitBranch className="w-4 h-4" /><span>Versions</span></div>
+                <span className="text-xs text-gray-400">{versions.length}</span>
+              </button>
+            </li>
           </ul>
         </div>
 
@@ -1007,8 +1315,8 @@ export default function EnvironmentDetail() {
                 disabled
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500"
               />
-            ) : availableServices.filter((s) => s.category === serviceForm.category).length === 0 ? (
-              <p className="text-sm text-gray-500 py-2">All {CATEGORY_LABELS[serviceForm.category]} services have been added.</p>
+            ) : availableServices.length === 0 ? (
+              <p className="text-sm text-gray-500 py-2">All services have been added.</p>
             ) : (
               <select
                 value={serviceForm.serviceKey}
@@ -1022,7 +1330,7 @@ export default function EnvironmentDetail() {
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
-                {availableServices.filter((s) => s.category === serviceForm.category).map((s) => (
+                {availableServices.map((s) => (
                   <option key={s.key} value={s.key}>{s.label} ({s.key})</option>
                 ))}
               </select>
@@ -1030,12 +1338,15 @@ export default function EnvironmentDetail() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-            <input
-              type="text"
-              value={CATEGORY_LABELS[serviceForm.category] || serviceForm.category}
-              disabled
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500"
-            />
+            <select
+              value={serviceForm.category}
+              onChange={(e) => setServiceForm({ ...serviceForm, category: e.target.value as NpmServiceCategory })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              {SERVICE_FUNC_CATEGORIES.map((cat) => (
+                <option key={cat} value={cat}>{SERVICE_FUNC_LABELS[cat]}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">URL</label>
@@ -1201,6 +1512,88 @@ export default function EnvironmentDetail() {
         </div>
       </Modal>
 
+      {/* ── Config Entry Modal ── */}
+      <Modal
+        isOpen={showConfigEntryModal}
+        onClose={() => {
+          setShowConfigEntryModal(false);
+          setEditingConfigEntry(null);
+        }}
+        title={editingConfigEntry ? 'Edit Config Entry' : 'Add Config Entry'}
+        size="lg"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Config Key</label>
+            <input
+              type="text"
+              value={configEntryForm.configKey}
+              onChange={(e) => setConfigEntryForm({ ...configEntryForm, configKey: e.target.value })}
+              disabled={!!editingConfigEntry}
+              placeholder="DB_PASSWORD"
+              className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ${editingConfigEntry ? 'bg-gray-100 text-gray-500' : ''}`}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+            <select
+              value={configEntryForm.category}
+              onChange={(e) => setConfigEntryForm({ ...configEntryForm, category: e.target.value as ConfigCategory })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              {CONFIG_CATEGORY_GROUPS.map((group) => (
+                <optgroup key={group.label} label={group.label}>
+                  {group.categories.map((cat) => (
+                    <option key={cat} value={cat}>{CONFIG_CATEGORY_LABELS[cat]}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Value</label>
+            <input
+              type={configEntryForm.isSecret ? 'password' : 'text'}
+              value={configEntryForm.configValue}
+              onChange={(e) => setConfigEntryForm({ ...configEntryForm, configValue: e.target.value })}
+              placeholder={editingConfigEntry?.isSecret ? 'Leave blank to keep current value' : 'Enter value'}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setConfigEntryForm({ ...configEntryForm, isSecret: !configEntryForm.isSecret })}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${configEntryForm.isSecret ? 'bg-red-500' : 'bg-gray-200'}`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${configEntryForm.isSecret ? 'translate-x-6' : 'translate-x-1'}`}
+              />
+            </button>
+            <span className="text-sm text-gray-700 flex items-center gap-1">
+              {configEntryForm.isSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              Secret value
+            </span>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <input
+              type="text"
+              value={configEntryForm.description}
+              onChange={(e) => setConfigEntryForm({ ...configEntryForm, description: e.target.value })}
+              placeholder="Brief description"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="secondary" onClick={() => { setShowConfigEntryModal(false); setEditingConfigEntry(null); }}>Cancel</Button>
+            <Button onClick={handleSaveConfigEntry} loading={saveLoading}>
+              {editingConfigEntry ? 'Update' : 'Create'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
       {/* ── Import Modal ── */}
       <Modal
         isOpen={showImportModal}
@@ -1345,6 +1738,86 @@ export default function EnvironmentDetail() {
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="secondary" onClick={() => setShowGlobalConfigModal(false)}>Cancel</Button>
             <Button onClick={handleSaveGlobalConfig} loading={versionSaveLoading}>Save</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Create Profile Modal ── */}
+      <Modal
+        isOpen={showCreateProfileModal}
+        onClose={() => setShowCreateProfileModal(false)}
+        title="Create Version Profile"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Profile Name</label>
+            <input
+              type="text"
+              value={profileForm.name}
+              onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+              placeholder="e.g. v1-baseline"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <input
+              type="text"
+              value={profileForm.description}
+              onChange={(e) => setProfileForm({ ...profileForm, description: e.target.value })}
+              placeholder="Optional description"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">Entries</label>
+              <button onClick={addProfileEntry} className="text-xs text-primary-600 hover:text-primary-700 font-medium">
+                + Add Entry
+              </button>
+            </div>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {profileForm.entries.map((entry, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <select
+                    value={entry.serviceKey}
+                    onChange={(e) => updateProfileEntry(idx, 'serviceKey', e.target.value)}
+                    className="flex-1 px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">Service...</option>
+                    {SERVICE_REGISTRY.map((s) => (
+                      <option key={s.key} value={s.key}>{s.label}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    value={entry.apiVersion}
+                    onChange={(e) => updateProfileEntry(idx, 'apiVersion', e.target.value)}
+                    placeholder="API ver"
+                    className="w-20 px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                  <input
+                    type="text"
+                    value={entry.releaseVersion}
+                    onChange={(e) => updateProfileEntry(idx, 'releaseVersion', e.target.value)}
+                    placeholder="Release"
+                    className="w-24 px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                  {profileForm.entries.length > 1 && (
+                    <button
+                      onClick={() => removeProfileEntry(idx)}
+                      className="p-1 text-gray-400 hover:text-red-500"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="secondary" onClick={() => setShowCreateProfileModal(false)}>Cancel</Button>
+            <Button onClick={handleCreateProfile} loading={versionSaveLoading}>Create Profile</Button>
           </div>
         </div>
       </Modal>

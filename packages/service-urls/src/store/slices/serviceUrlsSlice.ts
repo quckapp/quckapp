@@ -5,14 +5,17 @@ import type {
   ServiceUrlConfig,
   InfrastructureConfig,
   FirebaseConfig,
+  ConfigEntry,
   EnvironmentSummary,
-  ServiceCategory,
+  NpmServiceCategory,
+  ConfigCategory,
 } from '../../types';
 
 interface ServiceUrlsState {
   services: ServiceUrlConfig[];
   infrastructure: InfrastructureConfig[];
   firebase: FirebaseConfig | null;
+  configEntries: ConfigEntry[];
   summaries: EnvironmentSummary[];
   loading: boolean;
   saveLoading: boolean;
@@ -23,6 +26,7 @@ const initialState: ServiceUrlsState = {
   services: [],
   infrastructure: [],
   firebase: null,
+  configEntries: [],
   summaries: [],
   loading: false,
   saveLoading: false,
@@ -45,7 +49,7 @@ export const fetchSummaries = createAsyncThunk(
 
 export const fetchServices = createAsyncThunk(
   'serviceUrls/fetchServices',
-  async ({ env, category }: { env: Environment; category?: ServiceCategory }) => {
+  async ({ env, category }: { env: Environment; category?: NpmServiceCategory }) => {
     const params = category ? { category } : {};
     const response = await api.get(`${BASE}/${env}/services`, { params });
     return response.data.data;
@@ -128,6 +132,41 @@ export const upsertFirebase = createAsyncThunk(
   }
 );
 
+// ── Config Entries ──
+
+export const fetchConfigEntries = createAsyncThunk(
+  'serviceUrls/fetchConfigEntries',
+  async ({ env, category }: { env: Environment; category?: ConfigCategory }) => {
+    const params = category ? { category } : {};
+    const response = await api.get(`${BASE}/${env}/config-entries`, { params });
+    return response.data.data;
+  }
+);
+
+export const createConfigEntry = createAsyncThunk(
+  'serviceUrls/createConfigEntry',
+  async ({ env, data }: { env: Environment; data: Partial<ConfigEntry> }) => {
+    const response = await api.post(`${BASE}/${env}/config-entries`, data);
+    return response.data.data;
+  }
+);
+
+export const updateConfigEntry = createAsyncThunk(
+  'serviceUrls/updateConfigEntry',
+  async ({ env, configKey, data }: { env: Environment; configKey: string; data: Partial<ConfigEntry> }) => {
+    const response = await api.put(`${BASE}/${env}/config-entries/${configKey}`, data);
+    return response.data.data;
+  }
+);
+
+export const deleteConfigEntry = createAsyncThunk(
+  'serviceUrls/deleteConfigEntry',
+  async ({ env, configKey }: { env: Environment; configKey: string }) => {
+    await api.delete(`${BASE}/${env}/config-entries/${configKey}`);
+    return configKey;
+  }
+);
+
 // ── Bulk Operations ──
 
 export const bulkExport = createAsyncThunk(
@@ -183,6 +222,7 @@ const serviceUrlsSlice = createSlice({
       state.services = [];
       state.infrastructure = [];
       state.firebase = null;
+      state.configEntries = [];
     },
   },
   extraReducers: (builder) => {
@@ -291,6 +331,52 @@ const serviceUrlsSlice = createSlice({
       // Delete infra
       .addCase(deleteInfrastructure.fulfilled, (state, action) => {
         state.infrastructure = state.infrastructure.filter((i) => i.infraKey !== action.payload);
+      })
+
+      // Config Entries
+      .addCase(fetchConfigEntries.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchConfigEntries.fulfilled, (state, action) => {
+        state.loading = false;
+        state.configEntries = action.payload;
+      })
+      .addCase(fetchConfigEntries.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || 'Failed to fetch config entries';
+      })
+
+      // Create config entry
+      .addCase(createConfigEntry.pending, (state) => {
+        state.saveLoading = true;
+      })
+      .addCase(createConfigEntry.fulfilled, (state, action) => {
+        state.saveLoading = false;
+        state.configEntries.push(action.payload);
+      })
+      .addCase(createConfigEntry.rejected, (state, action) => {
+        state.saveLoading = false;
+        state.error = action.error.message || 'Failed to create config entry';
+      })
+
+      // Update config entry
+      .addCase(updateConfigEntry.pending, (state) => {
+        state.saveLoading = true;
+      })
+      .addCase(updateConfigEntry.fulfilled, (state, action) => {
+        state.saveLoading = false;
+        const idx = state.configEntries.findIndex((e) => e.configKey === action.payload.configKey);
+        if (idx !== -1) state.configEntries[idx] = action.payload;
+      })
+      .addCase(updateConfigEntry.rejected, (state, action) => {
+        state.saveLoading = false;
+        state.error = action.error.message || 'Failed to update config entry';
+      })
+
+      // Delete config entry
+      .addCase(deleteConfigEntry.fulfilled, (state, action) => {
+        state.configEntries = state.configEntries.filter((e) => e.configKey !== action.payload);
       })
 
       // Firebase

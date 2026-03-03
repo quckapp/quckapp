@@ -39,6 +39,11 @@ func main() {
 		&model.InfrastructureConfig{},
 		&model.FirebaseConfig{},
 		&model.ApiKey{},
+		&model.ConfigEntry{},
+		&model.VersionConfig{},
+		&model.GlobalVersionConfig{},
+		&model.VersionProfile{},
+		&model.VersionProfileEntry{},
 	); err != nil {
 		logger.Fatalf("Failed to migrate database: %v", err)
 	}
@@ -50,15 +55,21 @@ func main() {
 	infraRepo := repository.NewInfrastructureRepository(db)
 	firebaseRepo := repository.NewFirebaseRepository(db)
 	apiKeyRepo := repository.NewApiKeyRepository(db)
+	configEntryRepo := repository.NewConfigEntryRepository(db)
+	versionRepo := repository.NewVersionRepository(db)
+	versionProfileRepo := repository.NewVersionProfileRepository(db)
 
-	configSvc := service.NewConfigService(serviceUrlRepo, infraRepo, firebaseRepo)
+	configSvc := service.NewConfigService(serviceUrlRepo, infraRepo, firebaseRepo, configEntryRepo)
 	serviceUrlSvc := service.NewServiceUrlService(serviceUrlRepo)
 	infraSvc := service.NewInfrastructureService(infraRepo)
 	firebaseSvc := service.NewFirebaseService(firebaseRepo)
+	configEntrySvc := service.NewConfigEntryService(configEntryRepo)
+	versionSvc := service.NewVersionService(versionRepo, versionProfileRepo)
+	versionProfileSvc := service.NewVersionProfileService(versionProfileRepo, versionRepo)
 	authSvc := service.NewAuthService(cfg.JWTSecret)
 
 	configHandler := handler.NewConfigHandler(configSvc)
-	adminHandler := handler.NewAdminHandler(serviceUrlSvc, infraSvc, firebaseSvc, configSvc)
+	adminHandler := handler.NewAdminHandler(serviceUrlSvc, infraSvc, firebaseSvc, configSvc, configEntrySvc, versionSvc, versionProfileSvc)
 	authHandler := handler.NewAuthHandler(authSvc)
 
 	router := gin.New()
@@ -111,9 +122,37 @@ func main() {
 				env.GET("/firebase", adminHandler.GetFirebase)
 				env.PUT("/firebase", adminHandler.UpsertFirebase)
 
+				env.GET("/config-entries", adminHandler.ListConfigEntries)
+				env.POST("/config-entries", adminHandler.CreateConfigEntry)
+				env.PUT("/config-entries/:configKey", adminHandler.UpdateConfigEntry)
+				env.DELETE("/config-entries/:configKey", adminHandler.DeleteConfigEntry)
+
 				env.GET("/export", adminHandler.Export)
 				env.POST("/import", adminHandler.Import)
+
+				// Version management
+				env.GET("/versions", adminHandler.ListVersions)
+				env.POST("/versions", adminHandler.CreateVersion)
+				env.POST("/versions/bulk-plan", adminHandler.BulkPlanVersions)
+				env.POST("/versions/bulk-activate", adminHandler.BulkActivateVersions)
+				env.DELETE("/versions/:serviceKey/:ver", adminHandler.DeleteVersion)
+				env.POST("/versions/:serviceKey/:ver/ready", adminHandler.MarkVersionReady)
+				env.POST("/versions/:serviceKey/:ver/activate", adminHandler.ActivateVersion)
+				env.POST("/versions/:serviceKey/:ver/deprecate", adminHandler.DeprecateVersion)
+				env.POST("/versions/:serviceKey/:ver/disable", adminHandler.DisableVersion)
+
+				// Global config
+				env.GET("/global-config", adminHandler.GetGlobalConfig)
+				env.PUT("/global-config", adminHandler.UpdateGlobalConfig)
+
+				// Export env file
+				env.GET("/export/env-file", adminHandler.ExportEnvFile)
 			}
+
+			// Version profiles (not env-scoped)
+			su.GET("/profiles", adminHandler.ListProfiles)
+			su.POST("/profiles", adminHandler.CreateProfile)
+			su.POST("/profiles/:profileId/apply/:env", adminHandler.ApplyProfile)
 		}
 	}
 

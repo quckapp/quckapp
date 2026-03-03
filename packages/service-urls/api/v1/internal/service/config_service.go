@@ -8,20 +8,23 @@ import (
 )
 
 type ConfigService struct {
-	serviceUrlRepo *repository.ServiceUrlRepository
-	infraRepo      *repository.InfrastructureRepository
-	firebaseRepo   *repository.FirebaseRepository
+	serviceUrlRepo   *repository.ServiceUrlRepository
+	infraRepo        *repository.InfrastructureRepository
+	firebaseRepo     *repository.FirebaseRepository
+	configEntryRepo  *repository.ConfigEntryRepository
 }
 
 func NewConfigService(
 	serviceUrlRepo *repository.ServiceUrlRepository,
 	infraRepo *repository.InfrastructureRepository,
 	firebaseRepo *repository.FirebaseRepository,
+	configEntryRepo *repository.ConfigEntryRepository,
 ) *ConfigService {
 	return &ConfigService{
-		serviceUrlRepo: serviceUrlRepo,
-		infraRepo:      infraRepo,
-		firebaseRepo:   firebaseRepo,
+		serviceUrlRepo:  serviceUrlRepo,
+		infraRepo:       infraRepo,
+		firebaseRepo:    firebaseRepo,
+		configEntryRepo: configEntryRepo,
 	}
 }
 
@@ -57,6 +60,15 @@ func (s *ConfigService) GetFlatConfig(env string) (map[string]string, error) {
 		result["FIREBASE_CLIENT_EMAIL"] = fb.ClientEmail
 		result["FIREBASE_PRIVATE_KEY"] = fb.PrivateKey
 		result["FIREBASE_STORAGE_BUCKET"] = fb.StorageBucket
+	}
+
+	// Config entries loaded last — can override any colliding keys (intentional escape hatch)
+	entries, err := s.configEntryRepo.FindAllActiveByEnv(env)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load config entries: %w", err)
+	}
+	for _, e := range entries {
+		result[e.ConfigKey] = e.ConfigValue
 	}
 
 	return result, nil
